@@ -64,7 +64,7 @@ def PP_vals(cdf, x_samples, alphas):
     - alphas: array of values to evaluate the PP-vals 
     """
     F = cdf(x_samples).detach().numpy()
-    z = [np.sum(F < alpha) / x_samples.shape[0] for alpha in alphas]
+    z = [np.mean(F < alpha)  for alpha in alphas]
     return z
 
 

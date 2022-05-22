@@ -6,19 +6,20 @@ import numpy as np
 import torch.distributions as D
 import seaborn as sns
 
-def plot_pdf_1D(target_dist, x_samples, x_i, x_f, flow=None):
+def plot_pdf_1D(x_samples, x_i, x_f, target_dist=None, flow=None):
     eval_x = torch.linspace(x_i, x_f).reshape(-1,1)
 
     fig = plt.figure(figsize=(6, 2))
     plt.plot(x_samples, np.zeros_like(x_samples), 'bx', alpha=0.5, markerfacecolor='none', markersize=6)
     
-    try:
-        p_x_true = torch.exp(target_dist.log_prob(eval_x))
-        plt.plot(eval_x.numpy(), p_x_true.detach().numpy(),'--', color='blue')
-    except ValueError:  # in case of exponential distribution 
-        eval_x_pos = torch.linspace(0.01, x_f).reshape(-1,1)
-        p_x_true = torch.exp(target_dist.log_prob(eval_x_pos))
-        plt.plot(eval_x_pos.numpy(), p_x_true.detach().numpy(),'--', color='blue')
+    if target_dist is not None:
+        try:
+            p_x_true = torch.exp(target_dist.log_prob(eval_x))
+            plt.plot(eval_x.numpy(), p_x_true.detach().numpy(),'--', color='blue')
+        except ValueError:  # in case of exponential distribution 
+            eval_x_pos = torch.linspace(0.01, x_f).reshape(-1,1)
+            p_x_true = torch.exp(target_dist.log_prob(eval_x_pos))
+            plt.plot(eval_x_pos.numpy(), p_x_true.detach().numpy(),'--', color='blue')
 
     if flow is not None:
         p_x_learned = torch.exp(flow.log_prob(eval_x))

@@ -6,28 +6,37 @@ import numpy as np
 import torch.distributions as D
 import seaborn as sns
 
-def plot_pdf_1D(x_samples, x_i, x_f, target_dist=None, flow=None):
+def plot_pdf_1D(x_samples, x_i, x_f, target_dist=None, flows=None, context=None):
+    """`flows` must be a dict with the plot-label as key_name and 3 elements: (flow, context, plot-color). """
     eval_x = torch.linspace(x_i, x_f).reshape(-1,1)
+    if context is not None:
+        context = context.repeat(eval_x.size(0),1)
 
     fig = plt.figure(figsize=(6, 2))
     plt.plot(x_samples, np.zeros_like(x_samples), 'bx', alpha=0.5, markerfacecolor='none', markersize=6)
+    labels=['Samples']
     
     if target_dist is not None:
+        labels+=['True']
         try:
-            p_x_true = torch.exp(target_dist.log_prob(eval_x))
+            p_x_true = torch.exp(target_dist.log_prob(eval_x, context=context))
             plt.plot(eval_x.numpy(), p_x_true.detach().numpy(),'--', color='blue')
         except ValueError:  # in case of exponential distribution 
             eval_x_pos = torch.linspace(0.01, x_f).reshape(-1,1)
-            p_x_true = torch.exp(target_dist.log_prob(eval_x_pos))
+            p_x_true = torch.exp(target_dist.log_prob(eval_x_pos, context=context))
             plt.plot(eval_x_pos.numpy(), p_x_true.detach().numpy(),'--', color='blue')
 
-    if flow is not None:
-        p_x_learned = torch.exp(flow.log_prob(eval_x))
-        plt.plot(eval_x.numpy(), p_x_learned.detach().numpy(), color='orange')
+    if flows is not None:
+        for flow, ct, col in list(flows.values()):
+            if ct is not None:
+                ct = ct.repeat(eval_x.size(0),1)
+            p_x_learned = torch.exp(flow.log_prob(eval_x, context=ct))
+            plt.plot(eval_x.numpy(), p_x_learned.detach().numpy(), color=col)
+        labels += list(flows.keys())
+    
+    plt.legend(labels)
 
-    plt.legend(["Samples", "True", "Learned"], loc="upper right")
-
-    _ = plt.xlim([x_i, x_f]); _ = plt.ylim([-0.12, 3.2])
+    _ = plt.xlim([x_i, x_f]); _ = plt.ylim([-0.12, 1.2])
 
     plt.show()
 

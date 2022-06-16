@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import torch.distributions as D
 
 from nflows.flows import Flow
 import nflows.distributions as distributions
@@ -111,3 +112,7 @@ def construct_nsf(
 
 def count_parameters(model): 
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+# CDF function of a (conditional) flow evaluated in x: F_{Q|context}(x)
+def cdf_flow(x, context, flow, base_dist = D.Normal(0,1)): 
+    return base_dist.cdf(flow._transform(x, context=context)[0])

@@ -105,10 +105,12 @@ from matplotlib.lines import Line2D
 # 2D distributions: Evaluate the learnt transformation by plotting the learnt 2D pdf-contours
 # against the true pdf-contours and the training samples (drawn from the true distribution)
 def plot_2d_pdf_contours(
-    target_dist, flow, x_samples=None, title=None, n=500, gaussian=False
+    target_dist, flow, context=None, x_samples=None, title=None, n=500, gaussian=False
 ):
     x_true = target_dist.sample((n,))  # Sample from groundtruth
-    x_learned = flow.sample(n).detach().numpy()  # Sample from learned
+    x_learned = flow.sample(n, context=context).detach().numpy()  # Sample from learned
+    if context is not None:
+        x_learned = x_learned[0]
     if x_samples is not None:
         plt.scatter(
             x=x_samples[:, 0], y=x_samples[:, 1], color="blue", label="Samples"
@@ -127,7 +129,7 @@ def plot_2d_pdf_contours(
         ]
     )
 
-    plt.legend(handles=handles, loc="upper right")
+    plt.legend(handles=handles)
 
     if gaussian:
         means_learned = np.mean(x_learned, axis=0)  # Learned mean
@@ -158,7 +160,7 @@ def get_grid(low, high, n_samples=1000):
     return samples, XX, YY
 
 
-def plot_2d_pdf_on_grid(pdf, low, high, ground_truth=None):
+def plot_2d_pdf_on_grid(pdf, low, high):
     """Plot analytic and learned posterior on grid returned by the function get_grid() above.
 
     Parameters
@@ -181,8 +183,4 @@ def plot_2d_pdf_on_grid(pdf, low, high, ground_truth=None):
         cmap="Blues",
         zorder=0,
     )
-    if ground_truth is not None:
-        plt.scatter(
-            ground_truth[0], ground_truth[1], marker="*", color="red", s=100, zorder=1
-        )
-    plt.show()
+    # plt.show()

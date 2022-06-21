@@ -13,7 +13,9 @@ from scipy.stats import norm
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 ## BASELINE
-def localPIT_regression_baseline(alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF):
+def localPIT_regression_baseline(
+    alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF
+):
     """Method 1: Algorithm from [Zhao et. al, UAI 2021]: https://arxiv.org/abs/2102.10473"""
 
     r_alpha_test = {}  # evaluated classifiers for each alpha
@@ -34,10 +36,13 @@ def localPIT_regression_baseline(alphas, pit_values_train, x_train, x_eval, clas
 
     return r_alpha_test, accuracies
 
+
 # AMORTIZED IN ALPHA
-def localPIT_regression_grid(alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF, train=True):
+def localPIT_regression_grid(
+    alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF, train=True
+):
     """Method 2: Train the Classifier amortized on x and all alpha"""
-    
+
     # train features: all alpha and x
     T = len(alphas)
     train_features = []
@@ -72,7 +77,15 @@ def localPIT_regression_grid(alphas, pit_values_train, x_train, x_eval, classifi
     return r_alpha_test, train_accuracy, clf.loss_curve_, clf
 
 
-def localPIT_regression_sample(alphas, pit_values_train, x_train, x_eval, nb_samples=1, classifier=DEFAULT_CLF, train=True):
+def localPIT_regression_sample(
+    alphas,
+    pit_values_train,
+    x_train,
+    x_eval,
+    nb_samples=1,
+    classifier=DEFAULT_CLF,
+    train=True,
+):
     """METHOD 3: Train the Classifier amortized on x and sampled alpha"""
     train_features = []
     W_a_train = []
@@ -82,9 +95,9 @@ def localPIT_regression_sample(alphas, pit_values_train, x_train, x_eval, nb_sam
         train_features += [np.concatenate([x_rep, alphas_sample], axis=1)]
         # train labels W_alpha(z)
         W_a_train += [1 * (z <= alpha) for alpha in alphas_sample]
-        
+
     train_features = np.row_stack(train_features)
-    W_a_train  = np.row_stack(W_a_train)
+    W_a_train = np.row_stack(W_a_train)
 
     if train:
         # define classifier
@@ -99,7 +112,7 @@ def localPIT_regression_sample(alphas, pit_values_train, x_train, x_eval, nb_sam
     for alpha in alphas:
         test_features = np.concatenate([x_eval, np.array(alpha).reshape(-1, 1)], axis=1)
         r_alpha_test[alpha] = clf.predict_proba(test_features)[:, 1][0]
-    
+
     return r_alpha_test, train_accuracy, clf.loss_curve_, clf
 
 
@@ -109,16 +122,28 @@ cdf_flow = lambda x, context, flow: D.Normal(0, 1).cdf(
 )
 
 
-def run_localPIT_regression(methods, x_evals, nb_train_samples, alpha_samples, joint_data_generator, flow, feature_transform, samples_train = None):
+def run_localPIT_regression(
+    methods,
+    x_evals,
+    nb_train_samples,
+    alpha_samples,
+    joint_data_generator,
+    flow,
+    feature_transform,
+    samples_train=None,
+):
     # Training set for regression task
     if samples_train is not None:
         x_train_PIT, theta_train_PIT = samples_train
     else:
         # Generate samples from the joint !
         x_train_PIT, theta_train_PIT = joint_data_generator(n=nb_train_samples)
-        x_train_PIT, theta_train_PIT = torch.FloatTensor(x_train_PIT), torch.FloatTensor(theta_train_PIT)
+        x_train_PIT, theta_train_PIT = (
+            torch.FloatTensor(x_train_PIT),
+            torch.FloatTensor(theta_train_PIT),
+        )
     samples_train_new = (x_train_PIT, theta_train_PIT)
-    
+
     # Compute the PIT-values [PIT(Theta_i, X_i, flow)]
     pit_values_train = np.array(
         [
@@ -129,40 +154,46 @@ def run_localPIT_regression(methods, x_evals, nb_train_samples, alpha_samples, j
 
     r_alpha_learned = {}
     true_pit_values = {}
-    for i,x_eval in enumerate(x_evals):
-        method_kwargs = {'pit_values_train':pit_values_train, 'x_train':x_train_PIT, 'x_eval':x_eval}
-        
+    for i, x_eval in enumerate(x_evals):
+        method_kwargs = {
+            "pit_values_train": pit_values_train,
+            "x_train": x_train_PIT,
+            "x_eval": x_eval,
+        }
+
         # samples from the true distribution
         samples_theta_x = torch.FloatTensor(
             norm(loc=x_eval[:, 0] + x_eval[:, 1], scale=1).rvs(nb_train_samples)
         ).reshape(-1, 1)
-        # true PIT-values 
+        # true PIT-values
         true_pit_values[i] = (
-            cdf_flow(samples_theta_x, context=feature_transform(x_eval), flow=flow).detach().numpy()
+            cdf_flow(samples_theta_x, context=feature_transform(x_eval), flow=flow)
+            .detach()
+            .numpy()
         )
 
         r_alpha_x_eval = []
         labels = []
         for method in methods:
-            if 'baseline' in str(method):
-                alphas = np.linspace(0,0.99,100)
-                method_kwargs['alphas']=alphas
+            if "baseline" in str(method):
+                alphas = np.linspace(0, 0.99, 100)
+                method_kwargs["alphas"] = alphas
                 r_alpha_test, _ = method(**method_kwargs)
                 r_alpha_x_eval.append(r_alpha_test)
-                labels.append('baseline')
+                labels.append("baseline")
             else:
-                alphas = np.linspace(0,0.999,100)
-                method_kwargs['alphas']=alphas
-                if 'sample' in str(method):
+                alphas = np.linspace(0, 0.999, 100)
+                method_kwargs["alphas"] = alphas
+                if "sample" in str(method):
                     for ns in alpha_samples:
-                        method_kwargs['nb_samples'] = ns
+                        method_kwargs["nb_samples"] = ns
                         r_alpha_test, _, _, _ = method(**method_kwargs)
                         r_alpha_x_eval.append(r_alpha_test)
-                        labels.append(f'sample (T={ns})')
+                        labels.append(f"sample (T={ns})")
                 else:
                     r_alpha_test, _, _, _ = method(**method_kwargs)
                     r_alpha_x_eval.append(r_alpha_test)
-                    labels.append(f'grid (T=100)')
+                    labels.append(f"grid (T=100)")
         r_alpha_learned[i] = r_alpha_x_eval
 
     return r_alpha_learned, labels, true_pit_values, samples_train_new

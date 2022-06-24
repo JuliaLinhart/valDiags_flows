@@ -4,8 +4,40 @@ import pandas as pd
 
 import sys
 
+import torch.distributions as D
+
 sys.path.append("../")
 from nde.flows import cdf_flow
+
+
+def multi_cde_pit_values(
+    samples_theta, samples_x, flow, feature_transform, local=False
+):
+    dim = samples_theta.shape[-1]
+    pit_values = []
+    for i in range(dim):
+        if local:
+            conditional_transform_1d = (
+                D.Normal(0, 1)
+                .cdf(
+                    flow._transform(samples_theta, context=feature_transform(samples_x))
+                )
+                .detach()
+                .numpy()
+            )
+        else:
+            conditional_transform_1d = np.array(
+                [
+                    D.Normal(0, 1)
+                    .cdf(flow._transform(samples_theta[j][None], context=x)[0][:, i])
+                    .detach()
+                    .numpy()
+                    for j, x in enumerate(feature_transform(samples_x))
+                ]
+            )
+        pit_values.append(conditional_transform_1d)
+
+    return pit_values
 
 
 def cde_pit_values(samples_theta, samples_x, flow, feature_transform, local=False):
@@ -19,13 +51,7 @@ def cde_pit_values(samples_theta, samples_x, flow, feature_transform, local=Fals
     else:
         pit_values = np.array(
             [
-                cdf_flow(
-                    samples_theta[i][None],
-                    context=x,
-                    flow=flow,
-                )
-                .detach()
-                .numpy()
+                cdf_flow(samples_theta[i][None], context=x, flow=flow).detach().numpy()
                 for i, x in enumerate(feature_transform(samples_x))
             ]
         )

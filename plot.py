@@ -105,29 +105,35 @@ from matplotlib.lines import Line2D
 # 2D distributions: Evaluate the learnt transformation by plotting the learnt 2D pdf-contours
 # against the true pdf-contours and the training samples (drawn from the true distribution)
 def plot_2d_pdf_contours(
-    target_dist, flow, context=None, x_samples=None, title=None, n=500, gaussian=False
+    target_dist, flows, x_samples=None, title=None, n=500, gaussian=False
 ):
-    x_true = target_dist.sample((n,))  # Sample from groundtruth
-    x_learned = flow.sample(n, context=context).detach().numpy()  # Sample from learned
-    if context is not None:
-        x_learned = x_learned[0]
+    """`flows` must be a dict with the plot-label as key_name and 3 elements: 
+    (flow, context, plot-color).
+    """
+
     if x_samples is not None:
         plt.scatter(
             x=x_samples[:, 0], y=x_samples[:, 1], color="blue", label="Samples"
         )  # Plot training samples
+    x_true = target_dist.sample((n,))  # Sample from groundtruth
     sns.kdeplot(x=x_true[:, 0], y=x_true[:, 1], color="blue")  # Plot true distribution
-    sns.kdeplot(
-        x=x_learned[:, 0], y=x_learned[:, 1], color="orange"
-    )  # Plot learned distribution
+    handles_ext = [Line2D([0], [0], color="blue", label="True")]
 
-    handles, labels = plt.gca().get_legend_handles_labels()
+    labels = list(flows.keys())
+    for i, (flow, context, col) in enumerate(list(flows.values())):
+        x_learned = (
+            flow.sample(n, context=context).detach().numpy()
+        )  # Sample from learned
+        if context is not None:
+            x_learned = x_learned[0]
+        sns.kdeplot(
+            x=x_learned[:, 0], y=x_learned[:, 1], color=col
+        )  # Plot learned distribution
+        handles_ext.append(Line2D([0], [0], color=col, label=labels[i]))
 
-    handles.extend(
-        [
-            Line2D([0], [0], color="blue", label="True"),
-            Line2D([0], [0], color="orange", label="Learned"),
-        ]
-    )
+    handles, _ = plt.gca().get_legend_handles_labels()
+
+    handles.extend(handles_ext)
 
     plt.legend(handles=handles)
 

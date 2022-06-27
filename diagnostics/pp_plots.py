@@ -6,6 +6,9 @@ import sys
 
 import torch.distributions as D
 
+from matplotlib.lines import Line2D
+
+
 sys.path.append("../")
 from nde.flows import cdf_flow
 
@@ -20,7 +23,9 @@ def multi_cde_pit_values(
             conditional_transform_1d = (
                 D.Normal(0, 1)
                 .cdf(
-                    flow._transform(samples_theta, context=feature_transform(samples_x))
+                    flow._transform(
+                        samples_theta, context=feature_transform(samples_x)
+                    )[0][:, i]
                 )
                 .detach()
                 .numpy()
@@ -76,6 +81,7 @@ def PP_plot_1D(
     alphas,
     r_alpha_learned=None,
     colors=["blue"],
+    colors_r_alpha=["red"],
     labels=["Target"],
     title="PIT-distribution",
 ):
@@ -95,18 +101,44 @@ def PP_plot_1D(
     lims = [np.min([0, 0]), np.max([1, 1])]
     plt.plot(lims, lims, "--", color="black", alpha=0.75)
 
-    for i, Z in enumerate(PIT_values):
-        # compute quantiles P_{target}(PIT_values <= alpha)
-        pp_vals = PP_vals(Z, alphas)
-        # Plot the quantiles as a function of alpha
-        plt.plot(alphas, pp_vals, color=colors[i], label=labels[i])
+    if PIT_values is not None:
+        for i, Z in enumerate(PIT_values):
+            # compute quantiles P_{target}(PIT_values <= alpha)
+            pp_vals = PP_vals(Z, alphas)
+            # Plot the quantiles as a function of alpha
+            plt.plot(alphas, pp_vals, color=colors[i], label=labels[i])
 
+    handles_new = []
     if r_alpha_learned is not None:
-        fig = pd.Series(r_alpha_learned).plot(
-            style=".", color="red", markersize=7, label="Learned"
-        )
+        for i, r_alpha in enumerate(r_alpha_learned):
+            label = labels[i]
+            if PIT_values is not None:
+                style = "o"
+                if len(r_alpha_learned) == 1:
+                    label = "Learned"
+                else:
+                    handles_new.append(
+                        Line2D(
+                            [],
+                            [],
+                            color=colors_r_alpha[i],
+                            marker=".",
+                            linestyle="solid",
+                            label=labels[i],
+                        )
+                    )
+            else:
+                style = "-o"
 
-    plt.legend()
+            _ = pd.Series(r_alpha).plot(
+                style=style, color=colors_r_alpha[i], markersize=3, label=label
+            )
+
+    handles, _ = plt.gca().get_legend_handles_labels()
+    if handles_new:
+        handles = handles_new
+
+    plt.legend(handles=handles)
     plt.ylabel(r"$\alpha$-quantile $r_{\alpha}(x_0)$")
     plt.xlabel(r"$\alpha$")
     plt.title(title)

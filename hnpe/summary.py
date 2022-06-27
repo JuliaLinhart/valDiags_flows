@@ -5,10 +5,38 @@ from scipy.signal import welch
 import torch
 from torch import nn
 
-from hnpe.summary import YuleNet, AutocorrSeq, PowerSpecDens
-
 torch.autograd.set_detect_anomaly(True)
 
+class PowerSpecDens(nn.Module):
+    def __init__(self, nbins=128, logscale=False):
+        super().__init__()
+        self.nbins = nbins
+        self.logscale = logscale
+
+    def forward(self, X):
+
+        if X.ndim == 1:
+            X = X.view(1, -1)
+        else:
+            X = X.view(len(X), -1)
+
+        ntrials = X.shape[0]
+        ns = X.shape[1]
+        nfreqs = 2*(self.nbins-1) + 1
+        windows = [wi + torch.arange(nfreqs) for wi in range(0,
+                                                             ns-nfreqs+1,
+                                                             int(nfreqs/2))]
+        S = []
+        for i in range(ntrials):
+            Xi = X[i, :].view(-1)
+            Si = []
+            for w in windows:
+                Si.append(torch.abs(torch.fft.rfft(Xi[w]))**2)
+            Si = torch.mean(torch.stack(Si), axis=0)
+            if self.logscale:
+                Si = torch.log10(Si)
+            S.append(Si)
+        return torch.stack(S)
 
 class FourierLayer(nn.Module):
     def __init__(self, nfreqs=129):
@@ -41,54 +69,9 @@ class fourier_embedding(nn.Module):
         return y
 
 
-class autocorr_embedding(nn.Module):
-    def __init__(self, d_out=1, n_time_samples=1024):
-        super().__init__()
-        self.d_out = d_out
-        self.net = AutocorrSeq(n_lags=d_out)
-
-    def forward(self, x):
-        y = self.net(x.view(1, -1))
-        return y
-
-
-class yulenet_embedding(nn.Module):
-    def __init__(self, d_out=1, n_time_samples=1024):
-        super().__init__()
-        self.d_out = d_out
-        self.n_time_samples = n_time_samples
-        self.net = YuleNet(n_features=d_out, n_time_samples=n_time_samples)
-
-    def forward(self, x):
-        y = self.net(x.reshape(-1, self.n_time_samples))
-        return y
-
-
-class identity(nn.Module):
-    def __init__(self, d_in, d_out):
-        super().__init__()
-
-    def forward(self, x):
-        return x
-
-
-class debug_embedding(nn.Module):
-    def __init__(self, d_out=1, n_time_samples=1024):
-        super().__init__()
-        self.net = nn.Linear(in_features=n_time_samples, out_features=d_out)
-
-    def forward(self, x):
-        y = self.net(x.view(1, -1))
-        # A = torch.ones(33, 1024)
-        # y = A * x
-        return y
-
 
 emb_dict = {}
 emb_dict['Fourier'] = partial(fourier_embedding, plcr=True)
-emb_dict['Autocorr'] = autocorr_embedding
-emb_dict['YuleNet'] = yulenet_embedding
-emb_dict['Debug'] = debug_embedding
 
 
 class summary_JRNMM(nn.Module):

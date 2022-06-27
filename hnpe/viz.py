@@ -11,7 +11,7 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
                   meta_parameters, round_=0, batch_theta=None, batch_x=None):
 
-    folderpath = Path.cwd() / "results" / meta_parameters["label"]
+    folderpath = Path.cwd() / meta_parameters["label"]
 
     # load ground truth
     ground_truth = torch.load(folderpath / "ground_truth.pkl",

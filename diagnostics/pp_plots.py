@@ -31,15 +31,12 @@ def multi_cde_pit_values(
                 .numpy()
             )
         else:
-            conditional_transform_1d = np.array(
-                [
-                    D.Normal(0, 1)
-                    .cdf(flow._transform(samples_theta[j][None], context=x)[0][:, i])
-                    .detach()
-                    .numpy()
-                    for j, x in enumerate(feature_transform(samples_x))
+            conditional_transform_1d = D.Normal(0, 1).cdf(
+                flow._transform(samples_theta, context=feature_transform(samples_x))[0][
+                    :, i
                 ]
-            )
+            ).detach().numpy()
+
         pit_values.append(conditional_transform_1d)
 
     return pit_values

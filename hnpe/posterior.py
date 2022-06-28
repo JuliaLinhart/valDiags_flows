@@ -194,6 +194,15 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
         samples = torch.cat([samples_flow_2, samples_flow_1], dim=1)
         return samples
 
+    def _transform(self, input, context):
+        context_1 = self._flow_1._embedding_net(context)
+        transform_1 = self._flow_1._transform(input[:,0].reshape(-1,1), context=context_1)[0]
+        context_2 = torch.cat([context[:, :, 0], input[:,0].reshape(-1,1)], dim=1)
+        context_2 = self._flow_2._embedding_net(context_2)
+        transform_2 = self._flow_2._transform(input[:,1:], context=context_2)[0]
+        transform = (torch.cat([transform_1, transform_2], dim=1), None)
+        return transform
+
     def save_state(self, filename):
         state_dict = {}
         state_dict['flow_1'] = self._flow_1.state_dict()

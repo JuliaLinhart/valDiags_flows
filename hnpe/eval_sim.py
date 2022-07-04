@@ -16,43 +16,17 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.font_manager as font_manager
 
-def compute_dist_to_dirac(posterior, theta, n_samples=10000):
-    """Compute the distance between the posterior and the ground-truth dirac measure.
+def plot_pairgrid_with_groundtruth(posteriors, theta_gt, color_dict, handles, context, n_samples=10000):
     
-    Parameters
-    ----------
-    posterior : DirectPosterior object from sbi.inference.posteriors
-    theta : list of len 4
-        Values of the ground-truth parameters [C, mu, sigma, gain].
-    
-    Returns
-    -------
-    dist_to_dirac : float. 
-    """
-    theta = torch.FloatTensor(theta)
-
-    samples = posterior.sample((n_samples,), sample_with_mcmc=False)
-
-    dist_to_dirac = []
-    for j in range(len(theta)):
-        samples_coordj = samples[:, j]
-        sd = np.sqrt(samples_coordj.var())
-        dist_to_dirac.append((samples_coordj.var() + (samples_coordj.mean() - theta[j])**2) / sd)
-    
-    dist_to_dirac = torch.stack(dist_to_dirac).mean()
-    return dist_to_dirac
-
-def plot_pairgrid_with_groundtruth(posteriors, theta_gt, color_dict, handles, n_samples=10000):
-
     modes = list(posteriors.keys())
     dfs = []
     for n in range(len(posteriors)):
         posterior = posteriors[modes[n]]
         if modes[n]=='prior':
-            samples = posterior.sample((n_samples,))
+            samples = posterior.sample(n_samples, context=context[modes[n]])
         else:
-            samples = posterior.sample((n_samples,), sample_with_mcmc=False)
-        df = pd.DataFrame(samples.numpy(),columns=[r'$C$',r'$\mu$',r'$\sigma$',r'$g$'])
+            samples = posterior.sample(n_samples, context=context[modes[n]])
+        df = pd.DataFrame(samples.detach().numpy(),columns=[r'$C$',r'$\mu$',r'$\sigma$',r'$g$'])
         df['mode'] = modes[n]
         dfs.append(df)
     
@@ -120,3 +94,4 @@ def plot_pairgrid_with_groundtruth(posteriors, theta_gt, color_dict, handles, n_
     plt.legend(handles=handles, prop=font, fontsize=21, title="Extra observations", title_fontsize=20, bbox_to_anchor=(1.1,3.5))
     
     return g 
+

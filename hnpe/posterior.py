@@ -89,6 +89,12 @@ class JRNMMFlow_nflows_base(base.Distribution):
     def _sample(self, num_samples, context):
         samples = self._flow.sample(num_samples, context)[0]
         return samples
+    
+    def _transform(self, input, context):
+        context = self._flow._embedding_net(context)
+        transform = (self._flow._transform(input, context=context)[0], None)
+        return transform
+        
 
     def save_state(self, filename):
         state_dict = {}
@@ -195,11 +201,15 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
         return samples
 
     def _transform(self, input, context):
+        # of the flow that models p(gain | x, x1, ..., xn)
         context_1 = self._flow_1._embedding_net(context)
-        transform_1 = self._flow_1._transform(input[:,0].reshape(-1,1), context=context_1)[0]
-        context_2 = torch.cat([context[:, :, 0], input[:,0].reshape(-1,1)], dim=1)
+        theta_1 = input[:, -1:] # gain is the last parameter
+        transform_1 = self._flow_1._transform(theta_1, context=context_1)[0]
+        # of the flow that models p(C, mu, sigma | x, gain)
+        context_2 = torch.cat([context[:, :, 0], theta_1], dim=1)
         context_2 = self._flow_2._embedding_net(context_2)
-        transform_2 = self._flow_2._transform(input[:,1:], context=context_2)[0]
+        theta_2 = input[:, :-1]
+        transform_2 = self._flow_2._transform(theta_2, context=context_2)[0]
         transform = (torch.cat([transform_1, transform_2], dim=1), None)
         return transform
 

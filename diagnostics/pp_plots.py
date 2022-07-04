@@ -109,8 +109,8 @@ def PP_plot_1D(
     if r_alpha_learned is not None:
         for i, r_alpha in enumerate(r_alpha_learned):
             label = labels[i]
+            style = "o"
             if PIT_values is not None:
-                style = "o"
                 if len(r_alpha_learned) == 1:
                     label = "Learned"
                 else:
@@ -124,8 +124,6 @@ def PP_plot_1D(
                             label=labels[i],
                         )
                     )
-            else:
-                style = "-o"
 
             _ = pd.Series(r_alpha).plot(
                 style=style, color=colors_r_alpha[i], markersize=3, label=label
@@ -136,8 +134,8 @@ def PP_plot_1D(
         handles = handles_new
 
     plt.legend(handles=handles)
-    plt.ylabel(r"$\alpha$-quantile $r_{\alpha}(x_0)$")
-    plt.xlabel(r"$\alpha$")
+    plt.ylabel(r"$\alpha$-quantile $r_{\alpha}(x_0)$", fontsize=12)
+    plt.xlabel(r"$\alpha$", fontsize=12)
     plt.title(title)
     plt.show()
 

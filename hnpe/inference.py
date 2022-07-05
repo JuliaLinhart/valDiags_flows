@@ -36,8 +36,9 @@ def run_inference(simulator, prior, build_nn_posterior, ground_truth,
         folderpath = Path.cwd() / meta_parameters["label"]
         print(folderpath)
         folderpath.mkdir(exist_ok=True, parents=True)
-        path = folderpath / "ground_truth.pkl"
-        torch.save(ground_truth, path)
+        if ground_truth is not None:
+            path = folderpath / "ground_truth.pkl"
+            torch.save(ground_truth, path)
         path = folderpath / "parameters.pkl"
         torch.save(meta_parameters, path)
 
@@ -88,7 +89,8 @@ def run_inference(simulator, prior, build_nn_posterior, ground_truth,
         if build_aggregate_before is not None:
             aggregate_before = build_aggregate_before(x_ref=x) # standardize data wrt x
             x = aggregate_before(x)
-            ground_truth_obs = aggregate_before(ground_truth["observation"])
+            if ground_truth is not None:
+                ground_truth_obs = aggregate_before(ground_truth["observation"])
         else:
             aggregate_before = None
         ## ----------------------- ##
@@ -117,6 +119,7 @@ def run_inference(simulator, prior, build_nn_posterior, ground_truth,
             ## ------------------------------------ ##
 
         if meta_parameters['n_rd'] > 1:
+            assert ground_truth is not None
             # set the proposal prior for the next round
             proposal = posterior.set_default_x(ground_truth_obs)
 

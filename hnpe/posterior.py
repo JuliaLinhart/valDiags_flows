@@ -1,9 +1,11 @@
 
 import torch
+from pathlib import Path
 
 # Imports for the SBI package
 from sbi.utils.get_nn_models import build_maf
 from pyknos.nflows.distributions import base
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 
 
 class AggregateInstances(torch.nn.Module):
@@ -244,20 +246,28 @@ def build_flow(batch_theta,
     return flow
 
 
-if __name__ == '__main__':
+def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
+                  meta_parameters, round_=0, batch_theta=None, batch_x=None):
 
-    from summary import summary_JRNMM
+    folderpath = Path.cwd() / meta_parameters["label"]
 
-    batch_theta = torch.randn(10, 3)
-    batch_x = torch.randn(10, 1024, 1)
-    embedding_net = summary_JRNMM(0, 33, 1024, 'Fourier')
+    if batch_theta is None:
+        batch_theta = prior.sample((2,))
+    if batch_x is None:
+        batch_x = simulator(batch_theta)
+        if summary_extractor is not None:
+            batch_x = summary_extractor(batch_x)
 
-    flow = build_flow(batch_theta,
-                      batch_x,
-                      embedding_net,
-                      naive=True,
-                      aggregate=False)
+    nn_posterior = build_nn_posterior(batch_theta=batch_theta,
+                                      batch_x=batch_x)
+    nn_posterior.eval()
+    posterior = DirectPosterior(
+        method_family="snpe", neural_net=nn_posterior, prior=prior,
+        x_shape=batch_x[0][None, :].shape
+    )
 
-    logp = flow.log_prob(batch_theta, batch_x)
-    samples = flow.sample(100, batch_x[0])
-    print(samples)
+    state_dict_path = folderpath / f"nn_posterior_round_{round_:02}.pkl"
+    posterior.net.load_state(state_dict_path)
+    # posterior = posterior.set_default_x(ground_truth["observation"])
+
+    return posterior

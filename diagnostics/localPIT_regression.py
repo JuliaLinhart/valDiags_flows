@@ -6,15 +6,19 @@ import torch
 import torch.distributions as D
 
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 import sklearn
 
 from scipy.stats import norm
 
+import time
+
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
+# DEFAULT_CLF = HistGradientBoostingClassifier(monotonic_cst=[0, 0, 1], max_iter=60)
 
 ## BASELINE
 def localPIT_regression_baseline(
-    alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF
+    alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF,
 ):
     """Method 1: Algorithm from [Zhao et. al, UAI 2021]: https://arxiv.org/abs/2102.10473"""
 
@@ -39,7 +43,7 @@ def localPIT_regression_baseline(
 
 # AMORTIZED IN ALPHA
 def localPIT_regression_grid(
-    alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF, train=True
+    alphas, pit_values_train, x_train, x_eval, classifier=DEFAULT_CLF, train=True,
 ):
     """Method 2: Train the Classifier amortized on x and all alpha"""
 
@@ -74,7 +78,7 @@ def localPIT_regression_grid(
         test_features = np.concatenate([x_eval, np.array(alpha).reshape(-1, 1)], axis=1)
         r_alpha_test[alpha] = clf.predict_proba(test_features)[:, 1][0]
 
-    return r_alpha_test, train_accuracy, clf.loss_curve_, clf
+    return r_alpha_test, train_accuracy, clf
 
 
 def localPIT_regression_sample(
@@ -113,7 +117,7 @@ def localPIT_regression_sample(
         test_features = np.concatenate([x_eval, np.array(alpha).reshape(-1, 1)], axis=1)
         r_alpha_test[alpha] = clf.predict_proba(test_features)[:, 1][0]
 
-    return r_alpha_test, train_accuracy, clf.loss_curve_, clf
+    return r_alpha_test, train_accuracy, clf
 
 
 # CDF function of a (conditional) flow evaluated in x: F_{Q|context}(x)
@@ -124,42 +128,49 @@ cdf_flow = lambda x, context, flow: D.Normal(0, 1).cdf(
 
 def run_localPIT_regression(
     methods,
+    method_names,
     x_evals,
     nb_train_samples,
-    alpha_samples,
     joint_data_generator,
     flow,
     feature_transform,
     samples_train=None,
+    null_hyp=False,
+    alpha_points=100,
+    n_trials = 1000,
 ):
     # Training set for regression task
     if samples_train is not None:
-        x_train_PIT, theta_train_PIT = samples_train
+        x_train_PIT_new, theta_train_PIT_new = samples_train
     else:
         # Generate samples from the joint !
-        x_train_PIT, theta_train_PIT = joint_data_generator(n=nb_train_samples)
-        x_train_PIT, theta_train_PIT = (
-            torch.FloatTensor(x_train_PIT),
-            torch.FloatTensor(theta_train_PIT),
+        x_train_PIT_new, theta_train_PIT_new = joint_data_generator(n=nb_train_samples)
+        x_train_PIT_new, theta_train_PIT_new = (
+            torch.FloatTensor(x_train_PIT_new),
+            torch.FloatTensor(theta_train_PIT_new),
         )
-    samples_train_new = (x_train_PIT, theta_train_PIT)
+    samples_train_new = (x_train_PIT_new, theta_train_PIT_new)
 
     # Compute the PIT-values [PIT(Theta_i, X_i, flow)]
     pit_values_train = np.array(
         [
-            cdf_flow(theta_train_PIT[i][None], context=x, flow=flow).detach().numpy()
-            for i, x in enumerate(feature_transform(x_train_PIT))
+            cdf_flow(theta_train_PIT_new[i][None], context=x, flow=flow)
+            .detach()
+            .numpy()
+            for i, x in enumerate(feature_transform(x_train_PIT_new))
         ]
     ).ravel()
+
+    if not null_hyp:
+        n_trials = 1
+    print('NULL HYP: ', null_hyp)
 
     r_alpha_learned = {}
     true_pit_values = {}
     for i, x_eval in enumerate(x_evals):
-        method_kwargs = {
-            "pit_values_train": pit_values_train,
-            "x_train": x_train_PIT,
-            "x_eval": x_eval,
-        }
+        print(f'x_eval {i}: ', x_eval)
+        if n_trials > 1:
+            r_alpha_learned[i] = {}
 
         # samples from the true distribution
         samples_theta_x = torch.FloatTensor(
@@ -172,28 +183,103 @@ def run_localPIT_regression(
             .numpy()
         )
 
+
         r_alpha_x_eval = []
         labels = []
-        for method in methods:
-            if "baseline" in str(method):
-                alphas = np.linspace(0, 0.99, 100)
-                method_kwargs["alphas"] = alphas
-                r_alpha_test, _ = method(**method_kwargs)
-                r_alpha_x_eval.append(r_alpha_test)
-                labels.append("baseline")
-            else:
-                alphas = np.linspace(0, 0.999, 100)
-                method_kwargs["alphas"] = alphas
-                if "sample" in str(method):
-                    for ns in alpha_samples:
-                        method_kwargs["nb_samples"] = ns
-                        r_alpha_test, _, _, _ = method(**method_kwargs)
-                        r_alpha_x_eval.append(r_alpha_test)
-                        labels.append(f"sample (T={ns})")
+        times = []
+        j = 0
+        for method, method_name in zip(methods, method_names):
+            print(method_name)
+            r_alpha_k = []
+            for k in range(n_trials):
+                # print(k)
+                if null_hyp:
+                    pit_values_train = np.random.uniform(size=nb_train_samples)
+                
+                method_kwargs = {
+                    "pit_values_train": pit_values_train,
+                    "x_train": x_train_PIT_new,
+                    "x_eval": x_eval,
+                }
+
+                start = time.time()
+                if "baseline" in str(method):
+                    alphas = np.linspace(0, 0.99, alpha_points)
+                    method_kwargs["alphas"] = alphas
+                    r_alpha_test, _ = method(**method_kwargs)
+                    
                 else:
-                    r_alpha_test, _, _, _ = method(**method_kwargs)
-                    r_alpha_x_eval.append(r_alpha_test)
-                    labels.append(f"grid (T=100)")
+                    alphas = np.linspace(0, 0.999, alpha_points)
+                    method_kwargs["alphas"] = alphas
+                    r_alpha_test, _, _ = method(**method_kwargs)
+                r_alpha_k.append(r_alpha_test)
+                times.append(start-time.time())
+
+        
+            if n_trials > 1:
+                r_alpha_x_eval.append(r_alpha_k)
+            else:
+                r_alpha_x_eval.append(r_alpha_test)
+
         r_alpha_learned[i] = r_alpha_x_eval
 
-    return r_alpha_learned, labels, true_pit_values, samples_train_new
+    return r_alpha_learned, method_names, true_pit_values, samples_train_new, times
+
+
+def compute_pvalues(
+    methods,
+    method_names,
+    x_evals,
+    nb_train_samples,
+    alpha_samples,
+    joint_data_generator,
+    flow,
+    feature_transform,
+    samples_train,
+    n_trials = 10,
+):
+    r_alpha_pit_dict, _, _, _, _ = run_localPIT_regression(
+        methods,
+        method_names,
+        x_evals,
+        nb_train_samples,
+        alpha_samples,
+        joint_data_generator,
+        flow,
+        feature_transform,
+        samples_train,
+        null_hyp=False,
+        alpha_points=11,
+    )
+
+    r_alpha_null_dict, _, _, _, _ = run_localPIT_regression(
+        methods,
+        method_names,
+        x_evals,
+        nb_train_samples,
+        alpha_samples,
+        joint_data_generator,
+        flow,
+        feature_transform,
+        samples_train,
+        null_hyp=True,
+        alpha_points=11,
+        n_trials=n_trials
+    )
+
+    pvalues = {}
+
+    for i in range(len(x_evals)):
+        pvalues[str(x_evals[i].numpy())] = {}
+        for method_name, r_alpha_pit, r_alpha_null in zip(method_names, r_alpha_pit_dict[i], r_alpha_null_dict[i]):
+            alphas = pd.Series(list(r_alpha_pit.keys()))
+            r_alpha_pit_values = pd.Series(r_alpha_pit)
+            Ti_value = ((r_alpha_pit_values - alphas) ** 2).sum() / len(alphas)
+            all_unif_Ti_values = {}
+            for k in range(len(r_alpha_null)):
+                r_alpha_k = pd.Series(r_alpha_null[k])
+                all_unif_Ti_values[k] = ((r_alpha_k - alphas) ** 2).sum() / len(alphas)
+
+            pvalues[str(x_evals[i].numpy())][method_name] = sum(1 * (Ti_value < pd.Series(all_unif_Ti_values))) / len(all_unif_Ti_values)
+    
+    return r_alpha_pit_dict, r_alpha_null_dict, pvalues

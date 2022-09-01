@@ -171,3 +171,8 @@ def compare_pp_plots_regression(
             r"Local PIT-distribution of the flow at $x_0$ = " + str(x_eval.numpy())
         )
         plt.show()
+
+
+# CDF function of a (conditional) flow evaluated in x: F_{Q|context}(x)
+def cdf_flow(x, context, flow, base_dist = D.Normal(0,1)): 
+    return base_dist.cdf(flow._transform(x, context=context)[0])

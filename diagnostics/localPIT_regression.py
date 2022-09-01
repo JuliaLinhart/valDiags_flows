@@ -3,15 +3,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import torch
-import torch.distributions as D
 
 from sklearn.neural_network import MLPClassifier
-from sklearn.ensemble import HistGradientBoostingClassifier
+# from sklearn.ensemble import HistGradientBoostingClassifier
 import sklearn
 
 from scipy.stats import norm
 
 import time
+
+from nde.flows import cdf_flow
+from data.feature_transforms import identity
+from diagnostics.pp_plots import multi_cde_pit_values
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 # DEFAULT_CLF = HistGradientBoostingClassifier(monotonic_cst=[0, 0, 1], max_iter=60)
@@ -120,11 +123,12 @@ def localPIT_regression_sample(
     return r_alpha_test, train_accuracy, clf
 
 
-# CDF function of a (conditional) flow evaluated in x: F_{Q|context}(x)
-cdf_flow = lambda x, context, flow: D.Normal(0, 1).cdf(
-    flow._transform(x, context=context)[0]
-)
+# # CDF function of a (conditional) flow evaluated in x: F_{Q|context}(x)
+# cdf_flow = lambda x, context, flow: D.Normal(0, 1).cdf(
+#     flow._transform(x, context=context)[0]
+# )
 
+#### 1d scripts for method comparison purposes ###
 
 def run_localPIT_regression(
     methods,
@@ -231,7 +235,6 @@ def compute_pvalues(
     method_names,
     x_evals,
     nb_train_samples,
-    alpha_samples,
     joint_data_generator,
     flow,
     feature_transform,
@@ -243,7 +246,6 @@ def compute_pvalues(
         method_names,
         x_evals,
         nb_train_samples,
-        alpha_samples,
         joint_data_generator,
         flow,
         feature_transform,
@@ -257,7 +259,6 @@ def compute_pvalues(
         method_names,
         x_evals,
         nb_train_samples,
-        alpha_samples,
         joint_data_generator,
         flow,
         feature_transform,
@@ -272,7 +273,7 @@ def compute_pvalues(
     for i in range(len(x_evals)):
         pvalues[str(x_evals[i].numpy())] = {}
         for method_name, r_alpha_pit, r_alpha_null in zip(method_names, r_alpha_pit_dict[i], r_alpha_null_dict[i]):
-            alphas = pd.Series(list(r_alpha_pit.keys()))
+            alphas = np.array(list(r_alpha_pit.keys()))
             r_alpha_pit_values = pd.Series(r_alpha_pit)
             Ti_value = ((r_alpha_pit_values - alphas) ** 2).sum() / len(alphas)
             all_unif_Ti_values = {}
@@ -283,3 +284,62 @@ def compute_pvalues(
             pvalues[str(x_evals[i].numpy())][method_name] = sum(1 * (Ti_value < pd.Series(all_unif_Ti_values))) / len(all_unif_Ti_values)
     
     return r_alpha_pit_dict, r_alpha_null_dict, pvalues
+
+
+
+##### scripts for multivariate case #####
+
+def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, null_hyp = False, n_trials = 1, alphas = np.linspace(0,0.99,100)):
+
+    pit_values_train = multi_cde_pit_values(
+        theta, x, flow, feature_transform=feature_transform
+    )
+    r_alpha_k = []
+    for k in range(n_trials):
+
+        if null_hyp:
+            pit_values_train = [np.random.uniform(size=pit_values_train[0].shape)]*len(pit_values_train)
+
+        r_alpha_learned = {}
+        for i in range(len(pit_values_train)):
+            r_alpha_learned[f"dim_{i+1}"], _ = localPIT_regression_baseline(
+                alphas=alphas,
+                pit_values_train=pit_values_train[
+                    i
+                ].ravel(),  # pit-values used to compute the targets
+                x_train=x[:, :, 0],
+                x_eval=x_obs[:, :, 0].numpy(),  # evaluation sample x_0
+            )
+        r_alpha_k.append(r_alpha_learned)
+    if n_trials > 1:
+        return r_alpha_k
+    else:
+        return r_alpha_learned
+
+def compute_multi_pvalues(theta, x, x_obs, flow, n_trials, n_alphas=11):
+    r_alpha_learned = learn_multi_local_pit(theta, x, x_obs, flow, alphas=np.linspace(0,0.99,n_alphas))
+
+    r_alpha_null_list = learn_multi_local_pit(theta, x, x_obs, flow, null_hyp=True, n_trials=n_trials, alphas=np.linspace(0,0.99,n_alphas))
+    
+    pvalues = {}
+    for i, r_alpha_i in enumerate(r_alpha_learned.values()):
+        alphas = np.array(list(r_alpha_i.keys()))
+        r_alpha_pit_values = pd.Series(r_alpha_i)
+        Ti_value = ((r_alpha_pit_values - alphas) ** 2).sum() / len(alphas)
+        all_unif_Ti_values = {}
+        for k, r_alpha_null_k in enumerate(r_alpha_null_list):
+            r_alpha_k_i = pd.Series(r_alpha_null_k[f"dim_{i+1}"])
+            all_unif_Ti_values[k] = ((r_alpha_k_i - alphas) ** 2).sum() / len(alphas)
+
+        pvalues[f'dim {i+1}'] = sum(1 * (Ti_value < pd.Series(all_unif_Ti_values))) / len(all_unif_Ti_values)
+    
+    return pvalues, r_alpha_learned, r_alpha_null_list
+
+def multi_LCT(pvalues, alpha=0.05):
+    accepted = True
+    for p in pvalues:
+        if p<alpha:
+            accepted = False
+    return accepted
+
+

@@ -41,7 +41,7 @@ def localPIT_regression_baseline(
         else:  # MLPClassifier
             r_alpha_test[alpha] = prob[:, 1][0]
 
-    return r_alpha_test, accuracies
+    return r_alpha_test, accuracies, clf
 
 
 # AMORTIZED IN ALPHA
@@ -289,7 +289,7 @@ def compute_pvalues(
 
 ##### scripts for multivariate case #####
 
-def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, null_hyp = False, n_trials = 1, alphas = np.linspace(0,0.99,100)):
+def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, null_hyp = False, n_trials = 1, alphas = np.linspace(0,1,100), clf=DEFAULT_CLF, reg_method=localPIT_regression_baseline):
 
     pit_values_train = multi_cde_pit_values(
         theta, x, flow, feature_transform=feature_transform
@@ -302,13 +302,14 @@ def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, nul
 
         r_alpha_learned = {}
         for i in range(len(pit_values_train)):
-            r_alpha_learned[f"dim_{i+1}"], _ = localPIT_regression_baseline(
+            r_alpha_learned[f"dim_{i+1}"], _, _ = reg_method(
                 alphas=alphas,
                 pit_values_train=pit_values_train[
                     i
                 ].ravel(),  # pit-values used to compute the targets
                 x_train=x[:, :, 0],
                 x_eval=x_obs[:, :, 0].numpy(),  # evaluation sample x_0
+                classifier=clf,
             )
         r_alpha_k.append(r_alpha_learned)
     if n_trials > 1:
@@ -316,10 +317,10 @@ def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, nul
     else:
         return r_alpha_learned
 
-def compute_multi_pvalues(theta, x, x_obs, flow, n_trials, n_alphas=11):
-    r_alpha_learned = learn_multi_local_pit(theta, x, x_obs, flow, alphas=np.linspace(0,0.99,n_alphas))
+def compute_multi_pvalues(theta, x, x_obs, flow, n_trials, n_alphas=11, alpha_max=0.99, reg_method=localPIT_regression_baseline, clf=DEFAULT_CLF):
+    r_alpha_learned = learn_multi_local_pit(theta, x, x_obs, flow, alphas=np.linspace(0,alpha_max,n_alphas), reg_method=reg_method, clf=clf)
 
-    r_alpha_null_list = learn_multi_local_pit(theta, x, x_obs, flow, null_hyp=True, n_trials=n_trials, alphas=np.linspace(0,0.99,n_alphas))
+    r_alpha_null_list = learn_multi_local_pit(theta, x, x_obs, flow, null_hyp=True, n_trials=n_trials, alphas=np.linspace(0,alpha_max,n_alphas),reg_method=reg_method, clf=clf)
     
     pvalues = {}
     for i, r_alpha_i in enumerate(r_alpha_learned.values()):

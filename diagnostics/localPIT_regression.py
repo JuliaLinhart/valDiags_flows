@@ -289,7 +289,7 @@ def compute_pvalues(
 
 ##### scripts for multivariate case #####
 
-def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, null_hyp = False, n_trials = 1, alphas = np.linspace(0,1,100), clf=DEFAULT_CLF, reg_method=localPIT_regression_baseline):
+def learn_multi_local_pit(theta, x, x_obs, flow, feature_transform=identity, null_hyp = False, n_trials = 1, alphas = np.linspace(0,0.99,100), clf=DEFAULT_CLF, reg_method=localPIT_regression_baseline):
 
     pit_values_train = multi_cde_pit_values(
         theta, x, flow, feature_transform=feature_transform

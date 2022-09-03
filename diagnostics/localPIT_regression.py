@@ -344,3 +344,11 @@ def multi_LCT(pvalues, alpha=0.05):
     return accepted
 
 
+def compute_test_statistic(r_alpha_learned):
+    T_values = {}
+    for i, r_alpha_i in enumerate(r_alpha_learned.values()):
+        alphas = np.array(list(r_alpha_i.keys()))
+        r_alpha_pit_values = pd.Series(r_alpha_i)
+        Ti_value = ((r_alpha_pit_values - alphas) ** 2).sum() / len(alphas)
+        T_values[f"dim_{i+1}"] = Ti_value
+    return T_values

@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import pandas as pd
 
 import sys
@@ -93,6 +94,9 @@ def PP_plot_1D(
         - alphas: numpy array of values to evaluate the PP-vals
         - r_alpha_learned: regressed quantile values for local PIT
     """
+    mpl.rcParams["font.family"] = "serif"
+    mpl.rcParams['axes.formatter.use_mathtext'] = True
+    mpl.rcParams['mathtext.fontset'] = 'cm'
     # plot identity function
     fig = plt.figure()
     lims = [np.min([0, 0]), np.max([1, 1])]
@@ -134,9 +138,9 @@ def PP_plot_1D(
         handles = handles_new
 
     plt.legend(handles=handles)
-    plt.ylabel(r"$\alpha$-quantile $r_{\alpha}(x_0)$", fontsize=12)
-    plt.xlabel(r"$\alpha$", fontsize=12)
-    plt.title(title)
+    plt.ylabel(r"$\alpha$-quantile $r_{\alpha}(x_0)$", fontsize=15)
+    plt.xlabel(r"$\alpha$", fontsize=15)
+    plt.title(title, fontsize=18)
     plt.show()
 
 

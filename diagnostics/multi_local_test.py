@@ -48,12 +48,12 @@ def multi_local_pit_regression(dim, pit_values_train, x_train, reg_method, class
         else:
             trained_clfs_new = trained_clfs
         if x_eval is not None and alphas_eval is not None:
-            if 'baseline' in 'reg_method':
-                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_baseline(x_eval, trained_clfs_new[f'dim_{i+1}'])
+            if 'baseline' in str(reg_method):
+                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_baseline(x_eval[:,:,0].numpy(), trained_clfs_new[f'dim_{i+1}'])
             else:
-                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_amortized(x_eval, alphas_eval, trained_clfs_new[f'dim_{i+1}'])
+                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_amortized(x_eval[:,:,0].numpy(), alphas_eval, trained_clfs_new[f'dim_{i+1}'])
         
-    return local_pit_values, trained_clfs
+    return local_pit_values, trained_clfs_new
 
 
 def multivariate_lct(
@@ -76,12 +76,12 @@ def multivariate_lct(
     alphas = np.linspace(0, alpha_max, n_alphas)
 
     # Estimated Local PIT-values
-    pit_values_train = multi_cde_pit_values(
+    pit_values_train_flow = multi_cde_pit_values(
         theta_train, x_train, flow, feature_transform=feature_transform
     )
     r_alpha_learned, _ = multi_local_pit_regression(
         dim=theta_train.shape[-1],
-        pit_values_train=pit_values_train,
+        pit_values_train=pit_values_train_flow,
         x_train=x_train,
         x_eval=x_eval,
         alphas_eval=alphas,
@@ -105,8 +105,8 @@ def multivariate_lct(
         # Local PIT-values under the null hypothesis
         r_alpha_null_list = []
         for k in range(n_trials):
-            pit_values_train = [
-                np.random.uniform(size=pit_values_train[0].shape)
+            pit_values_train_null = [
+                np.random.uniform(size=pit_values_train_flow[0].shape)
             ] * theta_train.shape[-1]
 
             if trained_clfs_null is not None:
@@ -116,7 +116,7 @@ def multivariate_lct(
 
             r_alpha_null_k, _ = multi_local_pit_regression(
                 dim=theta_train.shape[-1],
-                pit_values_train=pit_values_train,
+                pit_values_train=pit_values_train_null,
                 x_train=x_train,
                 x_eval=x_eval,
                 alphas_eval=alphas,

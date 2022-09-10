@@ -1,0 +1,11 @@
+__pycache__/
+work_localPIT/
+work_inference/
+*.out
+*.err
+*.zip
+*.pdf
+.vscode/
+sbi_logs/
+saved_experiments/
+script_margaret_localPIT_regression_old.py

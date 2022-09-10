@@ -262,12 +262,13 @@ def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
                                       batch_x=batch_x)
     nn_posterior.eval()
     posterior = DirectPosterior(
-        method_family="snpe", neural_net=nn_posterior, prior=prior,
+        posterior_estimator=nn_posterior, prior=prior,
         x_shape=batch_x[0][None, :].shape
     )
 
     state_dict_path = folderpath / f"nn_posterior_round_{round_:02}.pkl"
-    posterior.net.load_state(state_dict_path)
+    posterior.posterior_estimator.load_state(state_dict_path)
     # posterior = posterior.set_default_x(ground_truth["observation"])
 
     return posterior
+

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import torch
 
 from diagnostics.localPIT_regression import (
     localPIT_regression_baseline,
@@ -11,6 +12,9 @@ from diagnostics.pp_plots import multi_cde_pit_values
 from data.feature_transforms import identity
 
 from sklearn.neural_network import MLPClassifier
+
+from scipy.stats import hmean
+from statsmodels.stats.multitest import multipletests
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
@@ -32,13 +36,23 @@ def compute_pvalue(r_alpha_learned, r_alpha_null_list):
 
     return pvalue
 
-def multi_local_pit_regression(dim, pit_values_train, x_train, reg_method, classifier, alphas_eval = None, x_eval = None, trained_clfs=None):
+
+def multi_local_pit_regression(
+    dim,
+    pit_values_train,
+    x_train,
+    reg_method,
+    classifier,
+    alphas_eval=None,
+    x_eval=None,
+    trained_clfs=None,
+):
     local_pit_values = {}
     trained_clfs_new = {}
     for i in range(dim):
         if trained_clfs is None:
             # Estimated Local PIT-values
-            trained_clfs_new[f'dim_{i+1}'] = reg_method(
+            trained_clfs_new[f"dim_{i+1}"] = reg_method(
                 pit_values_train=pit_values_train[
                     i
                 ].ravel(),  # pit-values used to compute the targets
@@ -48,11 +62,15 @@ def multi_local_pit_regression(dim, pit_values_train, x_train, reg_method, class
         else:
             trained_clfs_new = trained_clfs
         if x_eval is not None and alphas_eval is not None:
-            if 'baseline' in str(reg_method):
-                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_baseline(x_eval[:,:,0].numpy(), trained_clfs_new[f'dim_{i+1}'])
+            if "baseline" in str(reg_method):
+                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_baseline(
+                    x_eval[:, :, 0].numpy(), trained_clfs_new[f"dim_{i+1}"]
+                )
             else:
-                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_amortized(x_eval[:,:,0].numpy(), alphas_eval, trained_clfs_new[f'dim_{i+1}'])
-        
+                local_pit_values[f"dim_{i+1}"] = infer_r_alphas_amortized(
+                    x_eval[:, :, 0].numpy(), alphas_eval, trained_clfs_new[f"dim_{i+1}"]
+                )
+
     return local_pit_values, trained_clfs_new
 
 
@@ -69,7 +87,7 @@ def multivariate_lct(
     classifier=DEFAULT_CLF,
     trained_clfs=None,
     trained_clfs_null=None,
-    return_pvalues = False,
+    return_pvalues=False,
 ):
     lct_dict = {}
 
@@ -90,16 +108,15 @@ def multivariate_lct(
         trained_clfs=trained_clfs,
     )
 
-    lct_dict['r_alpha_learned'] = r_alpha_learned
+    lct_dict["r_alpha_learned"] = r_alpha_learned
 
     # test statistic
     T_values = {}
     for i, r_alpha_i in enumerate(r_alpha_learned.values()):
         Ti_value = compute_test_statistic(r_alpha_i)
-        T_values[f'dim_{i+1}'] = Ti_value
+        T_values[f"dim_{i+1}"] = Ti_value
 
-    lct_dict['test_stats'] = T_values
-    
+    lct_dict["test_stats"] = T_values
 
     if return_pvalues:
         # Local PIT-values under the null hypothesis
@@ -125,8 +142,8 @@ def multivariate_lct(
                 trained_clfs=trained_clfs_null_k,
             )
             r_alpha_null_list.append(r_alpha_null_k)
-        
-        lct_dict['r_alpha_null_list'] = r_alpha_null_list
+
+        lct_dict["r_alpha_null_list"] = r_alpha_null_list
 
         # p-values
         pvalues = {}
@@ -136,8 +153,50 @@ def multivariate_lct(
             ]
             pvalues[f"dim_{i+1}"] = compute_pvalue(r_alpha_i, r_alpha_null_list_i)
 
-        lct_dict['pvalues'] = pvalues
-    
+        lct_dict["pvalues"] = pvalues
+
     return lct_dict
 
 
+def get_lct_results(lct_paths, alpha=0.05, n_dims=4, pvalues=True):
+    test_stats = {}
+    if not pvalues:
+        for i in range(1, n_dims+1):
+            test_stats[f"dim_{i}"] = []
+
+        for lct_path in lct_paths:
+            lct = torch.load(lct_path)
+            for i in range(1, n_dims+1):
+                test_stats[f"dim_{i}"].append(lct["test_stats"][f"dim_{i}"])
+        df = pd.DataFrame(test_stats)
+    
+    else:
+        pvalues = {}
+        test_results = {}
+        for i in range(1, n_dims+1):
+            pvalues[f"dim_{i}"] = []
+            test_stats[f"dim_{i}"] = []
+            test_results[f"dim_{i}"] = []
+
+        pvalues['hmean'] = []
+        test_results['hmean'] = []
+        test_results['combined'] = []
+        for lct_path in lct_paths:
+            lct = torch.load(lct_path)
+            pvalues_g = lct['pvalues']
+            pvalues['hmean'].append(hmean(list(pvalues_g.values())))
+            test_result_hmean = (pvalues['hmean'][-1]<=alpha) # rejected if True
+            multi_test_result = multipletests(list(pvalues_g.values()), method='b')[0]
+            test_result = (multi_test_result.sum() > 0)
+            test_results['combined'].append(test_result)
+            test_results['hmean'].append(test_result_hmean)
+
+            for i in range(1, n_dims+1):
+                pvalues[f"dim_{i}"].append(pvalues_g[f"dim_{i}"])
+                test_stats[f"dim_{i}"].append(lct["test_stats"][f"dim_{i}"])
+                test_results[f"dim_{i}"].append(multi_test_result[i-1])
+        df_test_stats = pd.DataFrame(test_stats)
+        df_pvalues = pd.DataFrame(pvalues)
+        df_results = pd.DataFrame(test_results)
+        df = df_test_stats.add_prefix('test_stats__').join(df_pvalues.add_prefix('p_values__')).join(df_results.add_prefix('lct_results__'))
+    return df

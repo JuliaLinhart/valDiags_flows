@@ -2,12 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
+import torch
 
 import sys
 
 import torch.distributions as D
 
 from matplotlib.lines import Line2D
+
+from scipy.stats import hmean
 
 
 sys.path.append("../")
@@ -82,6 +85,7 @@ def PP_plot_1D(
     colors_r_alpha=["red"],
     labels=["Target"],
     title="PIT-distribution",
+    pvalue = None,
 ):
     """1D PP-plot: distribution of the PIT vs. uniform distribution
         It shows the deviation to the identity function and thus
@@ -137,8 +141,11 @@ def PP_plot_1D(
     if handles_new:
         handles = handles_new
 
+    if pvalue is not None:
+        plt.text(0.9,0.1, f'pvalue = {pvalue}', horizontalalignment='center')
+
     plt.legend(handles=handles)
-    plt.ylabel(r"$\alpha$-quantile $r_{\alpha}(x_0)$", fontsize=15)
+    plt.ylabel(r"$r_{\alpha}(x_0)$", fontsize=15)
     plt.xlabel(r"$\alpha$", fontsize=15)
     plt.title(title, fontsize=18)
     plt.show()
@@ -177,6 +184,32 @@ def compare_pp_plots_regression(
         plt.show()
 
 
-# CDF function of a (conditional) flow evaluated in x: F_{Q|context}(x)
-def cdf_flow(x, context, flow, base_dist = D.Normal(0,1)): 
-    return base_dist.cdf(flow._transform(x, context=context)[0])
+def multi_pp_plots(lct_paths, x_eval_names, param_names, pvalues = True, title = r"PP-plot at $x_0$"):
+    
+    for i, x_eval_name in enumerate(x_eval_names):
+        for k in range(len(lct_paths)):
+            lct_dict = torch.load(lct_paths[k][i])
+
+            r_alpha_learned = lct_dict['r_alpha_learned']
+            hmean_pvalue = None 
+            labels = param_names
+            if pvalues:
+                pvalues = lct_dict['pvalues']
+                labels = [param_names[i-1]+f", pvalue={pvalues[f'dim_{i}']}" for i in range(1,len(param_names)+1)]
+                hmean_pvalue = np.round(hmean(list(pvalues.values())), decimals=3)
+
+            PP_plot_1D(
+                PIT_values=None,
+                alphas=np.linspace(0, 1, 21),
+                r_alpha_learned=[
+                    r_alpha_learned["dim_1"],
+                    r_alpha_learned["dim_2"],
+                    r_alpha_learned["dim_3"],
+                    r_alpha_learned["dim_4"],
+                ],
+                colors=["orange", "red"],
+                colors_r_alpha=["orange", "red", "purple", "blue"],
+                labels=labels,
+                title=title+f"{x_eval_name}",
+                pvalue = hmean_pvalue,
+            )

@@ -110,7 +110,7 @@ def run_inference(simulator, prior, build_nn_posterior, ground_truth,
         # save the parameters of the neural posterior for this round
         if save_rounds:
             path = folderpath / f"nn_posterior_round_{round_:02}.pkl"
-            posterior.net.save_state(path)
+            posterior.posterior_estimator.save_state(path)
             ## --------------- added -------------- ##
             # save aggregate net parameters: mean and std based on training simulations 
             if aggregate_before is not None:

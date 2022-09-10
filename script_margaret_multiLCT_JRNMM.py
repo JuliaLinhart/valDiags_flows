@@ -62,12 +62,12 @@ MAX_ITER_LIST = [30, 40, 50, 60, 70, 80, 90]
 # CLF = HistGradientBoostingClassifier(
 #     monotonic_cst=[0 for i in range(33)] + [1], max_iter=MAX_ITER
 # )
-# CLF_LIST = [
-#     HistGradientBoostingClassifier(
-#         monotonic_cst=[0 for i in range(33)] + [1], max_iter=it
-#     )
-#     for it in MAX_ITER_LIST
-# ]
+CLF_LIST = [
+    HistGradientBoostingClassifier(
+        monotonic_cst=[0 for i in range(33)] + [1], max_iter=it
+    )
+    for it in MAX_ITER_LIST
+]
 # CLF = HistGradientBoostingClassifier(
 #     monotonic_cst=[0 for i in range(33)] + [0], max_iter=MAX_ITER
 # )

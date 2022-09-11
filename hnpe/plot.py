@@ -69,21 +69,22 @@ def plot_pairgrid_with_groundtruth(posteriors, theta_gt, color_dict, handles, co
 
     if theta_gt is not None:
         # get groundtruth parameters
-        C, mu, sigma, gain = theta_gt
+        for gt in theta_gt:
+            C, mu, sigma, gain = gt
 
-        # plot points
-        g.axes[1][0].scatter(C,mu, color='black', zorder=2)
-        g.axes[2][0].scatter(C,sigma, color='black', zorder=2)
-        g.axes[2][1].scatter(mu,sigma, color='black', zorder=2)
-        g.axes[3][0].scatter(C,gain, color='black', zorder=2)
-        g.axes[3][1].scatter(mu, gain, color='black', zorder=2)
-        g.axes[3][2].scatter(sigma, gain, color='black', zorder=2)
-        g.axes[3][3].axvline(x=gain, ls='--', c='black')
+            # plot points
+            g.axes[1][0].scatter(C,mu, color='black', zorder=2)
+            g.axes[2][0].scatter(C,sigma, color='black', zorder=2)
+            g.axes[2][1].scatter(mu,sigma, color='black', zorder=2)
+            g.axes[3][0].scatter(C,gain, color='black', zorder=2)
+            g.axes[3][1].scatter(mu, gain, color='black', zorder=2)
+            g.axes[3][2].scatter(sigma, gain, color='black', zorder=2)
+            g.axes[3][3].axvline(x=gain, ls='--', c='black')
 
-        # plot dirac
-        g.axes[0][0].axvline(x=C, ls='--', c='black')
-        g.axes[1][1].axvline(x=mu, ls='--', c='black')
-        g.axes[2][2].axvline(x=sigma, ls='--', c='black')
+            # plot dirac
+            g.axes[0][0].axvline(x=C, ls='--', c='black')
+            g.axes[1][1].axvline(x=mu, ls='--', c='black')
+            g.axes[2][2].axvline(x=sigma, ls='--', c='black')
 
     font = font_manager.FontProperties(family='serif', size=21)
 

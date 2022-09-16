@@ -200,3 +200,4 @@ def get_lct_results(lct_paths, alpha=0.05, n_dims=4, pvalues=True):
         df_results = pd.DataFrame(test_results)
         df = df_test_stats.add_prefix('test_stats__').join(df_pvalues.add_prefix('p_values__')).join(df_results.add_prefix('lct_results__'))
     return df
+    

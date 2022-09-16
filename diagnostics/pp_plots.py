@@ -10,7 +10,7 @@ import torch.distributions as D
 
 from matplotlib.lines import Line2D
 
-from scipy.stats import hmean
+from scipy.stats import hmean, binom
 
 
 sys.path.append("../")
@@ -85,7 +85,11 @@ def PP_plot_1D(
     colors_r_alpha=["red"],
     labels=["Target"],
     title="PIT-distribution",
+    ylabel=r"$r_{\alpha}(x_0)$",
+    xlabel=r"$\alpha$",
     pvalue = None,
+    sbc_ranks = None,
+    confidence_int = False,
 ):
     """1D PP-plot: distribution of the PIT vs. uniform distribution
         It shows the deviation to the identity function and thus
@@ -112,6 +116,9 @@ def PP_plot_1D(
             pp_vals = PP_vals(Z, alphas)
             # Plot the quantiles as a function of alpha
             plt.plot(alphas, pp_vals, color=colors[i], label=labels[i])
+            if sbc_ranks is not None:
+                sbc_cdf = np.histogram(sbc_ranks[:,i], bins=len(alphas))[0].cumsum()
+                plt.plot(alphas, sbc_cdf/sbc_cdf.max(), '--', color=colors[i], label=labels[i])
 
     handles_new = []
     if r_alpha_learned is not None:
@@ -144,9 +151,30 @@ def PP_plot_1D(
     if pvalue is not None:
         plt.text(0.9,0.1, f'pvalue = {pvalue}', horizontalalignment='center')
 
+    if confidence_int:
+        # Construct uniform histogram.
+        N = len(PIT_values[0])
+        nbins = len(alphas)
+        hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
+        hbb = hb.cumsum() / hb.sum()
+        # avoid last value being exactly 1
+        hbb[-1] -= 1e-9
+
+        lower = [binom(N, p=p).ppf(0.005) for p in hbb]
+        upper = [binom(N, p=p).ppf(0.995) for p in hbb]
+
+        # Plot grey area with expected ECDF.
+        plt.fill_between(
+            x=np.linspace(0, 1, nbins),
+            y1=np.repeat(lower / np.max(lower), 1),
+            y2=np.repeat(upper / np.max(lower), 1),
+            color="grey",
+            alpha=0.3,
+        )
+
     plt.legend(handles=handles)
-    plt.ylabel(r"$r_{\alpha}(x_0)$", fontsize=15)
-    plt.xlabel(r"$\alpha$", fontsize=15)
+    plt.ylabel(ylabel, fontsize=15)
+    plt.xlabel(xlabel, fontsize=15)
     plt.title(title, fontsize=18)
     plt.show()
 
@@ -213,3 +241,43 @@ def multi_pp_plots(lct_paths, x_eval_names, param_names, pvalues = True, title =
                 title=title+f"{x_eval_name}",
                 pvalue = hmean_pvalue,
             )
+
+
+def sbc_plot(sbc_ranks, colors, labels, alphas = np.linspace(0,1,100), confidence_int = True, title="SBC"):
+    mpl.rcParams["font.family"] = "serif"
+    mpl.rcParams['axes.formatter.use_mathtext'] = True
+    mpl.rcParams['mathtext.fontset'] = 'cm'
+
+    lims = [np.min([0, 0]), np.max([1, 1])]
+    plt.plot(lims, lims, "--", color="black", alpha=0.75)
+
+    for i in range(len(sbc_ranks[0])):
+        sbc_cdf = np.histogram(sbc_ranks[:,i], bins=len(alphas))[0].cumsum()
+        plt.plot(alphas, sbc_cdf/sbc_cdf.max(), color=colors[i], label=labels[i])
+
+    if confidence_int:
+        # Construct uniform histogram.
+        N = len(sbc_ranks)
+        nbins = len(alphas)
+        hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
+        hbb = hb.cumsum() / hb.sum()
+        # avoid last value being exactly 1
+        hbb[-1] -= 1e-9
+
+        lower = [binom(N, p=p).ppf(0.005) for p in hbb]
+        upper = [binom(N, p=p).ppf(0.995) for p in hbb]
+
+        # Plot grey area with expected ECDF.
+        plt.fill_between(
+            x=np.linspace(0, 1, nbins),
+            y1=np.repeat(lower / np.max(lower), 1),
+            y2=np.repeat(upper / np.max(lower), 1),
+            color="grey",
+            alpha=0.3,
+        )
+    
+    plt.ylabel('empirical CDF', fontsize=15)
+    plt.xlabel('ranks', fontsize=15)
+    plt.title(title, fontsize=18)
+    plt.legend()
+    plt.show()

@@ -72,3 +72,28 @@ def multi_global_consistency(
     axes[1].set_xlabel(r"$\alpha$", fontsize=15)
     axes[1].set_title("Global PIT", fontsize=18)
     return fig
+
+
+def multi_local_consistency(df_lct_results, gain_list, colors, labels):
+
+    plt.rcParams.update(
+        figsizes.neurips2022(nrows=2, ncols=3, height_to_width_ratio=0.8)
+    )
+    fig, axes = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True)
+
+    # test statistics
+    for i in range(1, 5):
+        plt.plot(
+            gain_list,
+            df_lct_results[f"dim_{i}"],
+            marker="x",
+            color=colors[i - 1],
+            label=labels[i - 1],
+        )
+
+    plt.legend()
+    plt.xlabel(r"$g_0$")
+    plt.ylabel(r"$T_i(x_0)$")
+    plt.title(r"Local test statistics")
+    plt.show()
+

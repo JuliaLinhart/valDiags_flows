@@ -35,11 +35,16 @@ def multi_cde_pit_values(
                 .numpy()
             )
         else:
-            conditional_transform_1d = D.Normal(0, 1).cdf(
-                flow._transform(samples_theta, context=feature_transform(samples_x))[0][
-                    :, i
-                ]
-            ).detach().numpy()
+            conditional_transform_1d = (
+                D.Normal(0, 1)
+                .cdf(
+                    flow._transform(
+                        samples_theta, context=feature_transform(samples_x)
+                    )[0][:, i]
+                )
+                .detach()
+                .numpy()
+            )
 
         pit_values.append(conditional_transform_1d)
 
@@ -87,9 +92,9 @@ def PP_plot_1D(
     title="PIT-distribution",
     ylabel=r"$r_{\alpha}(x_0)$",
     xlabel=r"$\alpha$",
-    pvalue = None,
-    sbc_ranks = None,
-    confidence_int = False,
+    pvalue=None,
+    sbc_ranks=None,
+    confidence_int=False,
 ):
     """1D PP-plot: distribution of the PIT vs. uniform distribution
         It shows the deviation to the identity function and thus
@@ -103,8 +108,8 @@ def PP_plot_1D(
         - r_alpha_learned: regressed quantile values for local PIT
     """
     mpl.rcParams["font.family"] = "serif"
-    mpl.rcParams['axes.formatter.use_mathtext'] = True
-    mpl.rcParams['mathtext.fontset'] = 'cm'
+    mpl.rcParams["axes.formatter.use_mathtext"] = True
+    mpl.rcParams["mathtext.fontset"] = "cm"
     # plot identity function
     fig = plt.figure()
     lims = [np.min([0, 0]), np.max([1, 1])]
@@ -117,8 +122,14 @@ def PP_plot_1D(
             # Plot the quantiles as a function of alpha
             plt.plot(alphas, pp_vals, color=colors[i], label=labels[i])
             if sbc_ranks is not None:
-                sbc_cdf = np.histogram(sbc_ranks[:,i], bins=len(alphas))[0].cumsum()
-                plt.plot(alphas, sbc_cdf/sbc_cdf.max(), '--', color=colors[i], label=labels[i])
+                sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
+                plt.plot(
+                    alphas,
+                    sbc_cdf / sbc_cdf.max(),
+                    "--",
+                    color=colors[i],
+                    label=labels[i],
+                )
 
     handles_new = []
     if r_alpha_learned is not None:
@@ -149,11 +160,11 @@ def PP_plot_1D(
         handles = handles_new
 
     if pvalue is not None:
-        plt.text(0.9,0.1, f'pvalue = {pvalue}', horizontalalignment='center')
+        plt.text(0.9, 0.1, f"pvalue = {pvalue}", horizontalalignment="center")
 
     if confidence_int:
         # Construct uniform histogram.
-        N = len(PIT_values[0])
+        N = 1000
         nbins = len(alphas)
         hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
         hbb = hb.cumsum() / hb.sum()
@@ -212,18 +223,30 @@ def compare_pp_plots_regression(
         plt.show()
 
 
-def multi_pp_plots(lct_paths, x_eval_names, param_names, pvalues = True, title = r"PP-plot at $x_0$"):
-    
+def multi_pp_plots(
+    lct_paths,
+    x_eval_names,
+    param_names,
+    pvalues=True,
+    title=r"PP-plot at $x_0$",
+    xlabel=r"$\alpha$",
+    ylabel=r"$r_{i,\alpha}(x_0)$",
+    confidence_int=False,
+):
+
     for i, x_eval_name in enumerate(x_eval_names):
         for k in range(len(lct_paths)):
             lct_dict = torch.load(lct_paths[k][i])
 
-            r_alpha_learned = lct_dict['r_alpha_learned']
-            hmean_pvalue = None 
+            r_alpha_learned = lct_dict["r_alpha_learned"]
+            hmean_pvalue = None
             labels = param_names
             if pvalues:
-                pvalues = lct_dict['pvalues']
-                labels = [param_names[i-1]+f", pvalue={pvalues[f'dim_{i}']}" for i in range(1,len(param_names)+1)]
+                pvalues = lct_dict["pvalues"]
+                labels = [
+                    param_names[i - 1] + f", pvalue={pvalues[f'dim_{i}']}"
+                    for i in range(1, len(param_names) + 1)
+                ]
                 hmean_pvalue = np.round(hmean(list(pvalues.values())), decimals=3)
 
             PP_plot_1D(
@@ -238,22 +261,32 @@ def multi_pp_plots(lct_paths, x_eval_names, param_names, pvalues = True, title =
                 colors=["orange", "red"],
                 colors_r_alpha=["orange", "red", "purple", "blue"],
                 labels=labels,
-                title=title+f"{x_eval_name}",
-                pvalue = hmean_pvalue,
+                title=title + f"{x_eval_name}",
+                pvalue=hmean_pvalue,
+                xlabel=xlabel,
+                ylabel=ylabel,
+                confidence_int=confidence_int,
             )
 
 
-def sbc_plot(sbc_ranks, colors, labels, alphas = np.linspace(0,1,100), confidence_int = True, title="SBC"):
+def sbc_plot(
+    sbc_ranks,
+    colors,
+    labels,
+    alphas=np.linspace(0, 1, 100),
+    confidence_int=True,
+    title="SBC",
+):
     mpl.rcParams["font.family"] = "serif"
-    mpl.rcParams['axes.formatter.use_mathtext'] = True
-    mpl.rcParams['mathtext.fontset'] = 'cm'
+    mpl.rcParams["axes.formatter.use_mathtext"] = True
+    mpl.rcParams["mathtext.fontset"] = "cm"
 
     lims = [np.min([0, 0]), np.max([1, 1])]
     plt.plot(lims, lims, "--", color="black", alpha=0.75)
 
     for i in range(len(sbc_ranks[0])):
-        sbc_cdf = np.histogram(sbc_ranks[:,i], bins=len(alphas))[0].cumsum()
-        plt.plot(alphas, sbc_cdf/sbc_cdf.max(), color=colors[i], label=labels[i])
+        sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
+        plt.plot(alphas, sbc_cdf / sbc_cdf.max(), color=colors[i], label=labels[i])
 
     if confidence_int:
         # Construct uniform histogram.
@@ -275,9 +308,9 @@ def sbc_plot(sbc_ranks, colors, labels, alphas = np.linspace(0,1,100), confidenc
             color="grey",
             alpha=0.3,
         )
-    
-    plt.ylabel('empirical CDF', fontsize=15)
-    plt.xlabel('ranks', fontsize=15)
+
+    plt.ylabel("empirical CDF", fontsize=15)
+    plt.xlabel("ranks", fontsize=15)
     plt.title(title, fontsize=18)
     plt.legend()
     plt.show()

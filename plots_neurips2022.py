@@ -107,7 +107,9 @@ def multi_local_consistency(
     plt.rcParams["font.size"] = 15.0
     plt.rcParams["axes.titlesize"] = 18.0
 
-    fig, axes = plt.subplots(nrows=2, ncols=5, constrained_layout=False)
+    fig, axes = plt.subplots(
+        nrows=2, ncols=5, constrained_layout=False, sharex="row", sharey="row"
+    )
 
     for ax in axes:
         ax[-2].set_visible(False)

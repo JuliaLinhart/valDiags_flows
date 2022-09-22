@@ -57,7 +57,7 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
     # which example case we are considering here
     meta_parameters["case"] = PATH+"JRNMM_nextra_{:02}_trec_{}" \
                     "naive_{}_" \
-                    "single_rec_{}".format(meta_parameters["n_extra"],
+                    "single_rec_{}_nostandardize_n_layers_1".format(meta_parameters["n_extra"],
                                         t_rec,
                                         meta_parameters["naive"],
                                         single_rec)
@@ -105,8 +105,9 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
                                 embedding_net=IdentityJRNMM(),
                                 naive=meta_parameters["naive"],
                                 aggregate=True,
-                                z_score_theta=True,
-                                z_score_x=True)  
+                                z_score_theta=False,
+                                z_score_x=False,
+                                n_layers=1)  
 
     _ = run_inference(simulator=simulator, 
                     prior=prior, 

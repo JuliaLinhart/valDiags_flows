@@ -247,9 +247,11 @@ def build_flow(batch_theta,
 
 
 def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
-                  meta_parameters, round_=0, batch_theta=None, batch_x=None):
-
-    folderpath = Path.cwd() / meta_parameters["label"]
+                  meta_parameters, round_=0, batch_theta=None, batch_x=None, path=None):
+    if path is not None:
+        folderpath = path
+    else:
+        folderpath = Path.cwd() / meta_parameters["label"]
 
     if batch_theta is None:
         batch_theta = prior.sample((2,))
@@ -260,15 +262,15 @@ def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
 
     nn_posterior = build_nn_posterior(batch_theta=batch_theta,
                                       batch_x=batch_x)
-    nn_posterior.eval()
-    posterior = DirectPosterior(
-        posterior_estimator=nn_posterior, prior=prior,
-        x_shape=batch_x[0][None, :].shape
-    )
+    # nn_posterior.eval()
+    # posterior = DirectPosterior(
+    #     posterior_estimator=nn_posterior, prior=prior,
+    #     x_shape=batch_x[0][None, :].shape
+    # )
 
-    state_dict_path = folderpath / f"nn_posterior_round_{round_:02}.pkl"
-    posterior.posterior_estimator.load_state(state_dict_path)
+    state_dict_path = folderpath+f"nn_posterior_round_{round_:02}.pkl"
+    nn_posterior.load_state(state_dict_path)
     # posterior = posterior.set_default_x(ground_truth["observation"])
 
-    return posterior
+    return nn_posterior
 

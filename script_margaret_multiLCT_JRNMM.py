@@ -29,8 +29,8 @@ POSTERIOR = torch.load(
     + f"posteriors_amortized/{METHOD}_posterior_nextra_{N_EXTRA}_single_rec_{SINGLE_REC}_nsim_{N_SIM}.pkl"
 )
 
-EXP_NAME = 'max_iter_exp'
-# EXP_NAME = 'baseline'
+# EXP_NAME = 'max_iter_exp'
+EXP_NAME = 'baseline'
 # EXP_NAME = 't_stat_variance_exp'
 # EXP_NAME = "reg_eval"
 # EXP_NAME = 'histgrad30'
@@ -52,37 +52,37 @@ X_OBS_GAIN_NO_STOCH = torch.load(
 )
 
 N_TRIALS = 1000
-N_ALPHAS = 21
-ALPHA_MAX = 1
+N_ALPHAS = 100
+ALPHA_MAX = 0.99
 
 # MAX_ITER = 40
 # MAX_ITER_LIST = np.linspace(10, 200, 20, dtype=int)
-MAX_ITER_LIST = [100]
+# MAX_ITER_LIST = [100]
 
 # CLF = HistGradientBoostingClassifier(
 #     monotonic_cst=[0 for i in range(33)] + [1], max_iter=MAX_ITER
 # )
-CLF_LIST = [
-    HistGradientBoostingClassifier(
-        monotonic_cst=[0 for i in range(33)] + [1], max_iter=it
-    )
-    for it in MAX_ITER_LIST
-]
+# CLF_LIST = [
+#     HistGradientBoostingClassifier(
+#         monotonic_cst=[0 for i in range(33)] + [1], max_iter=it
+#     )
+#     for it in MAX_ITER_LIST
+# ]
 # CLF = HistGradientBoostingClassifier(
 #     monotonic_cst=[0 for i in range(33)] + [0], max_iter=MAX_ITER
 # )
-# CLF = MLPClassifier(alpha=0, max_iter=25000)
-# CLF_LIST = [CLF for i in range(NB_CLASSIFIERS)]
+CLF = MLPClassifier(alpha=0, max_iter=25000)
+CLF_LIST = [CLF for i in range(NB_CLASSIFIERS)]
 
-REG_METHOD = partial(localPIT_regression_sample, nb_samples=50)
-# REG_METHOD = partial(
-#     localPIT_regression_baseline, alphas=np.linspace(0, ALPHA_MAX, N_ALPHAS)
-# )
+# REG_METHOD = partial(localPIT_regression_sample, nb_samples=50)
+REG_METHOD = partial(
+    localPIT_regression_baseline, alphas=np.linspace(0, ALPHA_MAX, N_ALPHAS)
+)
 
-# METHOD_NAME_LIST = [f"baseline_mlp_nalpha_{N_ALPHAS}"]
+METHOD_NAME_LIST = [f"baseline_mlp_nalpha_{N_ALPHAS}"]
 # METHOD_NAME = "sample50_histgrad90_no_monoton"
 # METHOD_NAME = 'sample50_histgrad90'
-METHOD_NAME_LIST = [f"sample50_histgrad90_maxiter_{it}" for it in MAX_ITER_LIST]
+# METHOD_NAME_LIST = [f"sample50_histgrad90_maxiter_{it}" for it in MAX_ITER_LIST]
 # METHOD_NAME_LIST = [f"baseline_mlp_nalpha_{N_ALPHAS}_n_clf_{i}" for i in range(NB_CLASSIFIERS)]
 # METHOD_NAME_LIST = [
 #     f"sample50_histgrad130_{N_ALPHAS}_n_clf_{i}" for i in range(NB_CLASSIFIERS)
@@ -119,7 +119,7 @@ def train_classifiers(
     pit_values_train_flow = multi_cde_pit_values(
         theta_train, x_train, flow, feature_transform=feature_transform
     )
-    for i in range(len(MAX_ITER_LIST)):
+    for i in range(NB_CLASSIFIERS):
         if not null:
 
             _, trained_clfs = multi_local_pit_regression(
@@ -132,7 +132,7 @@ def train_classifiers(
             torch.save(
                 trained_clfs,
                 PATH_EXPERIMENT
-                + f"trained_classifiers/{EXP_NAME}/classifiers_{method_name_list[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl",
+                + f"trained_classifiers/new_{EXP_NAME}/classifiers_{method_name_list[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl",
             )
         else:
             trained_clfs_null = []
@@ -152,7 +152,7 @@ def train_classifiers(
             torch.save(
                 trained_clfs_null,
                 PATH_EXPERIMENT
-                + f"trained_classifiers/{EXP_NAME}/classifiers_{method_name_list[i]}_null_ntrials_{n_trials}.pkl",
+                + f"trained_classifiers/new_{EXP_NAME}/classifiers_{method_name_list[i]}_null_ntrials_{n_trials}.pkl",
             )
 
 
@@ -166,15 +166,15 @@ def compute_multi_lct_values(
     k=None,
     gain=None,
 ):
-    for i in range(len(MAX_ITER_LIST)):
+    for i in range(NB_CLASSIFIERS):
         trained_clfs = torch.load(
             PATH_EXPERIMENT
-            + f"trained_classifiers/{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl"
+            + f"trained_classifiers/new_{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl"
         )
         if return_pvalues:
             trained_clfs_null = torch.load(
                 PATH_EXPERIMENT
-                + f"trained_classifiers/{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_null_ntrials_{n_trials}.pkl"
+                + f"trained_classifiers/new_{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_null_ntrials_{n_trials}.pkl"
             )
         else:
             trained_clfs_null = None
@@ -197,7 +197,7 @@ def compute_multi_lct_values(
         if gain is not None:
             filename = (
                 PATH_EXPERIMENT
-                + f"lct_results/naive_nextra_{N_EXTRA}_nsim_{N_SIM}/gain/histgrad{MAX_ITER_LIST[i]}/lct_results_{METHOD_NAME_LIST[i]}_ntrials_{n_trials}_n_alphas_{N_ALPHAS}_gain_{gain}.pkl"
+                + f"lct_results/naive_nextra_{N_EXTRA}_nsim_{N_SIM}/gain_new/baseline/lct_results_{METHOD_NAME_LIST[i]}_ntrials_{n_trials}_n_alphas_{N_ALPHAS}_gain_{gain}.pkl"
             )
         else:
             filename = (
@@ -266,25 +266,25 @@ with executor.batch():
     #     }
     #     tasks.append(executor.submit(train_classifiers, **kwargs))
 
-    kwargs = {
-            "theta_train": DATASETS["B_prime"]["theta"],
-            "x_train": DATASETS["B_prime"]["x"],
-            "null": True,
-            "method_name_list": METHOD_NAME_LIST,
-            "clf_list": CLF_LIST,
-        }
-    tasks.append(executor.submit(train_classifiers, **kwargs))
-
-
-    # for g, x in zip(GAIN_LIST, X_OBS_GAIN):
-    #     kwargs = {
+    # kwargs = {
     #         "theta_train": DATASETS["B_prime"]["theta"],
     #         "x_train": DATASETS["B_prime"]["x"],
-    #         "x_obs": x[None,:,:],
-    #         "gain":g,
-    #         "return_pvalues":True,
+    #         "null": False,
+    #         "method_name_list": METHOD_NAME_LIST,
+    #         "clf_list": CLF_LIST,
     #     }
-    #     tasks.append(executor.submit(compute_multi_lct_values, **kwargs))
+    # tasks.append(executor.submit(train_classifiers, **kwargs))
+
+
+    for g, x in zip(GAIN_LIST, X_OBS_GAIN):
+        kwargs = {
+            "theta_train": DATASETS["B_prime"]["theta"],
+            "x_train": DATASETS["B_prime"]["x"],
+            "x_obs": x[None,:,:],
+            "gain":g,
+            "return_pvalues":False,
+        }
+        tasks.append(executor.submit(compute_multi_lct_values, **kwargs))
 
     # k_list = [19, 18, 15, 14, 13, 10, 9, 17]
     # for k in range(20):

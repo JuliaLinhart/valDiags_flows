@@ -27,7 +27,11 @@ def plot_pdf_1D(x_samples, x_i, x_f, target_dist=None, flows=None, context=None)
     if target_dist is not None:
         labels += ["True"]
         try:
-            p_x_true = torch.exp(target_dist.log_prob(eval_x, context=context))
+            if context is not None:
+                p_x_true = torch.exp(target_dist.log_prob(eval_x, context=context))
+            else:
+                p_x_true = torch.exp(target_dist.log_prob(eval_x))
+
             plt.plot(eval_x.numpy(), p_x_true.detach().numpy(), "--", color="blue")
         except ValueError:  # in case of exponential distribution
             eval_x_pos = torch.linspace(0.01, x_f).reshape(-1, 1)
@@ -38,7 +42,10 @@ def plot_pdf_1D(x_samples, x_i, x_f, target_dist=None, flows=None, context=None)
         for flow, ct, col in list(flows.values()):
             if ct is not None:
                 ct = ct.repeat(eval_x.size(0), 1)
-            p_x_learned = torch.exp(flow.log_prob(eval_x, context=ct))
+                p_x_learned = torch.exp(flow.log_prob(eval_x, context=ct))
+            else:
+                p_x_learned = torch.exp(flow.log_prob(eval_x))
+
             plt.plot(eval_x.numpy(), p_x_learned.detach().numpy(), color=col)
         labels += list(flows.keys())
 

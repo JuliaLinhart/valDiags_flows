@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from tueplots import figsizes, fonts, fontsizes
+import matplotlib.gridspec as gridspec
 
 
 import numpy as np
@@ -23,7 +24,7 @@ def multi_global_consistency(
     ylabel_sbc="empirical CDF",
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
-    plt.rcParams["figure.figsize"] = (12, 6)
+    plt.rcParams["figure.figsize"] = (10, 5)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams["legend.fontsize"] = 15.0
     plt.rcParams["xtick.labelsize"] = 15.0
@@ -70,6 +71,8 @@ def multi_global_consistency(
         axes[0].plot(alphas, sbc_cdf / sbc_cdf.max(), color=colors[i], label=labels[i])
 
     axes[0].set_ylabel(ylabel_sbc)
+    axes[0].set_ylim(0, 1)
+    axes[0].set_xlim(0, 1)
     axes[0].set_xlabel("ranks")
     axes[0].set_title("SBC")
     axes[0].legend(title="1D-plots for", loc="upper left")
@@ -98,7 +101,7 @@ def multi_local_consistency(
     # plt.rcParams.update(
     #     figsizes.neurips2022(nrows=2, ncols=3, height_to_width_ratio=1,)
     # )
-    plt.rcParams["figure.figsize"] = (20, 8)
+    plt.rcParams["figure.figsize"] = (10, 10)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams["legend.fontsize"] = 15.0
     plt.rcParams["xtick.labelsize"] = 15.0
@@ -107,85 +110,97 @@ def multi_local_consistency(
     plt.rcParams["font.size"] = 15.0
     plt.rcParams["axes.titlesize"] = 18.0
 
-    fig, axes = plt.subplots(
-        nrows=2, ncols=5, constrained_layout=False, sharex="row", sharey="row"
-    )
+    fig = plt.figure(figsize=(10, 10), constrained_layout=True)
+    gs = gridspec.GridSpec(2, 3)
 
-    for ax in axes:
-        ax[-2].set_visible(False)
-        ax[-1].set_visible(False)
+    ax = fig.add_subplot(gs[0, :])
+    ax.set_ylabel("YLabel0")
+    ax.set_xlabel("XLabel0")
 
-    # axes1 = subfigs[0].subplots(nrows=1, ncols=3)
+    ax0 = fig.add_subplot(gs[1, 0])
+    ax1 = fig.add_subplot(gs[1, 1], sharex=ax0)
+    ax2 = fig.add_subplot(gs[1, 2], sharex=ax0)
+    axes = [ax0, ax1, ax2]
+    # ax0.set_ylabel('YLabel1')
+    for ax1 in [ax1, ax2]:
+        ax1.set_yticklabels([])
+
+    # fig, axes = plt.subplots(
+    #     nrows=2, ncols=5, constrained_layout=False, sharex="row", sharey="row"
+    # )
+
+    # for ax in axes:
+    #     ax[-2].set_visible(False)
+    #     ax[-1].set_visible(False)
 
     # test statistics
     df_lct_results = get_lct_results(lct_path_list, pvalues=False)
     df_lct_results.index = gain_list
     for i in range(1, 5):
-        axes[0][1].plot(
+        ax.plot(
             gain_list,
             df_lct_results[f"dim_{i}"],
             marker="o",
-            markersize=1,
+            markersize=1.5,
             color=colors[i - 1],
             label=labels[i - 1],
             linewidth=1,
         )
 
-    axes[0][1].yaxis.set_tick_params(which="both", labelleft=True)
-    axes[0][1].set_xticks([gain_list[i] for i in [0, 2, 4, 6, 8]])
-    axes[0][1].set_yticks(
+    ax.yaxis.set_tick_params(which="both", labelleft=True)
+    ax.set_xticks(gain_list)
+    ax.set_yticks(
         np.round(np.linspace(0, np.max(df_lct_results.values), 5, endpoint=False), 2)
     )
 
-    axes[0][1].set_xlabel(r"$g_0$")
-    axes[0][1].set_ylabel(r"$T_i(x_0)$")
-    # axes1[1].legend()
-    handles = axes[0][1].get_legend_handles_labels()
-    axes[0][1].legend(
+    ax.set_xlabel(r"$g_0$")
+    ax.set_ylabel(r"$T_i(x_0)$")
+    handles = ax.get_legend_handles_labels()
+    ax.legend(
         handles=handles[0],
         title="1D-plots for",
-        # loc="upper right",
-        bbox_to_anchor=axes[0][1].get_position().get_points()[1]
-        + np.array([1.6, -0.08]),
+        loc="upper right",
+        # bbox_to_anchor=ax.get_position().get_points()[1]
+        # + np.array([1.6, -0.08]),
     )
 
-    axes[0][1].set_title("Local Test statistics")
+    ax.set_title("Local Test statistics")
 
     # pp-plots
     # axes = subfigs[1].subplots(nrows=1, ncols=3, sharex=True, sharey=True)
 
-    for n, (x0, g0) in enumerate(zip([0, 4, 8], [-20, 0, 20])):
+    for n, (ax1, x0, g0) in enumerate(zip(axes, [0, 4, 8], [-20, 0, 20])):
         r_alpha_x0 = torch.load(lct_path_list[x0])["r_alpha_learned"]
         # plot identity function
         lims = [np.min([0, 0]), np.max([1, 1])]
-        axes[1][n].plot(lims, lims, "--", color="black", alpha=0.75)
+        ax1.plot(lims, lims, "--", color="black", alpha=0.75)
         # plot pp-plots
         for i in range(1, 5):
-            axes[1][n].plot(
+            ax1.plot(
                 np.linspace(0, 1, 100),
                 pd.Series(r_alpha_x0[f"dim_{i}"]),
                 color=colors[i - 1],
                 marker="o",
-                markersize=1,
+                markersize=1.5,
                 linestyle="",
             )
-        axes[1][n].set_xlabel(r"$\alpha$", fontsize=15)
+        ax1.set_xlabel(r"$\alpha$", fontsize=15)
         if n == 1:
-            axes[1][n].set_title("Local PP-plots", y=-0.3)
-        axes[1][n].text(0.05, 0.95, r"$g_0=$" + f"{g0}", fontsize=15)
-        plt.setp(axes[1][n].spines.values(), color=colors_g0[n])
-    axes[1][0].set_ylabel(r"$\hat{r}_{i,\alpha}(x_0)$")
+            ax1.set_title("Local PP-plots")
+        ax1.text(0.01, 0.93, r"$g_0=$" + f"{g0}", fontsize=15)
+        plt.setp(ax1.spines.values(), color=colors_g0[n])
+    axes[0].set_ylabel(r"$\hat{r}_{i,\alpha}(x_0)$")
+    axes[0].set_yticks([0.0, 0.5, 1.0])
 
-    for ax in axes[1]:
-        ax.set_aspect("equal")
-        ax.set_aspect("equal")
-        ax.set_aspect("equal")
+    # plt.subplots_adjust(wspace=None, hspace=0.4)
 
-    # for ax in axes1:
-    #     ax.set_aspect("equal")
-
-    for j in [0, 2]:
-        axes[0][j].set_visible(False)
+    for ax1 in axes:
+        ax1.set_aspect("equal")
+    # ax.set_aspect("equal")
+    # for j in [0, 2]:
+    #     axes[0][j].set_visible(False)
+    ax.set_xlim(-20.1, 20.1)
+    # fig.align_ylabels()
 
     return fig
 
@@ -193,7 +208,7 @@ def multi_local_consistency(
 def plot_pairgrid_with_groundtruth(
     posteriors, theta_gt, color_dict, handles, context, n_samples=10000, title=None
 ):
-    plt.rcParams["figure.figsize"] = (20, 8)
+    plt.rcParams["figure.figsize"] = (6, 6)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams["legend.fontsize"] = 15.0
     plt.rcParams["xtick.labelsize"] = 15.0
@@ -277,7 +292,7 @@ def plot_pairgrid_with_groundtruth(
         bbox_to_anchor=(1.1, 4.3),
         # loc="upper right",
     )
-    g.fig.suptitle("Local pair-plots", y=1.05)
+    g.fig.suptitle("Local pair-plots", y=1.02)
 
     return g
 

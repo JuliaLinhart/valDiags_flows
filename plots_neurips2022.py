@@ -18,10 +18,12 @@ def multi_global_consistency(
     multi_PIT_values,
     alphas,
     sbc_ranks,
-    labels,
-    colors,
-    ylabel_pit=r"empirical $r_{i,\alpha}$",
-    ylabel_sbc="empirical CDF",
+    labels_sbc,
+    labels_pit,
+    colors_sbc,
+    colors_pit,
+    ylabel_pit=r"empirical $r_{i,\alpha} = \mathbb{P}(P_{i}\leq \alpha)$",
+    ylabel_sbc=r"empirical CDF",
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
     plt.rcParams["figure.figsize"] = (10, 5)
@@ -68,25 +70,27 @@ def multi_global_consistency(
     # sbc ranks
     for i in range(len(sbc_ranks[0])):
         sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
-        axes[0].plot(alphas, sbc_cdf / sbc_cdf.max(), color=colors[i], label=labels[i])
+        axes[0].plot(alphas, sbc_cdf / sbc_cdf.max(), color=colors_sbc[i], label=labels_sbc[i], linewidth=2)
 
     axes[0].set_ylabel(ylabel_sbc)
     axes[0].set_ylim(0, 1)
     axes[0].set_xlim(0, 1)
-    axes[0].set_xlabel("ranks")
+    axes[0].set_xlabel(r"posterior rank $\theta_i$")
     axes[0].set_title("SBC")
-    axes[0].legend(title="1D-plots for", loc="upper left")
+    axes[0].legend(loc="upper left")
 
     # global pit
     for i, Z in enumerate(multi_PIT_values):
         # compute quantiles P_{target}(PIT_values <= alpha)
         pp_vals = PP_vals(Z, alphas)
         # Plot the quantiles as a function of alpha
-        axes[1].plot(alphas, pp_vals, color=colors[i], label=labels[i])
+        axes[1].plot(alphas, pp_vals, color=colors_pit[i], label=labels_pit[i], linewidth=2)
 
     axes[1].set_ylabel(ylabel_pit)
     axes[1].set_xlabel(r"$\alpha$")
     axes[1].set_title("Global PIT")
+    axes[1].legend(loc="upper left")
+
     return fig
 
 
@@ -96,6 +100,7 @@ def multi_local_consistency(
     colors,
     labels,
     colors_g0=["#32327B", "#3838E2", "#52A9F5"],
+    apply_permutation = None,
 ):
 
     # plt.rcParams.update(
@@ -114,8 +119,6 @@ def multi_local_consistency(
     gs = gridspec.GridSpec(2, 3)
 
     ax = fig.add_subplot(gs[0, :])
-    ax.set_ylabel("YLabel0")
-    ax.set_xlabel("XLabel0")
 
     ax0 = fig.add_subplot(gs[1, 0])
     ax1 = fig.add_subplot(gs[1, 1], sharex=ax0)
@@ -125,26 +128,26 @@ def multi_local_consistency(
     for ax1 in [ax1, ax2]:
         ax1.set_yticklabels([])
 
-    # fig, axes = plt.subplots(
-    #     nrows=2, ncols=5, constrained_layout=False, sharex="row", sharey="row"
-    # )
-
-    # for ax in axes:
-    #     ax[-2].set_visible(False)
-    #     ax[-1].set_visible(False)
+    id = list(range(4))
+    iperm= id
+    if apply_permutation:
+        iperm = apply_permutation(id)
 
     # test statistics
     df_lct_results = get_lct_results(lct_path_list, pvalues=False)
+    T_stat = [df_lct_results[f'dim_{i}'] for i in range(1,5)]
+    if apply_permutation is not None:
+        T_stat = apply_permutation(T_stat)
     df_lct_results.index = gain_list
-    for i in range(1, 5):
+    for i,ip in zip(id,iperm):
         ax.plot(
             gain_list,
-            df_lct_results[f"dim_{i}"],
+            df_lct_results[f"dim_{ip+1}"],
             marker="o",
-            markersize=1.5,
-            color=colors[i - 1],
-            label=labels[i - 1],
-            linewidth=1,
+            markersize=3,
+            color=colors[i],
+            label=labels[i],
+            linewidth=2,
         )
 
     ax.yaxis.set_tick_params(which="both", labelleft=True)
@@ -175,11 +178,11 @@ def multi_local_consistency(
         lims = [np.min([0, 0]), np.max([1, 1])]
         ax1.plot(lims, lims, "--", color="black", alpha=0.75)
         # plot pp-plots
-        for i in range(1, 5):
+        for i,ip in zip(id,iperm):
             ax1.plot(
                 np.linspace(0, 1, 100),
-                pd.Series(r_alpha_x0[f"dim_{i}"]),
-                color=colors[i - 1],
+                pd.Series(r_alpha_x0[f"dim_{ip+1}"]),
+                color=colors[i],
                 marker="o",
                 markersize=1.5,
                 linestyle="",
@@ -189,7 +192,7 @@ def multi_local_consistency(
             ax1.set_title("Local PP-plots")
         ax1.text(0.01, 0.93, r"$g_0=$" + f"{g0}", fontsize=15)
         plt.setp(ax1.spines.values(), color=colors_g0[n])
-    axes[0].set_ylabel(r"$\hat{r}_{i,\alpha}(x_0)$")
+    axes[0].set_ylabel(r"$\hat{r}_{_i,\alpha}(x_0)$")
     axes[0].set_yticks([0.0, 0.5, 1.0])
 
     # plt.subplots_adjust(wspace=None, hspace=0.4)
@@ -208,7 +211,7 @@ def multi_local_consistency(
 def plot_pairgrid_with_groundtruth(
     posteriors, theta_gt, color_dict, handles, context, n_samples=10000, title=None
 ):
-    plt.rcParams["figure.figsize"] = (6, 6)
+    plt.rcParams["figure.figsize"] = (9, 9)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams["legend.fontsize"] = 15.0
     plt.rcParams["xtick.labelsize"] = 15.0
@@ -236,7 +239,7 @@ def plot_pairgrid_with_groundtruth(
     g = sns.PairGrid(
         joint_df, hue="mode", palette=color_dict, diag_sharey=False, corner=True
     )
-    g.fig.set_size_inches(6, 6)
+    g.fig.set_size_inches(7.5, 7.5)
 
     g.map_lower(sns.kdeplot, linewidths=1)
     g.map_diag(sns.kdeplot, shade=True, linewidths=1)
@@ -254,18 +257,18 @@ def plot_pairgrid_with_groundtruth(
     # g.axes[2][1].set_xticks([])
 
     g.axes[3][0].set_xlim(10.0, 300.0)  # C
-    g.axes[3][0].set_ylim(-20.0, 20.0)  # gain
+    g.axes[3][0].set_ylim(-22.0, 22.0)  # gain
     g.axes[3][0].set_yticks([-20, 0, 20])
 
     g.axes[3][1].set_xlim(50.0, 500.0)  # mu
-    g.axes[3][1].set_ylim(-20.0, 20.0)  # gain
+    g.axes[3][1].set_ylim(-22.0, 22.0)  # gain
     g.axes[3][1].set_xticks([200, 400])
 
     g.axes[3][2].set_xlim(100.0, 5000.0)  # sigma
-    g.axes[3][2].set_ylim(-20.0, 20.0)  # gain
+    g.axes[3][2].set_ylim(-22.0, 22.0)  # gain
     g.axes[3][2].set_xticks([2000, 4000])
 
-    g.axes[3][3].set_xlim(-20.0, 20.0)  # gain
+    g.axes[3][3].set_xlim(-22.0, 22.0)  # gain
 
     if theta_gt is not None:
         # get groundtruth parameters

@@ -28,12 +28,12 @@ def multi_global_consistency(
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
     plt.rcParams["figure.figsize"] = (10, 5)
     plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams["legend.fontsize"] = 15.0
-    plt.rcParams["xtick.labelsize"] = 15.0
-    plt.rcParams["ytick.labelsize"] = 15.0
-    plt.rcParams["axes.labelsize"] = 15.0
-    plt.rcParams["font.size"] = 15.0
-    plt.rcParams["axes.titlesize"] = 18.0
+    plt.rcParams["legend.fontsize"] = 23.0
+    plt.rcParams["xtick.labelsize"] = 23.0
+    plt.rcParams["ytick.labelsize"] = 23.0
+    plt.rcParams["axes.labelsize"] = 23.0
+    plt.rcParams["font.size"] = 23.0
+    plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axes = plt.subplots(
         nrows=1, ncols=2, sharex=True, sharey=True, constrained_layout=False
@@ -67,29 +67,31 @@ def multi_global_consistency(
         )
         ax.set_aspect("equal")
 
-    # sbc ranks
-    for i in range(len(sbc_ranks[0])):
-        sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
-        axes[0].plot(alphas, sbc_cdf / sbc_cdf.max(), color=colors_sbc[i], label=labels_sbc[i], linewidth=2)
-
-    axes[0].set_ylabel(ylabel_sbc)
-    axes[0].set_ylim(0, 1)
-    axes[0].set_xlim(0, 1)
-    axes[0].set_xlabel(r"posterior rank $\theta_i$")
-    axes[0].set_title("SBC")
-    axes[0].legend(loc="upper left")
-
     # global pit
     for i, Z in enumerate(multi_PIT_values):
         # compute quantiles P_{target}(PIT_values <= alpha)
         pp_vals = PP_vals(Z, alphas)
         # Plot the quantiles as a function of alpha
-        axes[1].plot(alphas, pp_vals, color=colors_pit[i], label=labels_pit[i], linewidth=2)
+        axes[0].plot(alphas, pp_vals, color=colors_pit[i], label=labels_pit[i], linewidth=2)
 
-    axes[1].set_ylabel(ylabel_pit)
-    axes[1].set_xlabel(r"$\alpha$")
-    axes[1].set_title("Global PIT")
+    axes[0].set_yticks([0.0,0.5,1.0])
+    axes[0].set_ylabel(ylabel_pit)
+    axes[0].set_xlabel(r"$\alpha$")
+    axes[0].set_title("Global PIT")
+    axes[0].legend(loc="upper left")
+
+    # sbc ranks
+    for i in range(len(sbc_ranks[0])):
+        sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
+        axes[1].plot(alphas, sbc_cdf / sbc_cdf.max(), color=colors_sbc[i], label=labels_sbc[i], linewidth=2)
+
+    axes[1].set_ylabel(ylabel_sbc)
+    axes[1].set_ylim(0, 1)
+    axes[1].set_xlim(0, 1)
+    axes[1].set_xlabel(r"posterior rank $\theta_i$")
+    axes[1].set_title("SBC")
     axes[1].legend(loc="upper left")
+
 
     return fig
 
@@ -108,12 +110,12 @@ def multi_local_consistency(
     # )
     plt.rcParams["figure.figsize"] = (10, 10)
     plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams["legend.fontsize"] = 15.0
-    plt.rcParams["xtick.labelsize"] = 15.0
-    plt.rcParams["ytick.labelsize"] = 15.0
-    plt.rcParams["axes.labelsize"] = 15.0
-    plt.rcParams["font.size"] = 15.0
-    plt.rcParams["axes.titlesize"] = 18.0
+    plt.rcParams["legend.fontsize"] = 23.0
+    plt.rcParams["xtick.labelsize"] = 23.0
+    plt.rcParams["ytick.labelsize"] = 23.0
+    plt.rcParams["axes.labelsize"] = 23.0
+    plt.rcParams["font.size"] = 23.0
+    plt.rcParams["axes.titlesize"] = 27.0
 
     fig = plt.figure(figsize=(10, 10), constrained_layout=True)
     gs = gridspec.GridSpec(2, 3)
@@ -127,6 +129,8 @@ def multi_local_consistency(
     # ax0.set_ylabel('YLabel1')
     for ax1 in [ax1, ax2]:
         ax1.set_yticklabels([])
+        ax1.set_xticks([0.0,0.5,1.0])
+
 
     id = list(range(4))
     iperm= id
@@ -187,10 +191,10 @@ def multi_local_consistency(
                 markersize=1.5,
                 linestyle="",
             )
-        ax1.set_xlabel(r"$\alpha$", fontsize=15)
+        ax1.set_xlabel(r"$\alpha$", fontsize=23)
         if n == 1:
             ax1.set_title("Local PP-plots")
-        ax1.text(0.01, 0.93, r"$g_0=$" + f"{g0}", fontsize=15)
+        ax1.text(0.01, 0.93, r"$g_0=$" + f"{g0}", fontsize=23)
         plt.setp(ax1.spines.values(), color=colors_g0[n])
     axes[0].set_ylabel(r"$\hat{r}_{_i,\alpha}(x_0)$")
     axes[0].set_yticks([0.0, 0.5, 1.0])
@@ -213,12 +217,12 @@ def plot_pairgrid_with_groundtruth(
 ):
     plt.rcParams["figure.figsize"] = (9, 9)
     plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams["legend.fontsize"] = 15.0
-    plt.rcParams["xtick.labelsize"] = 15.0
-    plt.rcParams["ytick.labelsize"] = 15.0
-    plt.rcParams["axes.labelsize"] = 15.0
-    plt.rcParams["font.size"] = 15.0
-    plt.rcParams["axes.titlesize"] = 18.0
+    plt.rcParams["legend.fontsize"] = 23.0
+    plt.rcParams["xtick.labelsize"] = 23.0
+    plt.rcParams["ytick.labelsize"] = 23.0
+    plt.rcParams["axes.labelsize"] = 23.0
+    plt.rcParams["font.size"] = 23.0
+    plt.rcParams["axes.titlesize"] = 27.0
 
     modes = list(posteriors.keys())
     dfs = []
@@ -239,18 +243,18 @@ def plot_pairgrid_with_groundtruth(
     g = sns.PairGrid(
         joint_df, hue="mode", palette=color_dict, diag_sharey=False, corner=True
     )
-    g.fig.set_size_inches(7.5, 7.5)
+    g.fig.set_size_inches(8, 8)
 
     g.map_lower(sns.kdeplot, linewidths=1)
     g.map_diag(sns.kdeplot, shade=True, linewidths=1)
 
     g.axes[1][0].set_xlim(10.0, 300.0)  # C
     g.axes[1][0].set_ylim(50.0, 500.0)  # mu
-    # g.axes[1][0].set_xticks([])
+    g.axes[1][0].set_yticks([200, 400])
 
     g.axes[2][0].set_xlim(10.0, 300.0)  # C
     g.axes[2][0].set_ylim(100.0, 5000.0)  # sigma
-    # g.axes[2][0].set_xticks([])
+    g.axes[2][0].set_yticks([1000,3500])
 
     g.axes[2][1].set_xlim(50.0, 500.0)  # mu
     g.axes[2][1].set_ylim(100.0, 5000.0)  # sigma
@@ -259,6 +263,7 @@ def plot_pairgrid_with_groundtruth(
     g.axes[3][0].set_xlim(10.0, 300.0)  # C
     g.axes[3][0].set_ylim(-22.0, 22.0)  # gain
     g.axes[3][0].set_yticks([-20, 0, 20])
+    g.axes[3][0].set_xticks([100, 250])
 
     g.axes[3][1].set_xlim(50.0, 500.0)  # mu
     g.axes[3][1].set_ylim(-22.0, 22.0)  # gain
@@ -266,7 +271,7 @@ def plot_pairgrid_with_groundtruth(
 
     g.axes[3][2].set_xlim(100.0, 5000.0)  # sigma
     g.axes[3][2].set_ylim(-22.0, 22.0)  # gain
-    g.axes[3][2].set_xticks([2000, 4000])
+    g.axes[3][2].set_xticks([1000,3500])
 
     g.axes[3][3].set_xlim(-22.0, 22.0)  # gain
 

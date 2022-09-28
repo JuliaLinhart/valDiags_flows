@@ -164,15 +164,15 @@ def PP_plot_1D(
 
     if confidence_int:
         # Construct uniform histogram.
-        N = 1000
+        N = 10000
         nbins = len(alphas)
         hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
         hbb = hb.cumsum() / hb.sum()
         # avoid last value being exactly 1
         hbb[-1] -= 1e-9
 
-        lower = [binom(N, p=p).ppf(0.005) for p in hbb]
-        upper = [binom(N, p=p).ppf(0.995) for p in hbb]
+        lower = [binom(N, p=p).ppf(0.05/2) for p in hbb]
+        upper = [binom(N, p=p).ppf(1-0.05/2) for p in hbb]
 
         # Plot grey area with expected ECDF.
         plt.fill_between(
@@ -297,8 +297,8 @@ def sbc_plot(
         # avoid last value being exactly 1
         hbb[-1] -= 1e-9
 
-        lower = [binom(N, p=p).ppf(0.005) for p in hbb]
-        upper = [binom(N, p=p).ppf(0.995) for p in hbb]
+        lower = [binom(N, p=p).ppf(0.05/2) for p in hbb]
+        upper = [binom(N, p=p).ppf(1-0.05/2) for p in hbb]
 
         # Plot grey area with expected ECDF.
         plt.fill_between(

@@ -60,7 +60,11 @@ def multi_local_pit_regression(
                 classifier=classifier,
             )
         else:
-            trained_clfs_new = trained_clfs
+            if len(trained_clfs) > 1:
+                trained_clfs_new = trained_clfs
+            else:
+                trained_clfs_new[f"dim_{i+1}"] = trained_clfs['dim_1']
+                
         if x_eval is not None and alphas_eval is not None:
             if "baseline" in str(reg_method):
                 local_pit_values[f"dim_{i+1}"] = infer_r_alphas_baseline(

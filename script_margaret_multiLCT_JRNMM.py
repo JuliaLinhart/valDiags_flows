@@ -51,7 +51,7 @@ X_OBS_GAIN_NO_STOCH = torch.load(
     PATH_EXPERIMENT + "gt_observations/nextra_0/gain_experiment_no_stoch_new.pkl"
 )
 
-N_TRIALS = 1000
+N_TRIALS = 100
 N_ALPHAS = 100
 ALPHA_MAX = 0.99
 
@@ -132,16 +132,17 @@ def train_classifiers(
             torch.save(
                 trained_clfs,
                 PATH_EXPERIMENT
-                + f"trained_classifiers/new_{EXP_NAME}/classifiers_{method_name_list[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl",
+                + f"trained_classifiers/5layers/{EXP_NAME}/classifiers_{method_name_list[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl",
             )
         else:
             trained_clfs_null = []
             for _ in range(n_trials):
-                pit_values_train_null = [
-                    np.random.uniform(size=pit_values_train_flow[0].shape)
-                ] * theta_train.shape[-1]
+                # pit_values_train_null = [
+                #     np.random.uniform(size=pit_values_train_flow[0].shape)
+                # ] * theta_train.shape[-1]
+                pit_values_train_null = [np.random.uniform(size=pit_values_train_flow[0].shape)]
                 _, trained_clfs_null_k = multi_local_pit_regression(
-                    dim=theta_train.shape[-1],
+                    dim=len(pit_values_train_null),
                     pit_values_train=pit_values_train_null,
                     x_train=x_train,
                     reg_method=REG_METHOD,
@@ -152,7 +153,7 @@ def train_classifiers(
             torch.save(
                 trained_clfs_null,
                 PATH_EXPERIMENT
-                + f"trained_classifiers/new_{EXP_NAME}/classifiers_{method_name_list[i]}_null_ntrials_{n_trials}.pkl",
+                + f"trained_classifiers/{EXP_NAME}/classifiers_{method_name_list[i]}_null_ntrials_{n_trials}.pkl",
             )
 
 
@@ -169,12 +170,12 @@ def compute_multi_lct_values(
     for i in range(NB_CLASSIFIERS):
         trained_clfs = torch.load(
             PATH_EXPERIMENT
-            + f"trained_classifiers/new_{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl"
+            + f"trained_classifiers/{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_{METHOD}_nextra_{N_EXTRA}_nsim_{N_SIM}.pkl"
         )
         if return_pvalues:
             trained_clfs_null = torch.load(
                 PATH_EXPERIMENT
-                + f"trained_classifiers/new_{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_null_ntrials_{n_trials}.pkl"
+                + f"trained_classifiers/{EXP_NAME}/classifiers_{METHOD_NAME_LIST[i]}_null_ntrials_{n_trials}.pkl"
             )
         else:
             trained_clfs_null = None
@@ -197,7 +198,7 @@ def compute_multi_lct_values(
         if gain is not None:
             filename = (
                 PATH_EXPERIMENT
-                + f"lct_results/naive_nextra_{N_EXTRA}_nsim_{N_SIM}/gain_new/baseline/lct_results_{METHOD_NAME_LIST[i]}_ntrials_{n_trials}_n_alphas_{N_ALPHAS}_gain_{gain}.pkl"
+                + f"lct_results/naive_nextra_{N_EXTRA}_nsim_{N_SIM}/gain/baseline/lct_results_{METHOD_NAME_LIST[i]}_ntrials_{n_trials}_n_alphas_{N_ALPHAS}_gain_{gain}.pkl"
             )
         else:
             filename = (
@@ -257,19 +258,19 @@ with executor.batch():
     #         f"sample50_histgrad{max_iter}_{N_ALPHAS}_n_clf_{i}"
     #         for i in range(NB_CLASSIFIERS)
     #     ]
-    #     kwargs = {
-    #         "theta_train": DATASETS["B_prime"]["theta"],
-    #         "x_train": DATASETS["B_prime"]["x"],
-    #         "null": False,
-    #         "method_name_list": method_name_list,
-    #         "clf_list": clf_list,
-    #     }
-    #     tasks.append(executor.submit(train_classifiers, **kwargs))
+        # kwargs = {
+        #     "theta_train": DATASETS["B_prime"]["theta"],
+        #     "x_train": DATASETS["B_prime"]["x"],
+        #     "null": False,
+        #     "method_name_list": method_name_list,
+        #     "clf_list": clf_list,
+        # }
+        # tasks.append(executor.submit(train_classifiers, **kwargs))
 
     # kwargs = {
     #         "theta_train": DATASETS["B_prime"]["theta"],
     #         "x_train": DATASETS["B_prime"]["x"],
-    #         "null": False,
+    #         "null": True,
     #         "method_name_list": METHOD_NAME_LIST,
     #         "clf_list": CLF_LIST,
     #     }
@@ -282,7 +283,7 @@ with executor.batch():
             "x_train": DATASETS["B_prime"]["x"],
             "x_obs": x[None,:,:],
             "gain":g,
-            "return_pvalues":False,
+            "return_pvalues":True,
         }
         tasks.append(executor.submit(compute_multi_lct_values, **kwargs))
 

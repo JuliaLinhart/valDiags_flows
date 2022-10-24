@@ -204,3 +204,73 @@ def infer_r_alphas_amortized(x_eval, alphas, clf):
 
     return r_alphas
 
+
+def multiPIT_regression_baseline(
+    alphas, pit_values_train, classifier=DEFAULT_CLF,
+):
+    """ Estimate the 1D local PIT-distribution:
+    
+    Algorithm from [Zhao et. al, UAI 2021]: https://arxiv.org/abs/2102.10473
+    --> adapted to multivariate data (conditionals).
+    FOR EVERY ALPHA, the point-wise c.d.f 
+        r_{\alpha} = P(PIT_i <= alpha | PIT_{1:i-1}) = E[1_{PIT_i <= alpha} | PIT_{1:i-1}]
+    is learned as a function of X, by regressing 1_{PIT_i <= alpha} on PIT_{1:i-1}.
+
+    inputs:
+    - alphas: numpy array, size: (K,)
+        Grid of alpha values. One alpha-value equals one regression problem.
+    - pit_values_train: list of numpy arrays of size (N,) for each dim 
+        pit values computed on N samples (\Theta, X) from the joint.
+        Used to compute the regression targets W and the context data.
+    - classifier: object
+        Regression model trained to estimate the point-wise c.d.f. 
+        Default is sklearn.MLPClassifier(alpha=0, max_iter=25000).
+    
+    output:
+    - clfs: dict
+        Trained regression models for each alpha-value.
+    """
+    clfs = {}
+    for i,pit_i in enumerate(pit_values_train):
+        pit_i = pit_i.ravel()
+        clfs[i] = {}
+        if i!=0:
+            # context for conditional regression
+            pit_context_train = np.concatenate(pit_values_train[:i], axis=1)
+            for alpha in alphas:
+                # compute the binary regression targets
+                W_a_train = (pit_i <= alpha).astype(int)  # size: (N,)
+                # define classifier
+                clf = sklearn.base.clone(classifier)
+                # train regression model
+                clf.fit(X=pit_context_train, y=W_a_train)
+                clfs[i][alpha] = clf
+    return clfs
+
+def infer_multiPIT_r_alphas_baseline(pit_eval, clfs):
+    """ Infer the point-wise conditional CDF of the PIT for a given dimension i:
+    r_{\alpha} = P(PIT_i <= alpha | PIT_{1:i-1}) = E[1_{PIT_i <= alpha} | PIT_{1:i-1}]
+
+    inputs:
+    - pit_eval: list of numpy arrays of size (N,) for each dim 1:i-1,
+        pit values PIT_{1:i-1} computed on N samples (\Theta, X) from the joint.
+        Used as context data / regression features.
+    - clfs: dict, keys: alpha-values
+        Trained regression models for each alpha-value. 
+        Ouput from the function "localPIT_regression_baseline". 
+
+    output:
+    - r_alphas: dict, keys: alpha-values 
+        Estimated c.d.f values at x_eval: regressors evaluated in x_eval.
+        There is one for every alpha value.
+    """
+    alphas = np.array(list(clfs.keys()))
+    r_alphas = {}
+    for alpha in alphas:
+        # evaluate in x_eval
+        prob = clfs[alpha].predict_proba(pit_eval)
+        if prob.shape[1] < 2:  # Dummy Classifier
+            r_alphas[alpha] = prob[:, 0][0]
+        else:  # MLPClassifier or other
+            r_alphas[alpha] = prob[:, 1][0]
+    return r_alphas

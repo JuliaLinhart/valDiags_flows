@@ -393,3 +393,24 @@ def compare_pp_plots_regression(
             r"Local PIT-distribution of the flow at $x_0$ = " + str(x_eval.numpy())
         )
         plt.show()
+
+
+# Construct uniform histogram.
+def confidence_region_null(alphas, N=1000, conf_alpha = 0.05):
+    nbins = len(alphas)
+    hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
+    hbb = hb.cumsum() / hb.sum()
+    # avoid last value being exactly 1
+    hbb[-1] -= 1e-9
+
+    lower = [binom(N, p=p).ppf(conf_alpha / 2) for p in hbb]
+    upper = [binom(N, p=p).ppf(1 - conf_alpha / 2) for p in hbb]
+
+    # Plot grey area with expected ECDF.
+    plt.fill_between(
+        x=np.linspace(0, 1, nbins),
+        y1=np.repeat(lower / np.max(lower), 1),
+        y2=np.repeat(upper / np.max(lower), 1),
+        color="grey",
+        alpha=0.3,
+    )

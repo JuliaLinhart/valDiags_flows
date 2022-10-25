@@ -236,22 +236,22 @@ def multiPIT_regression_baseline(
         Trained regression models for each alpha-value.
     """
     clfs = {}
-    for i in range(len(pit_values_train)):
-        # pit_i = pit_i.ravel()
+    for i,pit_i in enumerate(pit_values_train):
+        pit_i = pit_i.ravel()
         clfs[i] = {}
+        if x_train is not None:
+            # context for conditional regression
+            context_features_train = x_train
+            if i!=0:
+                context_features_train = np.concatenate([x_train]+pit_values_train[:i], axis=1)
+        elif x_train is None and i!=0:
+            context_features_train = np.concatenate(pit_values_train[:i], axis=1)
+        else:
+            continue
 
-        for k, alpha in enumerate(alphas):
-            if x_train is not None:
-                # context for conditional regression
-                context_features_train = x_train
-                if i!=0:
-                    context_features_train = np.concatenate([x_train]+[pit_values_train[j][k] for j in range(i)], axis=1)
-            elif x_train is None and i!=0:
-                context_features_train = np.concatenate([pit_values_train[j][k] for j in range(i)], axis=1)
-            else:
-                continue
+        for alpha in alphas:
             # compute the binary regression targets
-            W_a_train = pit_values_train[i][k][:,0]  # size: (N,)
+            W_a_train = (pit_i <= alpha).astype(int)  # size: (N,)
             # define classifier
             clf = sklearn.base.clone(classifier)
             # train regression model
@@ -259,20 +259,17 @@ def multiPIT_regression_baseline(
             clfs[i][alpha] = clf
     return clfs
 
-def infer_multiPIT_r_alphas_baseline(pit_eval, clfs, x_eval=None):
+def infer_multiPIT_r_alphas_baseline(pit_eval, clfs):
     """ Infer the point-wise conditional CDF of the PIT for a given dimension i:
     r_{\alpha} = P(PIT_i <= alpha | PIT_{1:i-1}) = E[1_{PIT_i <= alpha} | PIT_{1:i-1}]
     Computed empirically over test set. 
-
     inputs:
-    - pit_eval: numpy array of size (n_alphas, N,i-1):
-        Pit values PIT_{1:i-1} computed on N test samples (\Theta, X) from the joint.
+    - pit_eval: numpy array of size (N,i-1):
+        Pit values PIT_{1:i-1} computed on N test samples (\Theta) from the target distribution.
         Used as context data / regression features.
     - clfs: dict, keys: alpha-values
         Trained regression models for each alpha-value. 
-        Ouput from the function "localPIT_regression_baseline". 
-    - x_eval: numpy array, size: (1, nb_features)
-        Observation to evaluate the trained regressors in.
+        Ouput from the function "multiPIT_regression_baseline" for dimension i. 
 
     output:
     - r_alphas: dict, keys: alpha-values 
@@ -281,11 +278,16 @@ def infer_multiPIT_r_alphas_baseline(pit_eval, clfs, x_eval=None):
     """
     alphas = np.array(list(clfs.keys()))
     r_alphas = {}
-    for k, alpha in enumerate(alphas):
+    for alpha in alphas:
         # evaluate in pit_eval
-        probs = clfs[alpha].predict_proba(pit_eval[k])
+        probs = clfs[alpha].predict_proba(pit_eval)
         if probs.shape[1] < 2:  # Dummy Classifier
             r_alphas[alpha] = np.mean(probs[:, 0])
         else:  # MLPClassifier or other
             r_alphas[alpha] = np.mean(probs[:, 1])
     return r_alphas
+
+
+
+
+

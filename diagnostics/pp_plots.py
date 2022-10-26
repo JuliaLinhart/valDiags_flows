@@ -121,6 +121,7 @@ def PP_plot_1D(
     xlabel=r"$\alpha$",
     pvalue=None,
     confidence_int=False,
+    conf_alpha = 0.05,
 ):
     """1D PP-plot: c.d.f of the 1D PIT vs. c.d.f of the uniform distribution.
         It shows the deviation to the identity function and thus allows to 
@@ -156,6 +157,8 @@ def PP_plot_1D(
     - confidence_int: bool
         Whether to show the confidence region (acceptance of the null hypothesis).
         Default is False.
+    - conf_alpha: alpha level of the (1-conf-alpha)-confidence region.
+        Default is 0.05, for a confidence level of 0.95.
     """
     # plot identity function
     fig = plt.figure()
@@ -203,23 +206,7 @@ def PP_plot_1D(
     if confidence_int:
         # Construct uniform histogram.
         N = 10000
-        nbins = len(alphas)
-        hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
-        hbb = hb.cumsum() / hb.sum()
-        # avoid last value being exactly 1
-        hbb[-1] -= 1e-9
-
-        lower = [binom(N, p=p).ppf(0.05 / 2) for p in hbb]
-        upper = [binom(N, p=p).ppf(1 - 0.05 / 2) for p in hbb]
-
-        # Plot grey area with expected ECDF.
-        plt.fill_between(
-            x=np.linspace(0, 1, nbins),
-            y1=np.repeat(lower / np.max(lower), 1),
-            y2=np.repeat(upper / np.max(lower), 1),
-            color="grey",
-            alpha=0.3,
-        )
+        confidence_region_null(alphas=alphas, N=N, conf_alpha=conf_alpha)
 
     plt.legend(handles=handles)
     plt.ylabel(ylabel, fontsize=15)
@@ -237,6 +224,7 @@ def multi_pp_plots(
     xlabel=r"$\alpha$",
     ylabel=r"$r_{i,\alpha}(x_0)$",
     confidence_int=False,
+    conf_alpha=0.05,
 ):
     """PP-plot for multivariate target data: 
     C.d.f of every 1D element of the multivariate PIT (one for each dimension) 
@@ -264,6 +252,8 @@ def multi_pp_plots(
     - confidence_int: bool
         Whether to show the confidence region (acceptance of the null hypothesis).
         Default is False.
+    - conf_alpha: alpha level of the (1-conf-alpha)-confidence region.
+        Default is 0.05, for a confidence level of 0.95.
     """
     for i, x_eval_name in enumerate(x_eval_names):
         for k in range(len(lct_paths)):
@@ -297,6 +287,7 @@ def multi_pp_plots(
                 xlabel=xlabel,
                 ylabel=ylabel,
                 confidence_int=confidence_int,
+                conf_alpha=conf_alpha,
             )
 
 
@@ -306,6 +297,7 @@ def sbc_plot(
     labels,
     alphas=np.linspace(0, 1, 100),
     confidence_int=True,
+    conf_alpha=0.05,
     title="SBC",
 ):
     """ PP-plot for SBC validation method: 
@@ -322,6 +314,8 @@ def sbc_plot(
     - confidence_int: bool
         Whether to show the confidence region (acceptance of the null hypothesis).
         Default is True.
+    - conf_alpha: alpha level of the (1-conf-alpha)-confidence region.
+        Default is 0.05, for a confidence level of 0.95.
     - title: sting
         Title of the plot.
     """
@@ -335,23 +329,7 @@ def sbc_plot(
     if confidence_int:
         # Construct uniform histogram.
         N = len(sbc_ranks)
-        nbins = len(alphas)
-        hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
-        hbb = hb.cumsum() / hb.sum()
-        # avoid last value being exactly 1
-        hbb[-1] -= 1e-9
-
-        lower = [binom(N, p=p).ppf(0.05 / 2) for p in hbb]
-        upper = [binom(N, p=p).ppf(1 - 0.05 / 2) for p in hbb]
-
-        # Plot grey area with expected ECDF.
-        plt.fill_between(
-            x=np.linspace(0, 1, nbins),
-            y1=np.repeat(lower / np.max(lower), 1),
-            y2=np.repeat(upper / np.max(lower), 1),
-            color="grey",
-            alpha=0.3,
-        )
+        confidence_region_null(alphas=alphas, N=N, conf_alpha=conf_alpha)
 
     plt.ylabel("empirical CDF", fontsize=15)
     plt.xlabel("ranks", fontsize=15)

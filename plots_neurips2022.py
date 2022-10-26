@@ -26,9 +26,10 @@ def multi_global_consistency(
     ylabel_sbc=r"empirical CDF",
     confidence_int=True,
     conf_alpha=0.05,
+    hpd_values = None,
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
-    plt.rcParams["figure.figsize"] = (10, 5)
+    plt.rcParams["figure.figsize"] = (15, 5)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams.update(axes.color(base="black"))
     plt.rcParams["legend.fontsize"] = 23.0
@@ -39,12 +40,10 @@ def multi_global_consistency(
     plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
-        nrows=1, ncols=2, sharex=True, sharey=True, constrained_layout=False
+        nrows=1, ncols=3, sharex=True, sharey=True, constrained_layout=False
     )
 
     for i, ax in enumerate(axs):
-        if i > 1:
-            ax.set_visible(False)
         # plot identity function
         lims = [np.min([0, 0]), np.max([1, 1])]
         ax.plot(lims, lims, "--", color="black", alpha=0.75)
@@ -103,6 +102,17 @@ def multi_global_consistency(
     axs[1].set_title("SBC")
     axs[1].legend(loc="upper left")
 
+    # hpd_values 
+    if hpd_values is not None:
+        alphas = torch.linspace(0.0, 1.0, len(hpd_values))
+        axs[2].plot(alphas, hpd_values, label=r'$HPD(\mathbf{\theta})$')
+        axs[2].set_ylabel(r'MC-est. $\mathbb{P}(HPD \leq \alpha)$')
+        axs[2].set_ylim(0, 1)
+        axs[2].set_xlim(0, 1)
+        axs[2].set_xlabel(r"$\alpha$")
+        axs[2].set_title("Global HPD")
+        axs[2].legend(loc="upper left")
+        
     return fig
 
 

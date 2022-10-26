@@ -105,7 +105,7 @@ def multi_global_consistency(
     # hpd_values 
     if hpd_values is not None:
         alphas = torch.linspace(0.0, 1.0, len(hpd_values))
-        axs[2].plot(alphas, hpd_values, label=r'$HPD(\mathbf{\theta})$')
+        axs[2].plot(alphas, hpd_values, color='#1f77b4', label=r'$HPD(\mathbf{\theta})$')
         axs[2].set_ylabel(r'MC-est. $\mathbb{P}(HPD \leq \alpha)$')
         axs[2].set_ylim(0, 1)
         axs[2].set_xlim(0, 1)

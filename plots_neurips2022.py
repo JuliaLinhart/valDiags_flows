@@ -48,6 +48,8 @@ def multi_global_consistency(
         lims = [np.min([0, 0]), np.max([1, 1])]
         ax.plot(lims, lims, "--", color="black", alpha=0.75)
         if confidence_int:
+            if i != 2:
+                conf_alpha = conf_alpha/len(multi_PIT_values)
             # Construct uniform histogram.
             N = len(multi_PIT_values[0])
             nbins = len(alphas)

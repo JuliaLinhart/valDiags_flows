@@ -36,7 +36,7 @@ def highest_density_level(pdf, alpha, bias=0.0, min_epsilon=10e-17, region=False
     else:
         return optimal_level
 
-def highest_density(flow, theta_test, x_test=None, n_samples=1000):
+def highest_density(flow, theta_test, x_test=None, n_samples=1000, nflows_flow=True):
     """ Highest Density Levels for coverage tests:
 
     We check if a true sample x_0 is in the highest density region of the flow-estimator q
@@ -64,8 +64,11 @@ def highest_density(flow, theta_test, x_test=None, n_samples=1000):
         else:
             for theta_0, x_0 in zip(theta_test, x_test):
                 theta_0, x_0 = theta_0[None,:], x_0[None,:]
-                samples = flow.sample(len(theta_test), context = x_0)[0]
-                mask = flow.log_prob(theta_0, context=x_0) < flow.log_prob(samples, context=x_0.repeat((samples.shape[0],1)).reshape(x_test.shape))
+                samples = flow.sample(len(theta_test), context = x_0)
+                if not nflows_flow:
+                    samples = samples[0]
+                repeat_dims = tuple([samples.shape[0]]+[1 for _ in range(x_0.ndim-1)])
+                mask = flow.log_prob(theta_0, context=x_0) < flow.log_prob(samples, context=x_0.repeat(repeat_dims))
                 rank = mask.sum() / mask.numel()
                 ranks.append(rank)
 

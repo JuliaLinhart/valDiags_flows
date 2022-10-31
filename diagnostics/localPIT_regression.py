@@ -1,10 +1,13 @@
 import numpy as np
 
-from sklearn.neural_network import MLPClassifier
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 import sklearn
+
+from itertools import combinations
 
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
+DEFAULT_REG = MLPRegressor(alpha=0, max_iter=25000)
 
 # BASELINE
 def localPIT_regression_baseline(
@@ -288,6 +291,19 @@ def infer_multiPIT_r_alphas_baseline(pit_eval, clfs):
     return r_alphas
 
 
-
-
-
+def local_correlation_regression(df_flow_transform, x_train, x_eval = None, classifier = DEFAULT_REG):
+    Z_labels = list(df_flow_transform.keys())
+    # compute train targets
+    train_targets = []
+    for comb in combinations(Z_labels, 2):
+        train_targets.append(df_flow_transform[comb[0]]*df_flow_transform[comb[1]])
+    labels = ['12', '13', '14', '23', '24', '34']
+    results = {}
+    clfs = {}
+    for target,label in zip(train_targets, labels):
+        clf = sklearn.base.clone(classifier)
+        clf.fit(X=x_train, y=target)
+        clfs[label] = clf
+        if x_eval is not None:
+            results[label] = clf.predict(x_eval)
+    return clfs, results

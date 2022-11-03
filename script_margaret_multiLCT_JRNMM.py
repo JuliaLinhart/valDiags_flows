@@ -2,7 +2,6 @@ import submitit
 import torch
 import numpy as np
 
-
 from data.feature_transforms import identity
 from sklearn.ensemble import HistGradientBoostingClassifier
 
@@ -11,10 +10,13 @@ from diagnostics.pp_plots import multi_cde_pit_values
 from diagnostics.localPIT_regression import (
     localPIT_regression_sample,
     localPIT_regression_baseline,
+    local_correlation_regression,
 )
 from diagnostics.multi_local_test import multi_local_pit_regression, multivariate_lct
 
 from functools import partial
+
+from scipy.stats import norm
 
 PATH_EXPERIMENT = "saved_experiments/JR-NMM/"
 METHOD = "naive"
@@ -243,6 +245,23 @@ def compute_expected_pit(theta_train, x_train, x_evals, clf_list, method_name_li
     filename = PATH_EXPERIMENT + f"reg_eval/expected_pit_list_{method_name}.pkl"
     torch.save(E_hats, filename)
 
+def train_null_correlation_regression(x_train, n_trials=1000):
+    n = len(x_train)
+    null_df_list = []
+    for t in range(n_trials):
+        null_df_list.append(pd.DataFrame({
+            'Z_1': norm().rvs(n),
+            'Z_2': norm().rvs(n),
+            'Z_3': norm().rvs(n),
+            'Z_4': norm().rvs(n),
+        }))
+    clfs_null = []
+    for k in range(n_trials):
+        clfs, _ = local_correlation_regression(null_df_list[k], x_train[:,:,0])
+        clfs_null.append(clfs['12'])
+        torch.save(clfs_null, PATH_EXPERIMENT+f'clfs_correlation_null_n_trials_{n_trials}.pkl')
+
+
 
 executor = get_executor_marg(f"work_localPIT")
 # launch batches
@@ -277,15 +296,15 @@ with executor.batch():
     # tasks.append(executor.submit(train_classifiers, **kwargs))
 
 
-    for g, x in zip(GAIN_LIST, X_OBS_GAIN):
-        kwargs = {
-            "theta_train": DATASETS["B_prime"]["theta"],
-            "x_train": DATASETS["B_prime"]["x"],
-            "x_obs": x[None,:,:],
-            "gain":g,
-            "return_pvalues":True,
-        }
-        tasks.append(executor.submit(compute_multi_lct_values, **kwargs))
+    # for g, x in zip(GAIN_LIST, X_OBS_GAIN):
+    #     kwargs = {
+    #         "theta_train": DATASETS["B_prime"]["theta"],
+    #         "x_train": DATASETS["B_prime"]["x"],
+    #         "x_obs": x[None,:,:],
+    #         "gain":g,
+    #         "return_pvalues":True,
+    #     }
+    #     tasks.append(executor.submit(compute_multi_lct_values, **kwargs))
 
     # k_list = [19, 18, 15, 14, 13, 10, 9, 17]
     # for k in range(20):
@@ -328,3 +347,12 @@ with executor.batch():
     #         "method_name": f'hg{max_iter}',
     #     }
     #     tasks.append(executor.submit(compute_expected_pit, **kwargs))
+
+    
+    kwargs = {
+        "x_train": DATASETS["B_prime"]["x"],
+        "n_trials": 10,
+    }
+    tasks.append(executor.submit(train_null_correlation_regression, **kwargs))
+
+

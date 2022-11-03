@@ -290,13 +290,16 @@ def infer_multiPIT_r_alphas_baseline(pit_eval, clfs):
             r_alphas[alpha] = np.mean(probs[:, 1])
     return r_alphas
 
-def local_correlation_regression(df_flow_transform, x_train, x_eval = None, classifier = DEFAULT_REG):
+def local_correlation_regression(df_flow_transform, x_train, x_eval = None, classifier = DEFAULT_REG, null=False):
     Z_labels = list(df_flow_transform.keys())
     # compute train targets
     train_targets = []
     for comb in combinations(Z_labels, 2):
         train_targets.append(df_flow_transform[comb[0]]*df_flow_transform[comb[1]])
     labels = ['12', '13', '14', '23', '24', '34']
+    if null:
+        train_targets = [df_flow_transform[0], df_flow_transform[1]]
+        labels = ['12']
     results = {}
     clfs = {}
     for target,label in zip(train_targets, labels):

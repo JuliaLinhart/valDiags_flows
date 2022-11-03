@@ -1,6 +1,7 @@
 import submitit
 import torch
 import numpy as np
+import pandas as pd
 
 from data.feature_transforms import identity
 from sklearn.ensemble import HistGradientBoostingClassifier
@@ -245,10 +246,10 @@ def compute_expected_pit(theta_train, x_train, x_evals, clf_list, method_name_li
     filename = PATH_EXPERIMENT + f"reg_eval/expected_pit_list_{method_name}.pkl"
     torch.save(E_hats, filename)
 
-def train_null_correlation_regression(x_train, n_trials=1000):
+def train_null_correlation_regression(x_train, n_trials):
     n = len(x_train)
     null_df_list = []
-    for t in range(n_trials):
+    for k in range(n_trials):
         null_df_list.append(pd.DataFrame({
             'Z_1': norm().rvs(n),
             'Z_2': norm().rvs(n),
@@ -351,7 +352,7 @@ with executor.batch():
     
     kwargs = {
         "x_train": DATASETS["B_prime"]["x"],
-        "n_trials": 10,
+        "n_trials": 1000,
     }
     tasks.append(executor.submit(train_null_correlation_regression, **kwargs))
 

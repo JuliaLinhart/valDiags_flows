@@ -290,7 +290,7 @@ def infer_multiPIT_r_alphas_baseline(pit_eval, clfs):
             r_alphas[alpha] = np.mean(probs[:, 1])
     return r_alphas
 
-def local_correlation_regression(df_flow_transform, x_train, x_eval = None, classifier = DEFAULT_REG, null=False):
+def local_correlation_regression(df_flow_transform, x_train, x_eval = None, regressor = DEFAULT_REG, null=False):
     Z_labels = list(df_flow_transform.keys())
     # compute train targets
     train_targets = []
@@ -301,11 +301,11 @@ def local_correlation_regression(df_flow_transform, x_train, x_eval = None, clas
         train_targets = [df_flow_transform[0], df_flow_transform[1]]
         labels = ['12']
     results = {}
-    clfs = {}
+    regs = {}
     for target,label in zip(train_targets, labels):
-        clf = sklearn.base.clone(classifier)
-        clf.fit(X=x_train, y=target)
-        clfs[label] = clf
+        reg = sklearn.base.clone(regressor)
+        reg.fit(X=x_train, y=target)
+        regs[label] = reg
         if x_eval is not None:
-            results[label] = clf.predict(x_eval)
-    return clfs, results
+            results[label] = reg.predict(x_eval)
+    return regs, results

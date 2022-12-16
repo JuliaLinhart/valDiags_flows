@@ -16,7 +16,7 @@ data_gen = ConditionalGaussian1d()
 
 # Data dimensions
 DIM = 1 # target data
-N_LIST = [1000, 2000, 5000, 10000] # calibration dataset size
+N_LIST = [1000, 2000, 5000] # calibration dataset size
 
 # Reference samples (base distribution)
 P = D.MultivariateNormal(loc=torch.zeros(DIM), covariance_matrix=torch.eye(DIM))
@@ -68,14 +68,14 @@ def eval_classifier_for_lc2st(shifts, shift_object = 'mean', clfs=['rf', 'mlp'],
         for clf in clfs:
             for s in shifts:
                 for _ in range(n_trials):
-                    Q = D.MultivariateNormal(loc=torch.zeros(DIM), covariance_matrix=torch.eye(DIM)*s).rsample((n,))
+                    Q = D.MultivariateNormal(loc=torch.zeros(DIM), covariance_matrix=torch.eye(DIM)*s).rsample((nb_samples,))
                     Q_joint = torch.cat([Q,x_samples], axis=1)
                     score = c2st(P_joint, Q_joint,classifier=clf).item()
                     clf_method.append(clf)
                     shift.append(s)
                     scores.append(score)
     df = pd.DataFrame({f'{shift_object}_shift': shift, 'score': scores, 'classifier':clf_method,})
-    filename = f'saved_experiments/Gaussian1d_localPIT/lc2st_eval_clfs/df_{shift_object}.pkl'
+    filename = f'saved_experiments/Gaussian1d_localPIT/lc2st_eval_clfs/df_{shift_object}_{nb_samples}.pkl'
     torch.save(df, filename)
 
 # def score_lc2st(flow, x_obs, nb_samples):
@@ -86,7 +86,7 @@ with executor.batch():
     print("Submitting jobs...", end="", flush=True)
     tasks = []
     for n in N_LIST:
-        for shifts, s_object in zip([np.linspace(0,5,20),'mean'], [np.linspace(0.01,5,20),'scale']):
+        for shifts, s_object in zip([[0,0.3,0.6,1,1.5,2,2.5,3,5,10],np.linspace(1,10,10)], ['mean','scale']):
             kwargs = {
                 "shifts": shifts,
                 "shift_object": s_object,

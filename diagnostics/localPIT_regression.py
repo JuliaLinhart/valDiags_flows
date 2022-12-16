@@ -5,6 +5,9 @@ import sklearn
 
 from itertools import combinations
 
+from scipy.stats import multivariate_normal as mvn
+from scipy.stats import norm
+from sklearn.utils import shuffle
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 DEFAULT_REG = MLPRegressor(alpha=0, max_iter=25000)
@@ -207,89 +210,6 @@ def infer_r_alphas_amortized(x_eval, alphas, clf):
 
     return r_alphas
 
-
-def multiPIT_regression_baseline(
-    alphas, pit_values_train, x_train=None, classifier=DEFAULT_CLF,
-):
-    """ Estimate the 1D local PIT-distribution:
-    
-    Algorithm from [Zhao et. al, UAI 2021]: https://arxiv.org/abs/2102.10473
-    --> adapted to multivariate data (conditionals).
-    FOR EVERY ALPHA, the point-wise c.d.f 
-        r_{\alpha}(X) = P(PIT_i <= alpha | X, PIT_{1:i-1}) = E[1_{PIT_i <= alpha} | X, PIT_{1:i-1}]
-    is learned as a function of X, by regressing 1_{PIT_i <= alpha} on PIT_{1:i-1}.
-
-    inputs:
-    - alphas: numpy array, size: (K,)
-        Grid of alpha values. One alpha-value equals one regression problem.
-    - pit_values_train: list of numpy arrays of size (N,) for each dim 
-        pit values computed on N samples (\Theta, X) from the joint.
-        Used to compute the regression targets W and the context data.
-    - x_train: torch.Tensor, size: (N, nb_features)
-        Additional regression features for local PIT (i.e. when considering a conditional 
-        target distribution p(\Theta | X)): data X of each pair (\Theta, X) 
-        from the same dataset as used to compute the pit values.
-        Default is None (for non-conditional data-distributions p(\Theta))
-    - classifier: object
-        Regression model trained to estimate the point-wise c.d.f. 
-        Default is sklearn.MLPClassifier(alpha=0, max_iter=25000).
-    
-    output:
-    - clfs: dict
-        Trained regression models for each alpha-value.
-    """
-    clfs = {}
-    for i,pit_i in enumerate(pit_values_train):
-        pit_i = pit_i.ravel()
-        clfs[i] = {}
-        if x_train is not None:
-            # context for conditional regression
-            context_features_train = x_train
-            if i!=0:
-                context_features_train = np.concatenate([x_train]+pit_values_train[:i], axis=1)
-        elif x_train is None and i!=0:
-            context_features_train = np.concatenate(pit_values_train[:i], axis=1)
-        else:
-            continue
-
-        for alpha in alphas:
-            # compute the binary regression targets
-            W_a_train = (pit_i <= alpha).astype(int)  # size: (N,)
-            # define classifier
-            clf = sklearn.base.clone(classifier)
-            # train regression model
-            clf.fit(X=context_features_train, y=W_a_train)
-            clfs[i][alpha] = clf
-    return clfs
-
-def infer_multiPIT_r_alphas_baseline(pit_eval, clfs):
-    """ Infer the point-wise conditional CDF of the PIT for a given dimension i:
-    r_{\alpha} = P(PIT_i <= alpha | PIT_{1:i-1}) = E[1_{PIT_i <= alpha} | PIT_{1:i-1}]
-    Computed empirically over test set. 
-    inputs:
-    - pit_eval: numpy array of size (N,i-1):
-        Pit values PIT_{1:i-1} computed on N test samples (\Theta) from the target distribution.
-        Used as context data / regression features.
-    - clfs: dict, keys: alpha-values
-        Trained regression models for each alpha-value. 
-        Ouput from the function "multiPIT_regression_baseline" for dimension i. 
-
-    output:
-    - r_alphas: dict, keys: alpha-values 
-        Estimated c.d.f values at x_eval: regressors evaluated in x_eval and PIT_{1:i-1}(x_eval).
-        There is one for every alpha value.
-    """
-    alphas = np.array(list(clfs.keys()))
-    r_alphas = {}
-    for alpha in alphas:
-        # evaluate in pit_eval
-        probs = clfs[alpha].predict_proba(pit_eval)
-        if probs.shape[1] < 2:  # Dummy Classifier
-            r_alphas[alpha] = np.mean(probs[:, 0])
-        else:  # MLPClassifier or other
-            r_alphas[alpha] = np.mean(probs[:, 1])
-    return r_alphas
-
 def local_correlation_regression(df_flow_transform, x_train, x_eval = None, regressor = DEFAULT_REG, null=False):
     Z_labels = list(df_flow_transform.keys())
     # compute train targets
@@ -309,3 +229,38 @@ def local_correlation_regression(df_flow_transform, x_train, x_eval = None, regr
         if x_eval is not None:
             results[label] = reg.predict(x_eval)
     return regs, results
+
+def local_flow_c2st(flow_samples_train, x_train, classifier = MLPClassifier(alpha=0, max_iter=25000)):
+
+    N = len(x_train)
+    dim = flow_samples_train.shape[-1]
+    reference = mvn(mean = np.zeros(dim), cov=np.eye(dim)) # base distribution
+    
+    # flow_samples_train = flow._transform(theta_train, context=x_train)[0].detach().numpy()
+    ref_samples_train = reference.rvs(N)
+    if dim == 1:
+        ref_samples_train = ref_samples_train[:,None]
+
+    features_flow_train = np.concatenate([flow_samples_train, x_train], axis=1)
+    features_ref_train = np.concatenate([ref_samples_train, x_train], axis=1)
+    features_train = np.concatenate([features_ref_train, features_flow_train], axis=0)
+    labels_train = np.concatenate([np.array([0]*N),np.array([1]*N)]).ravel()
+    features_train, labels_train = shuffle(features_train,labels_train, random_state=13)
+
+    clf = sklearn.base.clone(classifier)
+    clf.fit(X=features_train, y=labels_train)
+
+    return clf
+
+def eval_local_flow_c2st(clf, x_eval, dim, n_rounds=1000):
+    if dim ==1 :
+        reference = norm()
+    else:
+        reference = mvn(mean = np.zeros(dim), cov=np.eye(dim)) # base distribution
+
+    proba = []
+    for i in range(n_rounds):
+        features_eval = np.concatenate([reference.rvs(1),x_eval])[None,:]
+        proba.append(clf.predict_proba(features_eval)[0][0])
+    
+    return proba

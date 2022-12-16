@@ -122,6 +122,7 @@ def PP_plot_1D(
     pvalue=None,
     confidence_int=False,
     conf_alpha = 0.05,
+    N=None,
 ):
     """1D PP-plot: c.d.f of the 1D PIT vs. c.d.f of the uniform distribution.
         It shows the deviation to the identity function and thus allows to 
@@ -166,6 +167,7 @@ def PP_plot_1D(
     plt.plot(lims, lims, "--", color="black", alpha=0.75)
 
     if PIT_values is not None:
+        N = len(PIT_values[0])
         for i, Z in enumerate(PIT_values):
             # compute quantiles P_{target}(PIT_values <= alpha)
             pp_vals = PP_vals(Z, alphas)
@@ -174,6 +176,7 @@ def PP_plot_1D(
 
     handles_new = []
     if r_alpha_learned is not None:
+        N = len(r_alpha_learned[0])
         for i, r_alpha in enumerate(r_alpha_learned):
             label = labels[i]
             style = "o"
@@ -205,7 +208,7 @@ def PP_plot_1D(
 
     if confidence_int:
         # Construct uniform histogram.
-        N = 10000
+        N = N
         confidence_region_null(alphas=alphas, N=N, conf_alpha=conf_alpha)
 
     plt.legend(handles=handles)

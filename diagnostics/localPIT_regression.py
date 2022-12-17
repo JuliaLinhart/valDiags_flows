@@ -10,6 +10,21 @@ from scipy.stats import norm
 from sklearn.utils import shuffle
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
+
+
+def c2st_clf(ndim):
+    return MLPClassifier(
+        **{
+            "activation": "relu",
+            "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+            "max_iter": 1000,
+            "solver": "adam",
+            "early_stopping": True,
+            "n_iter_no_change": 50,
+        }
+    )
+
+
 DEFAULT_REG = MLPRegressor(alpha=0, max_iter=25000)
 
 # BASELINE
@@ -121,7 +136,7 @@ def localPIT_regression_grid(
             np.concatenate([x_rep, alphas_train], axis=1)
         ]  # size: (K, nb_features + 1)
         # regression targets W_{\alpha}(pit)
-        W_a_train += [1 * (pit <= alpha) for alpha in alphas_train] # size: (1,)
+        W_a_train += [1 * (pit <= alpha) for alpha in alphas_train]  # size: (1,)
 
     train_features = np.row_stack(train_features)  # size: (K x N, nb_features + 1)
     W_a_train = np.row_stack(W_a_train)  # size: (K x N, 1)
@@ -168,14 +183,16 @@ def localPIT_regression_sample(
     W_a_train = []
     for x, pit in zip(x_train.numpy(), pit_values_train):
         # regression features
-        x_rep = x[None].repeat(nb_samples, axis=0) # size: (K, nb_features)
-        alphas_sample = np.random.rand(nb_samples).reshape(-1, 1) # size: (K, 1)
-        train_features += [np.concatenate([x_rep, alphas_sample], axis=1)] # size: (K, nb_features + 1)
+        x_rep = x[None].repeat(nb_samples, axis=0)  # size: (K, nb_features)
+        alphas_sample = np.random.rand(nb_samples).reshape(-1, 1)  # size: (K, 1)
+        train_features += [
+            np.concatenate([x_rep, alphas_sample], axis=1)
+        ]  # size: (K, nb_features + 1)
         # regression targets W_alpha(pit)
-        W_a_train += [1 * (pit <= alpha) for alpha in alphas_sample] # size: (1,)
+        W_a_train += [1 * (pit <= alpha) for alpha in alphas_sample]  # size: (1,)
 
-    train_features = np.row_stack(train_features) # size: (K x N, nb_features + 1)
-    W_a_train = np.row_stack(W_a_train) # size: (K x N, 1)
+    train_features = np.row_stack(train_features)  # size: (K x N, nb_features + 1)
+    W_a_train = np.row_stack(W_a_train)  # size: (K x N, 1)
 
     # define classifier
     clf = sklearn.base.clone(classifier)
@@ -205,24 +222,29 @@ def infer_r_alphas_amortized(x_eval, alphas, clf):
     """
     r_alphas = {}
     for alpha in alphas:
-        test_features = np.concatenate([x_eval, np.array(alpha).reshape(-1, 1)], axis=1) # size: (1, nb_features + 1)
+        test_features = np.concatenate(
+            [x_eval, np.array(alpha).reshape(-1, 1)], axis=1
+        )  # size: (1, nb_features + 1)
         r_alphas[alpha] = clf.predict_proba(test_features)[:, 1][0]
 
     return r_alphas
 
-def local_correlation_regression(df_flow_transform, x_train, x_eval = None, regressor = DEFAULT_REG, null=False):
+
+def local_correlation_regression(
+    df_flow_transform, x_train, x_eval=None, regressor=DEFAULT_REG, null=False
+):
     Z_labels = list(df_flow_transform.keys())
     # compute train targets
     train_targets = []
     for comb in combinations(Z_labels, 2):
-        train_targets.append(df_flow_transform[comb[0]]*df_flow_transform[comb[1]])
-    labels = ['12', '13', '14', '23', '24', '34']
+        train_targets.append(df_flow_transform[comb[0]] * df_flow_transform[comb[1]])
+    labels = ["12", "13", "14", "23", "24", "34"]
     if null:
         train_targets = [df_flow_transform[0], df_flow_transform[1]]
-        labels = ['12']
+        labels = ["12"]
     results = {}
     regs = {}
-    for target,label in zip(train_targets, labels):
+    for target, label in zip(train_targets, labels):
         reg = sklearn.base.clone(regressor)
         reg.fit(X=x_train, y=target)
         regs[label] = reg
@@ -230,37 +252,45 @@ def local_correlation_regression(df_flow_transform, x_train, x_eval = None, regr
             results[label] = reg.predict(x_eval)
     return regs, results
 
-def local_flow_c2st(flow_samples_train, x_train, classifier = MLPClassifier(alpha=0, max_iter=25000)):
+
+def local_flow_c2st(flow_samples_train, x_train, classifier="mlp"):
 
     N = len(x_train)
     dim = flow_samples_train.shape[-1]
-    reference = mvn(mean = np.zeros(dim), cov=np.eye(dim)) # base distribution
-    
+    reference = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # base distribution
+
     # flow_samples_train = flow._transform(theta_train, context=x_train)[0].detach().numpy()
     ref_samples_train = reference.rvs(N)
     if dim == 1:
-        ref_samples_train = ref_samples_train[:,None]
+        ref_samples_train = ref_samples_train[:, None]
 
     features_flow_train = np.concatenate([flow_samples_train, x_train], axis=1)
     features_ref_train = np.concatenate([ref_samples_train, x_train], axis=1)
     features_train = np.concatenate([features_ref_train, features_flow_train], axis=0)
-    labels_train = np.concatenate([np.array([0]*N),np.array([1]*N)]).ravel()
-    features_train, labels_train = shuffle(features_train,labels_train, random_state=13)
+    labels_train = np.concatenate([np.array([0] * N), np.array([1] * N)]).ravel()
+    features_train, labels_train = shuffle(
+        features_train, labels_train, random_state=13
+    )
 
-    clf = sklearn.base.clone(classifier)
+    if classifier == "mlp":
+        clf = c2st_clf(features_train.shape[-1])
+    else:
+        clf = DEFAULT_CLF
+
     clf.fit(X=features_train, y=labels_train)
 
     return clf
 
+
 def eval_local_flow_c2st(clf, x_eval, dim, n_rounds=1000):
-    if dim ==1 :
+    if dim == 1:
         reference = norm()
     else:
-        reference = mvn(mean = np.zeros(dim), cov=np.eye(dim)) # base distribution
+        reference = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # base distribution
 
     proba = []
     for i in range(n_rounds):
-        features_eval = np.concatenate([reference.rvs(1),x_eval])[None,:]
+        features_eval = np.concatenate([reference.rvs(1), x_eval])[None, :]
         proba.append(clf.predict_proba(features_eval)[0][0])
-    
+
     return proba

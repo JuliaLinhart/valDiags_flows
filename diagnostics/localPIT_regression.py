@@ -13,6 +13,9 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def c2st_clf(ndim):
+    """ same setup as in :
+    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
+    """
     return MLPClassifier(
         **{
             "activation": "relu",

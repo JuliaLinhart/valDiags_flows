@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 import seaborn as sns
 
-from scipy.stats import binom
+from scipy.stats import binom, uniform
 
 from diagnostics.pp_plots import PP_vals
 from diagnostics.multi_local_test import get_lct_results
@@ -26,6 +26,7 @@ def multi_global_consistency(
     ylabel_sbc=r"empirical CDF",
     confidence_int=True,
     conf_alpha=0.05,
+    n_trials = 1000,
     hpd_values = None,
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
@@ -48,27 +49,37 @@ def multi_global_consistency(
         lims = [np.min([0, 0]), np.max([1, 1])]
         ax.plot(lims, lims, "--", color="black", alpha=0.75)
         if confidence_int:
-            if i == 2:
-                conf_alpha = conf_alpha*len(multi_PIT_values) # bonferonni correction
+            if i == 0:
+                conf_alpha = conf_alpha/len(multi_PIT_values) # bonferonni correction
             # Construct uniform histogram.
             N = len(multi_PIT_values[0])
-            nbins = len(alphas)
-            hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
-            hbb = hb.cumsum() / hb.sum()
-            # avoid last value being exactly 1
-            hbb[-1] -= 1e-9
-
-            lower = [binom(N, p=p).ppf(conf_alpha / 2) for p in hbb]
-            upper = [binom(N, p=p).ppf(1 - conf_alpha / 2) for p in hbb]
-
-            # Plot grey area with expected ECDF.
-            ax.fill_between(
-                x=np.linspace(0, 1, nbins),
-                y1=np.repeat(lower / np.max(lower), 1),
-                y2=np.repeat(upper / np.max(lower), 1),
-                color="grey",
-                alpha=0.3,
+            u_pp_values = {}
+            for t in range(n_trials):
+                u_samples = uniform().rvs(N)
+                u_pp_values[t] = pd.Series(PP_vals(u_samples, alphas))
+            lower_band = pd.DataFrame(u_pp_values).quantile(q=conf_alpha / 2, axis=1)
+            upper_band = pd.DataFrame(u_pp_values).quantile(
+                q=1 - conf_alpha / 2, axis=1
             )
+
+            ax.fill_between(alphas, lower_band, upper_band, color="grey", alpha=0.3)
+            # nbins = len(alphas)
+            # hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
+            # hbb = hb.cumsum() / hb.sum()
+            # # avoid last value being exactly 1
+            # hbb[-1] -= 1e-9
+
+            # lower = [binom(N, p=p).ppf(conf_alpha / 2) for p in hbb]
+            # upper = [binom(N, p=p).ppf(1 - conf_alpha / 2) for p in hbb]
+
+            # # Plot grey area with expected ECDF.
+            # ax.fill_between(
+            #     x=np.linspace(0, 1, nbins),
+            #     y1=np.repeat(lower / np.max(lower), 1),
+            #     y2=np.repeat(upper / np.max(lower), 1),
+            #     color="grey",
+            #     alpha=0.3,
+            # )
         ax.set_aspect("equal")
 
     # global pit

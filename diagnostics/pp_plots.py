@@ -6,7 +6,7 @@ import torch
 import torch.distributions as D
 from matplotlib.lines import Line2D
 
-from scipy.stats import hmean, binom
+from scipy.stats import hmean, binom, uniform
 
 import sys
 
@@ -377,7 +377,20 @@ def compare_pp_plots_regression(
 
 
 # Construct uniform histogram.
-def confidence_region_null(alphas, N=1000, conf_alpha = 0.05):
+
+def confidence_region_null(alphas, N=1000, conf_alpha = 0.05, n_trials=1000):
+    u_pp_values = {}
+    for t in range(n_trials):
+        u_samples = uniform().rvs(N)
+        u_pp_values[t] = pd.Series(PP_vals(u_samples, alphas))
+    lower_band = pd.DataFrame(u_pp_values).quantile(q=conf_alpha / 2, axis=1)
+    upper_band = pd.DataFrame(u_pp_values).quantile(
+        q=1 - conf_alpha / 2, axis=1
+    )
+
+    plt.fill_between(alphas, lower_band, upper_band, color="grey", alpha=0.2)
+
+def confidence_region_null_analytic(alphas, N=1000, conf_alpha = 0.05):
     nbins = len(alphas)
     hb = binom(N, p=1 / nbins).ppf(0.5) * np.ones(nbins)
     hbb = hb.cumsum() / hb.sum()

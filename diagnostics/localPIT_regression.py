@@ -205,7 +205,7 @@ def localPIT_regression_sample(
     return clf
 
 
-def infer_r_alphas_amortized(x_eval, alphas, clf):
+def infer_r_alphas_amortized(x_eval, alphas, clfs):
     """ Infer the point-wise CDF for a given observation x_eval and 
     one or more alpha values.
 
@@ -228,7 +228,7 @@ def infer_r_alphas_amortized(x_eval, alphas, clf):
         test_features = np.concatenate(
             [x_eval, np.array(alpha).reshape(-1, 1)], axis=1
         )  # size: (1, nb_features + 1)
-        r_alphas[alpha] = clf.predict_proba(test_features)[:, 1][0]
+        r_alphas[alpha] = clfs.predict_proba(test_features)[:, 1][0]
 
     return r_alphas
 

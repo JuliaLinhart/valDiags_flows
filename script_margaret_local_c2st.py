@@ -15,27 +15,27 @@ from diagnostics.localPIT_regression import local_flow_c2st, eval_local_flow_c2s
 from data.data_generators import ConditionalGaussian1d
 from data.feature_transforms import first_dim_only
 
-EXPERIMENT = 'Gaussian1d_localPIT'
-# EXPERIMENT = 'JR-NMM'
+# EXPERIMENT = 'Gaussian1d_localPIT'
+EXPERIMENT = 'JR-NMM'
 gauss1d_data = torch.load('saved_experiments/Gaussian1d_localPIT/datasets.pkl')
 jrnmm_data = torch.load('saved_experiments/JR-NMM/datasets_naive.pkl')
 
 
 # Data dimensions
-DIM = 1 # target data
-N_LIST = [1000, 2000, 5000] # calibration dataset size
+DIM = 4 # target data
+N_LIST = [10000] # calibration dataset size
 
 # Simulated data for clf eval 
-data_gen = ConditionalGaussian1d()
-x_samples = {}
-for n in N_LIST:
-    x_samples[n], _ = data_gen.get_joint_data(n=n)
-
+# data_gen = ConditionalGaussian1d()
 # x_samples = {}
-# x_samples[1000] = jrnmm_data['B_double_prime']['x'][:,:,0]
-# x_samples[2000] = jrnmm_data[2000]['x'][:,:,0]
-# x_samples[5000] = jrnmm_data[5000]['x'][:,:,0]
-# x_samples[10000] = jrnmm_data['B_prime']['x'][:,:,0]
+# for n in N_LIST:
+#     x_samples[n], _ = data_gen.get_joint_data(n=n)
+
+x_samples = {}
+x_samples[1000] = jrnmm_data['B_double_prime']['x'][:,:,0]
+x_samples[2000] = jrnmm_data[2000]['x'][:,:,0]
+x_samples[5000] = jrnmm_data[5000]['x'][:,:,0]
+x_samples[10000] = jrnmm_data['B_prime']['x'][:,:,0]
 
 
 # Flows: trained on 10_000 samples...
@@ -162,42 +162,42 @@ def score_lc2st_flow(flow_values_cal, x_cal, x_obs, classifier = 'mlp', n_trials
     
 
 
-# executor = get_executor_marg(f"work_eval_lc2st_clfs")
-# launch batches
-# with executor.batch():
-#     print("Submitting jobs...", end="", flush=True)
-#     tasks = []
-#     for n in N_LIST:
-#         # for shifts, s_object in zip([[0,0.3,0.6,1,1.5,2,2.5,3,5,10],np.linspace(1,20,10)], ['mean','scale']):
-#         kwargs = {
-#             "shifts": np.linspace(1,20,10),
-#             "shift_object": 'scale',
-#             "x_samples": x_samples[n],
-#         }
-#         tasks.append(executor.submit(eval_classifier_for_lc2st, **kwargs))
-
-executor = get_executor_marg(f"work_score_lc2st_flow")
+executor = get_executor_marg(f"work_eval_lc2st_clfs")
 # launch batches
 with executor.batch():
     print("Submitting jobs...", end="", flush=True)
     tasks = []
-    for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
-        kwargs = {
-            "flow_values_cal": samples,
-            "x_cal": x_cal,
-            "x_obs": x_0,
-            "flow_name": name,
-        }
-        tasks.append(executor.submit(score_lc2st_flow, **kwargs))
-    # for x_0, g in zip(x_0_list, ['-25','-20', '-15','-10','0','10', '15','20','25']):
-    #     kwargs = {
-    #         "flow_values_cal": flow_values_cal_jrnmm,
-    #         "x_cal": x_cal[:,:,0],
-    #         "x_obs": x_0,
-    #         "flow_name": f'jrnmm_g_{g}',
-    #         "n_trials": 100,
-    #     }
-    #     tasks.append(executor.submit(score_lc2st_flow, **kwargs))
+    for n in N_LIST:
+        for shifts, s_object in zip([[0,0.3,0.6,1,1.5,2,2.5,3,5,10],np.linspace(1,20,10)], ['mean','scale']):
+            kwargs = {
+                "shifts": shifts,
+                "shift_object": s_object,
+                "x_samples": x_samples[n],
+            }
+            tasks.append(executor.submit(eval_classifier_for_lc2st, **kwargs))
+
+# executor = get_executor_marg(f"work_score_lc2st_flow")
+# # launch batches
+# with executor.batch():
+#     print("Submitting jobs...", end="", flush=True)
+#     tasks = []
+#     for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
+#         kwargs = {
+#             "flow_values_cal": samples,
+#             "x_cal": x_cal,
+#             "x_obs": x_0,
+#             "flow_name": name,
+#         }
+#         tasks.append(executor.submit(score_lc2st_flow, **kwargs))
+#     # for x_0, g in zip(x_0_list, ['-25','-20', '-15','-10','0','10', '15','20','25']):
+#     #     kwargs = {
+#     #         "flow_values_cal": flow_values_cal_jrnmm,
+#     #         "x_cal": x_cal[:,:,0],
+#     #         "x_obs": x_0,
+#     #         "flow_name": f'jrnmm_g_{g}',
+#     #         "n_trials": 100,
+#     #     }
+#     #     tasks.append(executor.submit(score_lc2st_flow, **kwargs))
 
 
 

@@ -6,7 +6,7 @@ import torch
 import torch.distributions as D
 from matplotlib.lines import Line2D
 
-from scipy.stats import hmean, binom, uniform
+from scipy.stats import hmean, binom, uniform, norm
 
 import sys
 
@@ -107,7 +107,6 @@ def PP_vals(PIT_values, alphas):
     """
     pp_vals = [np.mean(PIT_values <= alpha) for alpha in alphas]
     return pp_vals
-
 
 def PP_plot_1D(
     PIT_values,

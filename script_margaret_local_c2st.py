@@ -13,19 +13,21 @@ from diagnostics.localPIT_regression import local_flow_c2st, eval_local_flow_c2s
 from diagnostics.pp_plots import PP_vals
 from sklearn.model_selection import KFold
 
+from scipy.stats import wasserstein_distance
+
 
 from data.data_generators import ConditionalGaussian1d
 from data.feature_transforms import first_dim_only
 
-# EXPERIMENT = 'Gaussian1d_localPIT'
-EXPERIMENT = 'JR-NMM'
-gauss1d_data = torch.load('saved_experiments/Gaussian1d_localPIT/datasets.pkl')
+EXPERIMENT = 'Gaussian1d'
+# EXPERIMENT = 'JR-NMM'
+gauss1d_data = torch.load('saved_experiments/Gaussian1d/datasets.pkl')
 jrnmm_data = torch.load('saved_experiments/JR-NMM/datasets_naive.pkl')
 
 
 # Data dimensions
-DIM = 4 # target data
-N_LIST = [3000, 4000, 6000] #[1000, 2000, 5000] #, 10000, 20000, 50000] # calibration dataset size
+DIM = 1 # target data
+N_LIST = [1000, 2000, 3000, 5000, 6000, 10000] # [1000, 2000, 5000, 10000, 20000, 50000] # calibration dataset size
 
 # Simulated data for clf eval 
 data_gen = ConditionalGaussian1d()
@@ -43,8 +45,8 @@ for n in N_LIST:
 
 
 # Flows: trained on 10_000 samples...
-maf_good = torch.load('saved_experiments/Gaussian1d_localPIT/maf_good.pkl')
-maf_bad = torch.load('saved_experiments/Gaussian1d_localPIT/maf_bad.pkl')
+maf_good = torch.load('saved_experiments/Gaussian1d/maf_good.pkl')
+maf_bad = torch.load('saved_experiments/Gaussian1d/maf_bad.pkl')
 # ... / 50_000 samples
 jrnmm_flow = torch.load('saved_experiments/JR-NMM/posteriors_amortized/naive_posterior_nextra_0_single_rec_False_nsim_50000.pkl')
 
@@ -52,14 +54,14 @@ jrnmm_flow = torch.load('saved_experiments/JR-NMM/posteriors_amortized/naive_pos
 P = D.MultivariateNormal(loc=torch.zeros(DIM), covariance_matrix=torch.eye(DIM))
 
 # Calibration dataset (used to compute transformed flow samples)
-# x_cal, theta_cal = gauss1d_data['cal']
+x_cal, theta_cal = gauss1d_data['cal']
 # x_cal, theta_cal = jrnmm_data['B_prime']['x'], jrnmm_data['B_prime']['theta'] # 10_000
-x_cal, theta_cal = jrnmm_data['B']['x'][:12500], jrnmm_data['B']['theta'][:12500] # 12_500
+# x_cal, theta_cal = jrnmm_data['B']['x'][:12500], jrnmm_data['B']['theta'][:12500] # 12_500
 
 # Flow transform 
-# flow_values_cal_good = maf_good._transform(theta_cal, context=x_cal)[0].detach().numpy()
-# flow_values_cal_bad = maf_bad._transform(theta_cal, context=first_dim_only(x_cal))[0].detach().numpy()
-flow_values_cal_jrnmm = jrnmm_flow._transform(theta_cal, context=x_cal)[0].detach().numpy()
+flow_values_cal_good = maf_good._transform(theta_cal, context=x_cal)[0].detach().numpy()
+flow_values_cal_bad = maf_bad._transform(theta_cal, context=first_dim_only(x_cal))[0].detach().numpy()
+# flow_values_cal_jrnmm = jrnmm_flow._transform(theta_cal, context=x_cal)[0].detach().numpy()
 
 null_samples = P.rsample((len(x_cal),)).numpy()
 
@@ -157,6 +159,7 @@ def eval_clf_null(x_samples, dim=DIM, n_list = N_LIST, classifiers=['mlp'], n_tr
     nb_samples = []
     probas_stds = []
     test_stats = []
+    w_dist = []
     times = []
     clf_method = []
 
@@ -173,21 +176,24 @@ def eval_clf_null(x_samples, dim=DIM, n_list = N_LIST, classifiers=['mlp'], n_tr
                 clf = local_flow_c2st(Q_train, x_samples_train, classifier=clf_name)
                 std_x = []
                 test_stats_x = []
+                w_dist_x = []
                 for i,x_obs in enumerate(x_samples_test):
                     proba = eval_local_flow_c2st(clf, x_obs, dim=dim, n_rounds=1000)
                     pp_vals = pd.Series(PP_vals(proba, alphas))
                     test_stats_x.append(((pp_vals - pp_vals_dirac) ** 2).sum() / len(alphas))
+                    w_dist_x.append(wasserstein_distance([0.5]*1000, proba))
                     std_x.append(np.std(proba))
                 probas_stds.append(np.mean(std_x))
                 test_stats.append(np.mean(test_stats_x))
+                w_dist.append(np.mean(w_dist_x))
                 nb_samples.append(n)
     
             total_cv_time = time.time() - start
-            for t in range(n_trials):
+            for _ in range(n_trials):
                 times.append(total_cv_time)
                 clf_method.append(clf_name)
-    df = pd.DataFrame({f'nb_samples': nb_samples, 'probas_std': probas_stds, 'test_stats': test_stats, 'total_cv_time':times, 'classifier':clf_method,})
-    filename = f'saved_experiments/{EXPERIMENT}/lc2st_eval_clfs/df_null_std_cv_n_{n_list}_ntrials_{n_trials}_Tstats.pkl'
+    df = pd.DataFrame({f'nb_samples': nb_samples, 'probas_std': probas_stds, 'test_stats': test_stats, 'w_dist': w_dist, 'total_cv_time':times, 'classifier':clf_method,})
+    filename = f'saved_experiments/{EXPERIMENT}/lc2st_eval_clfs/df_null_std_cv_n_{n_list}_ntrials_{n_trials}_Tstats_wdist.pkl'
     torch.save(df, filename)
 
 def score_lc2st_flow(flow_values_cal, x_cal, x_obs, classifier = 'mlp', n_trials=1000, flow_name='maf'):
@@ -208,7 +214,7 @@ def score_lc2st_flow(flow_values_cal, x_cal, x_obs, classifier = 'mlp', n_trials
     
 
 
-# executor = get_executor_marg(f"work_eval_lc2st_clfs")
+executor = get_executor_marg(f"work_eval_lc2st_clfs")
 # launch batches
 # with executor.batch():
 #     print("Submitting jobs...", end="", flush=True)
@@ -222,40 +228,40 @@ def score_lc2st_flow(flow_values_cal, x_cal, x_obs, classifier = 'mlp', n_trials
 #             }
 #             tasks.append(executor.submit(eval_classifier_for_lc2st, **kwargs))
 
-# # launch batches
-# with executor.batch():
-#     print("Submitting jobs...", end="", flush=True)
-#     tasks = []
-#     for n in N_LIST:
-#         kwargs = {
-#             "x_samples": x_samples,
-#             "n_list": [n],
-#             "n_trials": 100
-#         }
-#         tasks.append(executor.submit(eval_clf_null, **kwargs))
-
-executor = get_executor_marg(f"work_score_lc2st_flow")
 # launch batches
 with executor.batch():
     print("Submitting jobs...", end="", flush=True)
     tasks = []
-    # for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
-    #     kwargs = {
-    #         "flow_values_cal": samples,
-    #         "x_cal": x_cal,
-    #         "x_obs": x_0,
-    #         "flow_name": name,
-    #     }
-    #     tasks.append(executor.submit(score_lc2st_flow, **kwargs))
-    for x_0, g in zip(x_0_list, np.linspace(-25,25,11,dtype=int)):
+    for n in N_LIST:
         kwargs = {
-            "flow_values_cal": flow_values_cal_jrnmm,
-            "x_cal": x_cal[:,:,0],
-            "x_obs": x_0,
-            "flow_name": f'jrnmm_g_{g}',
-            "n_trials": 1000,
+            "x_samples": x_samples,
+            "n_list": [n],
+            "n_trials": 100
         }
-        tasks.append(executor.submit(score_lc2st_flow, **kwargs))
+        tasks.append(executor.submit(eval_clf_null, **kwargs))
+
+# executor = get_executor_marg(f"work_score_lc2st_flow")
+# # launch batches
+# with executor.batch():
+#     print("Submitting jobs...", end="", flush=True)
+#     tasks = []
+#     # for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
+#     #     kwargs = {
+#     #         "flow_values_cal": samples,
+#     #         "x_cal": x_cal,
+#     #         "x_obs": x_0,
+#     #         "flow_name": name,
+#     #     }
+#     #     tasks.append(executor.submit(score_lc2st_flow, **kwargs))
+#     for x_0, g in zip(x_0_list, np.linspace(-25,25,11,dtype=int)):
+#         kwargs = {
+#             "flow_values_cal": flow_values_cal_jrnmm,
+#             "x_cal": x_cal[:,:,0],
+#             "x_obs": x_0,
+#             "flow_name": f'jrnmm_g_{g}',
+#             "n_trials": 1000,
+#         }
+#         tasks.append(executor.submit(score_lc2st_flow, **kwargs))
 
 
 

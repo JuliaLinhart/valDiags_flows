@@ -24,7 +24,7 @@ from data.data_generators import ConditionalGaussian1d
 
 # EXPERIMENT = 'Gaussian1d_localPIT'
 EXPERIMENT = "JR-NMM"
-gauss1d_data = torch.load("saved_experiments/Gaussian1d_localPIT/datasets.pkl")
+gauss1d_data = torch.load("saved_experiments/Gaussian1d/datasets.pkl")
 jrnmm_data = torch.load("saved_experiments/JR-NMM/datasets_naive.pkl")
 
 # data DIM

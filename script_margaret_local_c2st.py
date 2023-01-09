@@ -5,12 +5,14 @@ import pandas as pd
 import torch
 import time
 import torch.distributions as D
-# from sbi.utils.metrics import c2st_scores
-from diagnostics.c2st_scores_modified import c2st_scores
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-from diagnostics.localPIT_regression import local_flow_c2st, eval_local_flow_c2st
+# from sbi.utils.metrics import c2st_scores
+from diagnostics.c2st_scores_modified import c2st_scores
+
+from diagnostics.localC2ST import local_flow_c2st, eval_local_flow_c2st
+
 from diagnostics.pp_plots import PP_vals
 from sklearn.model_selection import KFold
 

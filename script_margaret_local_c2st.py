@@ -5,7 +5,8 @@ import pandas as pd
 import torch
 import time
 import torch.distributions as D
-from sbi.utils.metrics import c2st_scores
+# from sbi.utils.metrics import c2st_scores
+from diagnostics.c2st_scores_modified import c2st_scores
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
 

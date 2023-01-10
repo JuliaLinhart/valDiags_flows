@@ -53,13 +53,11 @@ def local_flow_c2st(flow_samples_train, x_train, classifier="mlp"):
 
 def eval_local_flow_c2st(clf, x_eval, dim, n_rounds=1000):
     if dim == 1:
-        reference = norm()
+        norm_samples = norm().rvs(n_rounds).reshape(-1,1)
     else:
-        reference = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # base distribution
+        norm_samples = mvn(mean=np.zeros(dim), cov=np.eye(dim)).rvs(n_rounds)
 
-    proba = []
-    for i in range(n_rounds):
-        features_eval = np.concatenate([reference.rvs(1), x_eval])[None, :]
-        proba.append(clf.predict_proba(features_eval)[0][0])
+    features_eval = np.concatenate([norm_samples, x_eval.repeat(n_rounds,1)], axis=1)
+    proba = clf.predict_proba(features_eval)[:,0]
 
     return proba

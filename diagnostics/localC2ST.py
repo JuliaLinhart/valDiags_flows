@@ -51,13 +51,19 @@ def local_flow_c2st(flow_samples_train, x_train, classifier="mlp"):
     return clf
 
 
-def eval_local_flow_c2st(clf, x_eval, dim, n_rounds=1000):
-    if dim == 1:
-        norm_samples = norm().rvs(n_rounds).reshape(-1,1)
-    else:
-        norm_samples = mvn(mean=np.zeros(dim), cov=np.eye(dim)).rvs(n_rounds)
+def eval_local_flow_c2st(clf, x_eval, dim, size=1000, grid=None):
+    if not len(grid) == 0:
+        z_values = grid
+    else: 
+        # sample from normal dist (class 0)
+        z_values = mvn(mean=np.zeros(dim), cov=np.eye(dim)).rvs(size)
+    
+    if dim == 1 and z_values.ndim == 1:
+        z_values = z_values.reshape(-1,1)
 
-    features_eval = np.concatenate([norm_samples, x_eval.repeat(n_rounds,1)], axis=1)
+    assert (z_values.shape[0] == size) and (z_values.shape[-1] == dim)
+
+    features_eval = np.concatenate([z_values, x_eval.repeat(size,1)], axis=1)
     proba = clf.predict_proba(features_eval)[:,0]
 
     return proba

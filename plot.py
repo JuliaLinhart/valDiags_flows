@@ -9,11 +9,11 @@ import seaborn as sns
 
 def plot_pdf_1D(x_samples, x_i, x_f, target_dist=None, flows=None, context=None):
     """`flows` must be a dict with the plot-label as key_name and 3 elements: (flow, context, plot-color)."""
-    eval_x = torch.linspace(x_i, x_f).reshape(-1, 1)
+    eval_x = torch.linspace(x_i, x_f, 100).reshape(-1, 1)
     if context is not None:
         context = context.repeat(eval_x.size(0), 1)
 
-    fig = plt.figure(figsize=(6, 2))
+    _ = plt.figure(figsize=(6, 2))
     plt.plot(
         x_samples,
         np.zeros_like(x_samples),

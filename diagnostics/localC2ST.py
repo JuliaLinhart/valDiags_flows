@@ -52,7 +52,7 @@ def local_flow_c2st(flow_samples_train, x_train, classifier="mlp"):
 
 
 def eval_local_flow_c2st(clf, x_eval, dim, size=1000, grid=None):
-    if not len(grid) == 0:
+    if grid is not None:
         z_values = grid
     else: 
         # sample from normal dist (class 0)

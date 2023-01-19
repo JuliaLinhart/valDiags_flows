@@ -24,8 +24,11 @@ LIST_TREC_NEXTRA = [(8,0)] #, (8,9)] #[(2,3), (8,10)]   #(8,3), (2,10) #(8,4) (2
 # during inference only
 LIST_SINGLE_REC = [False]
 
+# fixed gain
+FIXED_GAIN = True
+
 # target folder path inside results folder for saving
-PATH = "saved_experiments/JR-NMM/Flows_amortized_new/"
+PATH = "saved_experiments/JR-NMM/fixed_gain_3d/Flows_amortized/"
 
 def get_executor_marg(job_name, timeout_hour=60, n_cpus=40):
     
@@ -57,7 +60,7 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
     # which example case we are considering here
     meta_parameters["case"] = PATH+"JRNMM_nextra_{:02}_trec_{}" \
                     "naive_{}_" \
-                    "single_rec_{}_nostandardize_n_layers_1".format(meta_parameters["n_extra"],
+                    "single_rec_{}".format(meta_parameters["n_extra"],
                                         t_rec,
                                         meta_parameters["naive"],
                                         single_rec)
@@ -82,6 +85,11 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
                                     ('mu', 50.0, 500.0),
                                     ('sigma', 100.0, 5000.0),
                                     ('gain', -20.0, +20.0)])
+    if FIXED_GAIN:
+        input_parameters = ['C', 'mu', 'sigma']
+        prior = prior_JRNMM(parameters=[('C', 10.0, 250.0),
+                                        ('mu', 50.0, 500.0),
+                                        ('sigma', 100.0, 5000.0)])
 
     # choose how to setup the simulator for training
     simulator = partial(simulator_JRNMM,
@@ -105,9 +113,9 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
                                 embedding_net=IdentityJRNMM(),
                                 naive=meta_parameters["naive"],
                                 aggregate=True,
-                                z_score_theta=False,
-                                z_score_x=False,
-                                n_layers=1)  
+                                z_score_theta=True,
+                                z_score_x=True,
+                                n_layers=10)  
 
     _ = run_inference(simulator=simulator, 
                     prior=prior, 

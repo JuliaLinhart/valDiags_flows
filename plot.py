@@ -2,6 +2,7 @@ from turtle import color
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 import torch.distributions as D
 import seaborn as sns
@@ -197,3 +198,97 @@ def plot_2d_pdf_on_grid(pdf, low, high):
         zorder=0,
     )
     # plt.show()
+
+def plot_pairgrid_with_groundtruth(
+    posteriors, theta_gt, color_dict, handles, context, n_samples=10000, title=None, fixed_gain=False
+):
+    plt.rcParams["figure.figsize"] = (9, 9)
+    # plt.rcParams["legend.fontsize"] = 23.0
+    # plt.rcParams["xtick.labelsize"] = 23.0
+    # plt.rcParams["ytick.labelsize"] = 23.0
+    # plt.rcParams["axes.labelsize"] = 23.0
+    # plt.rcParams["font.size"] = 23.0
+    # plt.rcParams["axes.titlesize"] = 27.0
+
+    dim = theta_gt.shape[-1]
+    modes = list(posteriors.keys())
+    dfs = []
+    for n in range(len(posteriors)):
+        posterior = posteriors[modes[n]]
+        samples = posterior.sample(n_samples, context=context[modes[n]])
+        df = pd.DataFrame(
+            samples.detach().numpy(), columns=[r"$C$", r"$\mu$", r"$\sigma$", r"$g$"][:dim]
+        )
+        df["mode"] = modes[n]
+        dfs.append(df)
+
+    joint_df = pd.concat(dfs, ignore_index=True)
+
+    g = sns.PairGrid(
+        joint_df, hue="mode", palette=color_dict, diag_sharey=False, corner=True
+    )
+    g.fig.set_size_inches(8, 8)
+
+    g.map_lower(sns.kdeplot, linewidths=1)
+    g.map_diag(sns.kdeplot, shade=True, linewidths=1)
+
+    g.axes[1][0].set_xlim(10.0, 300.0)  # C
+    g.axes[1][0].set_ylim(50.0, 500.0)  # mu
+    g.axes[1][0].set_yticks([200, 400])
+
+    g.axes[2][0].set_xlim(10.0, 300.0)  # C
+    g.axes[2][0].set_ylim(100.0, 5000.0)  # sigma
+    g.axes[2][0].set_yticks([1000, 3500])
+
+    g.axes[2][1].set_xlim(50.0, 500.0)  # mu
+    g.axes[2][1].set_ylim(100.0, 5000.0)  # sigma
+    # g.axes[2][1].set_xticks([])
+
+    if not fixed_gain:
+
+        g.axes[3][0].set_xlim(10.0, 300.0)  # C
+        g.axes[3][0].set_ylim(-22.0, 22.0)  # gain
+        g.axes[3][0].set_yticks([-20, 0, 20])
+        g.axes[3][0].set_xticks([100, 250])
+
+        g.axes[3][1].set_xlim(50.0, 500.0)  # mu
+        g.axes[3][1].set_ylim(-22.0, 22.0)  # gain
+        g.axes[3][1].set_xticks([200, 400])
+
+        g.axes[3][2].set_xlim(100.0, 5000.0)  # sigma
+        g.axes[3][2].set_ylim(-22.0, 22.0)  # gain
+        g.axes[3][2].set_xticks([1000, 3500])
+
+        g.axes[3][3].set_xlim(-22.0, 22.0)  # gain
+
+    if theta_gt is not None:
+        # get groundtruth parameters
+        for gt in theta_gt:
+            C, mu, sigma = gt[:3]
+            # plot points
+            g.axes[1][0].scatter(C, mu, color="black", zorder=2, s=8)
+            g.axes[2][0].scatter(C, sigma, color="black", zorder=2, s=8)
+            g.axes[2][1].scatter(mu, sigma, color="black", zorder=2, s=8)
+            # plot dirac
+            g.axes[0][0].axvline(x=C, ls="--", c="black", linewidth=1)
+            g.axes[1][1].axvline(x=mu, ls="--", c="black", linewidth=1)
+            g.axes[2][2].axvline(x=sigma, ls="--", c="black", linewidth=1)
+
+            if not fixed_gain:
+                gain = gt[3]
+                # plot points
+                g.axes[3][0].scatter(C, gain, color="black", zorder=2, s=8)
+                g.axes[3][1].scatter(mu, gain, color="black", zorder=2, s=8)
+                g.axes[3][2].scatter(sigma, gain, color="black", zorder=2, s=8)
+                # plot dirac
+                g.axes[3][3].axvline(x=gain, ls="--", c="black", linewidth=1)
+
+    plt.legend(
+        handles=handles,
+        title=title,
+        bbox_to_anchor=(1.1, 3.3),
+        # loc="upper right",
+    )
+    g.fig.suptitle("Local pair-plots", y=1.02)
+
+    return g

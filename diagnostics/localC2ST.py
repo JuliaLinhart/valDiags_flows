@@ -4,6 +4,12 @@ from sklearn.neural_network import MLPClassifier
 from scipy.stats import multivariate_normal as mvn
 from scipy.stats import norm
 from sklearn.utils import shuffle
+import sklearn
+
+from scipy.stats import wasserstein_distance
+from diagnostics.pp_plots import PP_vals
+
+import pandas as pd
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
@@ -67,3 +73,49 @@ def eval_local_flow_c2st(clf, x_eval, dim, size=1000, z_values=None):
     proba = clf.predict_proba(features_eval)[:,0]
 
     return proba, z_values
+
+def score_lc2st(P, Q, x_train, x_eval, n_folds=10, classifier='mlp'):
+
+    return 
+
+def score_lc2st_flow(flow, theta_train, x_train, x_eval, metrics=['mean'], n_folds=10, val_frac=0.1, clf=MLPClassifier, clf_kwargs={'alpha':0, 'max_iter':25000}):
+    inv_flow_samples = flow(x_train).transform(theta_train).detach().numpy()
+    base_dist_samples = flow(x_train).base.sample()
+    joint_inv_flow = np.concatenate([inv_flow_samples, x_train], axis=1)
+    joint_base_dist = np.concatenate([base_dist_samples, x_train], axis=1)
+
+    features = np.concatenate([joint_base_dist, joint_inv_flow], axis=0)
+    labels = np.concatenate([np.array([0] * len(x_train)), np.array([1] * len(x_train))]).ravel()
+
+    features, labels = shuffle(features, labels, random_state=13)
+    
+    classifier = clf(**clf_kwargs)
+
+    probas = []
+    scores = {}
+    for m in metrics:
+        scores[m] = []
+    for _ in range(n_folds):
+        # train n^th classifier 
+        clf_n = sklearn.base.clone(classifier)
+        clf_n.fit(X=features, y=labels)
+
+        # eval n^th classifier
+        val_size = int(len(x_train)*val_frac)
+        base_dist_samples_eval = flow(x_train[:val_size]).base.sample()
+        proba, _ = eval_local_flow_c2st(clf_n, x_eval, dim=theta_train.shape[-1], size=val_size, z_values=base_dist_samples_eval)
+        probas.append(proba)
+        for m in metrics:
+            if m == 'mean':
+                scores[m].append(np.mean(proba))
+            elif m == 'w_dist': # wasserstein distance to dirac
+                scores[m].append(wasserstein_distance([0.5]*val_size, proba)) 
+            elif m == 'TV': # total variation: distance between cdfs of dirac and probas
+                alphas = np.linspace(0,1,100)
+                pp_vals_dirac = pd.Series(PP_vals([0.5]*val_size, alphas))
+                pp_vals = PP_vals(proba, alphas)
+                scores[m].append(((pp_vals - pp_vals_dirac) ** 2).sum() / len(alphas))
+            else:
+                print(f'metric "{m}" not implemented')
+    
+    return scores, probas

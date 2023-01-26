@@ -82,7 +82,7 @@ def run_inference_lampe(
             x,
             num_epochs=max_num_epochs,
             batch_size=training_batch_size,
-            lr= 5e-5, # default learning rate from sbi training function
+            lr= 5e-4, # default learning rate from sbi training function
             clip=5.0, # default clip from sbi training function 
             optimizer=torch.optim.AdamW,
             validation=True,

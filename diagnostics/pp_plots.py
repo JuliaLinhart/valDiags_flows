@@ -407,3 +407,53 @@ def confidence_region_null_analytic(alphas, N=1000, conf_alpha = 0.05):
         color="grey",
         alpha=0.3,
     )
+
+
+    ## lampe
+
+
+def cdf_flow_zuko_1d(target, context, flow, base_dist=D.Normal(0,1)):
+    return base_dist.cdf(flow(context).transform(target))
+
+def cde_pit_values_zuko(
+    target, context, flow
+):
+    pit_values = (
+        cdf_flow_zuko_1d(target, context, flow)
+        .detach()
+        .numpy()
+    )
+    return pit_values
+
+def multi_cde_pit_values_zuko(
+    samples_theta, samples_x, flow, 
+):
+    """ Compute PIT-values for multivaraite target data,
+    computed on N samples (theta, x) from the joint.
+
+    inputs:
+    - samples_theta: torch.Tensor, size: (N, dim)
+    - samples_x: torch.Tensor, size: (N, nb_features, 1)
+    - flow: class based on zuko.distributions.FlowModule
+        Pytorch neural network defining our Normalizing Flow, 
+        hence conditional (posterior) density estimator.
+    
+    outputs:
+    - pit_values: list of length dim with numpy arrays of size (N, )
+        List of pit-values for each dimension.
+    """
+    dim = samples_theta.shape[-1]
+    pit_values = []
+    for i in range(dim):
+        conditional_transform_1d = (
+            D.Normal(0, 1)
+            .cdf(
+                flow(samples_x).transform(samples_theta)[
+                    :, i
+                ]
+            )
+            .detach()
+            .numpy()
+        )
+        pit_values.append(conditional_transform_1d)
+    return pit_values

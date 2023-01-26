@@ -1,11 +1,12 @@
-
 import torch
 from pathlib import Path
 
 # Imports for the SBI package
 from sbi.utils.get_nn_models import build_maf
 from pyknos.nflows.distributions import base
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from zuko.flows import MAF, NSF
+from lampe.inference import NPE
+import torch.nn as nn
 
 
 class AggregateInstances(torch.nn.Module):
@@ -15,14 +16,23 @@ class AggregateInstances(torch.nn.Module):
         self.mean = mean
 
     def forward(self, x):
-        if x.shape[2] == 1:
-            return x.view(len(x), -1)
+        if x.shape[-1] == 1:
+            if x.ndim == 3:
+                return x.view(len(x), -1)
+            else:
+                return x[:,0]
         else:
             if self.mean:
-                xobs = x[:, :, 0]  # n_batch, n_embed
-                xagg = x[:, :, 1:].mean(dim=2)  # n_batch, n_embed
-                x = torch.cat([xobs, xagg], dim=1)  # n_batch, 2*n_embed
+                if x.ndim == 3:
+                    xobs = x[:, :, 0]  # n_batch, n_embed
+                    xagg = x[:, :, 1:].mean(dim=2)  # n_batch, n_embed
+                    x = torch.cat([xobs, xagg], dim=1)  # n_batch, 2*n_embed
+                else:  # no batch, single observation (used in sample..)
+                    xobs = x[:, 0]  # n_embed
+                    xagg = x[:, 1:].mean(dim=1)  # n_embed
+                    x = torch.cat([xobs, xagg])  # 2*n_embed
                 return x
+
             else:
                 return x.view(len(x), -1)
 
@@ -62,25 +72,33 @@ class StackContext(torch.nn.Module):
 
 
 class JRNMMFlow_nflows_base(base.Distribution):
-
-    def __init__(self, batch_theta, batch_x, embedding_net, n_layers=10,
-                 z_score_theta=True, z_score_x=True, aggregate=True):
+    def __init__(
+        self,
+        batch_theta,
+        batch_x,
+        embedding_net,
+        n_layers=10,
+        z_score_theta=True,
+        z_score_x=True,
+        aggregate=True,
+    ):
 
         super().__init__()
 
         embedding_net = torch.nn.Sequential(
-            embedding_net,
-            AggregateInstances(mean=aggregate)
+            embedding_net, AggregateInstances(mean=aggregate)
         )
         self._embedding_net = embedding_net
 
         # instantiate the flow
-        flow = build_maf(batch_x=batch_theta,
-                         batch_y=batch_x,
-                         z_score_x=z_score_theta,
-                         z_score_y=z_score_x,
-                         embedding_net=embedding_net,
-                         num_transforms=n_layers)
+        flow = build_maf(
+            batch_x=batch_theta,
+            batch_y=batch_x,
+            z_score_x=z_score_theta,
+            z_score_y=z_score_x,
+            embedding_net=embedding_net,
+            num_transforms=n_layers,
+        )
 
         self._flow = flow
 
@@ -91,27 +109,32 @@ class JRNMMFlow_nflows_base(base.Distribution):
     def _sample(self, num_samples, context):
         samples = self._flow.sample(num_samples, context)[0]
         return samples
-    
+
     def _transform(self, input, context):
         context = self._flow._embedding_net(context)
         transform = (self._flow._transform(input, context=context)[0], None)
         return transform
-        
 
     def save_state(self, filename):
         state_dict = {}
-        state_dict['flow'] = self._flow.state_dict()
+        state_dict["flow"] = self._flow.state_dict()
         torch.save(state_dict, filename)
 
     def load_state(self, filename):
-        state_dict = torch.load(filename, map_location='cpu')
-        self._flow.load_state_dict(state_dict['flow'])
+        state_dict = torch.load(filename, map_location="cpu")
+        self._flow.load_state_dict(state_dict["flow"])
 
 
 class JRNMMFlow_nflows_factorized(base.Distribution):
-
-    def __init__(self, batch_theta, batch_x, embedding_net, n_layers_factor=5,
-                 z_score_theta=True, z_score_x=True):
+    def __init__(
+        self,
+        batch_theta,
+        batch_x,
+        embedding_net,
+        n_layers_factor=5,
+        z_score_theta=True,
+        z_score_x=True,
+    ):
 
         super().__init__()
 
@@ -119,8 +142,7 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
         # create a new net that embeds all n+1 observations and then aggregates
         # n of them via a sum operation
         embedding_net_1 = torch.nn.Sequential(
-            embedding_net,
-            AggregateInstances(mean=True)
+            embedding_net, AggregateInstances(mean=True)
         )
         self._embedding_net_1 = embedding_net_1
 
@@ -128,12 +150,14 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
         # the flow object or not; this can have an impact over the z-scoring
         batch_theta_1 = batch_theta[:, -1:]
         batch_context_1 = batch_x
-        flow_1 = build_maf(batch_x=batch_theta_1,
-                           batch_y=batch_context_1,
-                           z_score_x=z_score_theta,
-                           z_score_y=z_score_x,
-                           embedding_net=embedding_net_1,
-                           num_transforms=n_layers_factor)
+        flow_1 = build_maf(
+            batch_x=batch_theta_1,
+            batch_y=batch_context_1,
+            z_score_x=z_score_theta,
+            z_score_y=z_score_x,
+            embedding_net=embedding_net_1,
+            num_transforms=n_layers_factor,
+        )
 
         self._flow_1 = flow_1
 
@@ -146,15 +170,16 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
 
         batch_theta_2 = batch_theta[:, :-1]
         batch_context_2 = torch.cat(
-            [batch_x[:, :, 0], batch_theta[:, -1:]],
-            dim=1
+            [batch_x[:, :, 0], batch_theta[:, -1:]], dim=1
         )  # shape (n_batch, n_times+1)
-        flow_2 = build_maf(batch_x=batch_theta_2,
-                           batch_y=batch_context_2,
-                           z_score_x=z_score_theta,
-                           z_score_y=z_score_x,
-                           embedding_net=embedding_net_2,
-                           num_transforms=n_layers_factor)
+        flow_2 = build_maf(
+            batch_x=batch_theta_2,
+            batch_y=batch_context_2,
+            z_score_x=z_score_theta,
+            z_score_y=z_score_x,
+            embedding_net=embedding_net_2,
+            num_transforms=n_layers_factor,
+        )
 
         self._flow_2 = flow_2
 
@@ -192,12 +217,12 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
         context_1 = context
         # shape (n_samples, 1)
         samples_flow_1 = self._flow_1.sample(num_samples, context_1)[0]
-        context_2 = torch.cat([context[:, :, 0].repeat(num_samples, 1),
-                               samples_flow_1], dim=1)
+        context_2 = torch.cat(
+            [context[:, :, 0].repeat(num_samples, 1), samples_flow_1], dim=1
+        )
         context_2 = self._flow_2._embedding_net(context_2)
         noise = self._flow_2._distribution.sample(num_samples)
-        samples_flow_2, _ = self._flow_2._transform.inverse(noise,
-                                                            context=context_2)
+        samples_flow_2, _ = self._flow_2._transform.inverse(noise, context=context_2)
 
         samples = torch.cat([samples_flow_2, samples_flow_1], dim=1)
         return samples
@@ -205,7 +230,7 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
     def _transform(self, input, context):
         # of the flow that models p(gain | x, x1, ..., xn)
         context_1 = self._flow_1._embedding_net(context)
-        theta_1 = input[:, -1:] # gain is the last parameter
+        theta_1 = input[:, -1:]  # gain is the last parameter
         transform_1 = self._flow_1._transform(theta_1, context=context_1)[0]
         # of the flow that models p(C, mu, sigma | x, gain)
         context_2 = torch.cat([context[:, :, 0], theta_1], dim=1)
@@ -217,22 +242,19 @@ class JRNMMFlow_nflows_factorized(base.Distribution):
 
     def save_state(self, filename):
         state_dict = {}
-        state_dict['flow_1'] = self._flow_1.state_dict()
-        state_dict['flow_2'] = self._flow_2.state_dict()
+        state_dict["flow_1"] = self._flow_1.state_dict()
+        state_dict["flow_2"] = self._flow_2.state_dict()
         torch.save(state_dict, filename)
 
     def load_state(self, filename):
-        state_dict = torch.load(filename, map_location='cpu')
-        self._flow_1.load_state_dict(state_dict['flow_1'])
-        self._flow_2.load_state_dict(state_dict['flow_2'])
+        state_dict = torch.load(filename, map_location="cpu")
+        self._flow_1.load_state_dict(state_dict["flow_1"])
+        self._flow_2.load_state_dict(state_dict["flow_2"])
 
 
-def build_flow(batch_theta,
-               batch_x,
-               embedding_net,
-               naive=False,
-               aggregate=True,
-               **kwargs):
+def build_flow(
+    batch_theta, batch_x, embedding_net, naive=False, aggregate=True, **kwargs
+):
 
     if naive:
         flow = JRNMMFlow_nflows_base(
@@ -246,8 +268,17 @@ def build_flow(batch_theta,
     return flow
 
 
-def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
-                  meta_parameters, round_=0, batch_theta=None, batch_x=None, path=None):
+def get_posterior(
+    simulator,
+    prior,
+    summary_extractor,
+    build_nn_posterior,
+    meta_parameters,
+    round_=0,
+    batch_theta=None,
+    batch_x=None,
+    path=None,
+):
     if path is not None:
         folderpath = path
     else:
@@ -260,17 +291,55 @@ def get_posterior(simulator, prior, summary_extractor, build_nn_posterior,
         if summary_extractor is not None:
             batch_x = summary_extractor(batch_x)
 
-    nn_posterior = build_nn_posterior(batch_theta=batch_theta,
-                                      batch_x=batch_x)
+    nn_posterior = build_nn_posterior(batch_theta=batch_theta, batch_x=batch_x)
     # nn_posterior.eval()
     # posterior = DirectPosterior(
     #     posterior_estimator=nn_posterior, prior=prior,
     #     x_shape=batch_x[0][None, :].shape
     # )
 
-    state_dict_path = folderpath+f"nn_posterior_round_{round_:02}.pkl"
+    state_dict_path = folderpath + f"nn_posterior_round_{round_:02}.pkl"
     nn_posterior.load_state(state_dict_path)
     # posterior = posterior.set_default_x(ground_truth["observation"])
 
     return nn_posterior
+
+
+class NPE_JRNMM_lampe_base(nn.Module):
+    def __init__(
+        self,
+        batch_theta,
+        batch_x,
+        flow=MAF,
+        embedding_net=IdentityJRNMM(),
+        aggregate=True,
+        n_layers=10,
+        hidden_features=[50] * 3,
+        randperm=False,
+        **kwargs,
+    ) -> None:
+        super().__init__()
+
+        x_dim = AggregateInstances(mean=aggregate)(batch_x).shape[-1]
+
+        self.npe = NPE(
+            theta_dim=batch_theta.shape[-1],
+            x_dim=x_dim,
+            build=flow,
+            transforms=n_layers,
+            hidden_features=hidden_features,
+            randperm=randperm,
+            **kwargs,
+        )
+
+        embedding_net = torch.nn.Sequential(
+            embedding_net, AggregateInstances(mean=aggregate)
+        )
+        self.embedding_net = embedding_net
+
+    def forward(self, theta: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        return self.npe(theta, self.embedding_net(x))
+
+    def flow(self, x: torch.Tensor):  # -> Distribution
+        return self.npe.flow(self.embedding_net(x))
 

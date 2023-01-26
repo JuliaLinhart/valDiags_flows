@@ -63,7 +63,7 @@ def train_lampe_npe(estimator, features, context, num_epochs=5000, batch_size=50
     dataset = data.TensorDataset(features, context)
 
     if validation:
-        val_size = int(0.3* len(dataset)) # change to 0.1
+        val_size = int(0.1* len(dataset)) # change to 0.1
         train_size = len(dataset) - val_size
         train_set, val_set = torch.utils.data.random_split(dataset, [train_size, val_size])
         train_loader = data.DataLoader(train_set, batch_size=batch_size)

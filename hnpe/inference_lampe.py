@@ -33,6 +33,9 @@ def run_inference_lampe(
     max_num_epochs=10_000,
     training_batch_size=100,
     dataset_train = None, 
+    optimizer=torch.optim.AdamW, 
+    lr=5e-4, # default learning rate from sbi training function
+    epochs_until_convergence=20,
 ):
 
     # set seed for numpy and torch
@@ -82,11 +85,11 @@ def run_inference_lampe(
             x,
             num_epochs=max_num_epochs,
             batch_size=training_batch_size,
-            lr= 5e-4, # default learning rate from sbi training function
+            lr= lr, 
             clip=5.0, # default clip from sbi training function 
-            optimizer=torch.optim.AdamW,
+            optimizer=optimizer,
             validation=True,
-            epochs_until_converge=20,
+            epochs_until_converge=epochs_until_convergence,
         )
         print(f'inference done in {epochs} epochs')
 
@@ -113,6 +116,7 @@ if __name__ == "__main__":
     from functools import partial
     from misc import make_label
     from posterior import NPE_JRNMM_lampe_base
+    from zuko.flows import NSF, MAF
 
     PATH_EXPERIMENT = "saved_experiments/JR-NMM/fixed_gain_3d/"
     N_EXTRA = 0
@@ -177,11 +181,13 @@ if __name__ == "__main__":
         simulator,
         prior,
         dataset_train=dataset_train,
-        estimator=NPE_JRNMM_lampe_base,
+        estimator=partial(NPE_JRNMM_lampe_base, randperm=False),
         meta_parameters=meta_parameters,
         ground_truth=ground_truth,
         summary_extractor=summary_extractor,
         save_rounds=True,
         training_batch_size=100,
+        # optimizer=torch.optim.Adam,
+        # lr=0.1,
     )
 

@@ -113,6 +113,8 @@ def compute_metric(proba, metrics):
     for m in metrics:
         if m == "mean":
             scores[m] = np.mean(proba)
+        elif m == "std":
+            scores[m] = np.std(proba)
         elif m == "w_dist":  # wasserstein distance to dirac
             scores[m] = wasserstein_distance([0.5] * len(proba), proba)
         elif (
@@ -160,9 +162,10 @@ def score_lc2st(
         proba = eval_lc2st(P_eval, x_eval, clf=clf_n)
         probas.append(proba)
         score = compute_metric(proba, metrics=metrics)
+
         for m in metrics:
             scores[m].append(score[m])
-
+    
     return scores, probas
 
 
@@ -262,27 +265,31 @@ def box_plot_lc2st(scores, scores_null, labels, colors, title=r'Box plot for l-c
 
 ## =============== eval clfs : shift experiment ========================
 # like in c2st... gl2st...
-def eval_classifier_for_lc2st(x_samples, ref_samples, shifted_samples, shifts, clf_class, clf_kwargs, metric='mean', n_folds=10):
+def eval_classifier_for_lc2st(x_samples, ref_samples, shifted_samples, shifts, clf_class, clf_kwargs, metrics=['mean'], n_folds=10):
     shift_list = []
     scores = []
     times = []
     for s_samples,s in zip(shifted_samples, shifts):
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=1)
         start = time.time()
-        for t, (train_index, eval_index) in enumerate(kf.split(x_samples)):
-            x_train = x_samples[train_index]
-            x_eval = x_samples[eval_index]
-            ref_train = ref_samples[train_index]
-            s_train = s_samples[train_index]
-            ref_eval = ref_samples[eval_index]
-            classifier = clf_class(**clf_kwargs)
-            clf = train_lc2st(ref_train, s_train, x_train, clf=classifier)
-        
-            for i,x_obs in enumerate(x_eval):
-                proba = eval_lc2st(ref_eval, x_obs, clf)
-                scores_x = compute_metric(proba, metrics=[metric])[metric]
+        # for t, (train_index, eval_index) in enumerate(kf.split(x_samples)):
+        #     x_train = x_samples[train_index]
+        #     x_eval = x_samples[eval_index]
+        #     ref_train = ref_samples[train_index]
+        #     s_train = s_samples[train_index]
+        #     ref_eval = ref_samples[eval_index]
             
-            scores.append(np.mean(scores_x))
+        #     classifier = clf_class(**clf_kwargs)
+        #     clf = train_lc2st(ref_train, s_train, x_train, clf=classifier)
+            
+        #     scores_x = []
+        #     for x_obs in x_eval:
+        #         proba = eval_lc2st(ref_eval, x_obs, clf)
+        #         scores_x.append(compute_metric(proba, metrics=[metric])[metric])
+            
+        #     scores.append(np.mean(scores_x))
+
+        scores = score_expected_lc2st(ref_samples, shifted_samples, x_samples, metrics=metrics, n_folds=n_folds)
         total_cv_time = time.time() - start
         
         for t in range(n_folds):
@@ -291,46 +298,44 @@ def eval_classifier_for_lc2st(x_samples, ref_samples, shifted_samples, shifts, c
     return shift_list, scores, times
 
 ## =============== eval test-stats (precision under null) ========================
-def eval_null_lc2st(x_samples, null_dist, classifier, test_stats = ['mean'], n=1000, n_folds=10):
+def eval_null_lc2st(x_samples, null_dist, classifier=MLPClassifier(alpha=0, max_iter=25000), clf_name = 'mlp_base', test_stats = ['mean'], n=1000, n_folds=10):
     
-    nb_samples = []
-    probas_stds = []
     scores = {}
     for m in test_stats:
         scores[m] = []
-    times = []
 
-    
     P = null_dist.sample((n,))
     Q = null_dist.sample((n,))
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=1)
     start = time.time()
-    for t, (train_index, eval_index) in enumerate(kf.split(x_samples[n])):
-        x_train = x_samples[n][train_index]
-        x_eval = x_samples[n][eval_index]
-        Q_train = Q[train_index]
-        P_train = P[train_index]
-        P_eval = P[eval_index]
-
-        clf = train_lc2st(P_train, Q_train, x_train, clf=classifier)
-    
-        std_x = []
-        for i,x_obs in enumerate(x_eval):
-            proba = eval_lc2st(P_eval, x_obs, clf)
-            scores_x = compute_metric(proba, metrics=test_stats)
-            std_x.append(np.std(proba))
-        
-        probas_stds.append(np.mean(std_x))
-        for m in test_stats:
-            scores[m].append(np.mean(scores_x[m]))
-        nb_samples.append(n)
-
+    scores = score_expected_lc2st(P,Q,x_samples[n],metrics=test_stats+['std'], n_folds=n_folds)
     total_cv_time = time.time() - start
-    for t in range(n_folds):
-        times.append(total_cv_time)
+    # for t, (train_index, eval_index) in enumerate(kf.split(x_samples[n])):
+    #     x_train = x_samples[n][train_index]
+    #     x_eval = x_samples[n][eval_index]
+    #     Q_train = Q[train_index]
+    #     P_train = P[train_index]
+    #     P_eval = P[eval_index]
 
-    df = pd.DataFrame({f'nb_samples': nb_samples, 'probas_std': probas_stds, 'total_cv_time':times, 'classifier': ['mlp_sbi']*len(times)})
-    for m in test_stats:
+    #     clf = train_lc2st(P_train, Q_train, x_train, clf=classifier)
+    
+    #     std_x = []
+    #     scores_x = []
+    #     for x_obs in x_eval:
+    #         proba = eval_lc2st(P_eval, x_obs, clf)
+    #         scores_x.append(compute_metric(proba, metrics=test_stats))
+    #         std_x.append(np.std(proba))
+        
+    #     probas_stds.append(np.mean(std_x))
+    #     for m in test_stats:
+    #         scores[m].append(np.mean([scores_x[i][m] for i in range(len(x_eval))]))
+    #     nb_samples.append(n)
+
+    times = [total_cv_time]*n_folds
+    nb_samples = [n]*n_folds
+    classifier = [clf_name]*n_folds
+
+    df = pd.DataFrame({f'nb_samples': nb_samples, 'total_cv_time':times, 'classifier': classifier})
+    for m in test_stats+['std']:
         df[m] = scores[m]
 
     return df
@@ -359,3 +364,51 @@ def score_lc2st_flow_zuko(
         clf=clf,
         clf_kwargs=clf_kwargs,
     )
+
+
+## expected c2st score
+def score_expected_lc2st(
+    P,
+    Q,
+    x_cal,
+    metrics = ['mean'],
+    n_folds=10,
+    clf=MLPClassifier,
+    clf_kwargs={"alpha": 0, "max_iter": 25000},
+):
+
+    classifier = clf(**clf_kwargs)
+
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=1)
+
+    scores = {'accuracy': []}
+    for m in metrics:
+        scores[m] = []
+    
+    for train_index, val_index in kf.split(P):
+        P_train = P[train_index]
+        P_eval = P[val_index]
+        Q_train = Q[train_index]
+        Q_eval = Q[val_index]
+        x_train = x_cal[train_index]
+        x_eval = x_cal[val_index]
+
+        # train n^th classifier
+        clf_n = train_lc2st(P_train, Q_train, x_train, clf=classifier)
+
+        # eval n^th classifier
+        # joint samples
+        joint_P_x = np.concatenate([P_eval, x_eval], axis=1)
+        joint_Q_x = np.concatenate([Q_eval, x_eval], axis=1)
+
+        # define features and labels for classification
+        features = np.concatenate([joint_P_x, joint_Q_x], axis=0)
+        labels = np.concatenate([np.array([0] * len(x_eval)), np.array([1] * len(x_eval))]).ravel()
+        
+        accuracy = clf_n.score(features, labels)
+        scores['accuracy'].append(accuracy)
+        proba = clf_n.predict_proba(features)[:,0]
+        for m in metrics:
+            scores[m].append(compute_metric(proba, [m])[m])
+    
+    return scores

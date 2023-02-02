@@ -9,3 +9,4 @@ work_inference/
 sbi_logs/
 saved_experiments/
 script_margaret_localPIT_regression_old.py
+*.pyc

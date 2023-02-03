@@ -8,19 +8,19 @@ import torch.distributions as D
 import math
 from functools import partial
 from scipy.stats import norm
-from diagnostics.localPIT_regression import (
+from valdiags.localPIT_regression import (
     localPIT_regression_baseline,
     infer_r_alphas_baseline,
     localPIT_regression_sample,
     infer_r_alphas_amortized,
 )
-from diagnostics.pp_plots import PP_vals
+from valdiags.pp_plots import PP_vals
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from sklearn.model_selection import KFold
 
-from data.data_generators import ConditionalGaussian1d
+from tasks.toy_examples.data_generators import ConditionalGaussian1d
 
 # EXPERIMENT = 'Gaussian1d'
 EXPERIMENT = "JR-NMM"
@@ -54,8 +54,11 @@ alphas = np.linspace(0, 0.99, 100)
 
 # clfs
 # clf_hist = HistGradientBoostingClassifier(monotonic_cst=[0, 0, 1], max_iter=70)
-clf_hist = HistGradientBoostingClassifier(monotonic_cst=[0 for _ in range(33)]+[1], max_iter=90)
+clf_hist = HistGradientBoostingClassifier(
+    monotonic_cst=[0 for _ in range(33)] + [1], max_iter=90
+)
 clf_mlp = MLPClassifier(alpha=0, max_iter=25000)
+
 
 def get_executor_marg(job_name, timeout_hour=60, n_cpus=40):
 
@@ -92,12 +95,16 @@ def eval_classifier_for_localPIT(
     if shift_object == "mean":
         for method in reg_methods:
             print(method)
-            if 'sample' in method:
+            if "sample" in method:
                 infer = partial(infer_r_alphas_amortized, alphas=alphas)
-                if 'mlp' in method:
-                    reg = partial(localPIT_regression_sample, nb_samples=50, classifier=clf_mlp)
+                if "mlp" in method:
+                    reg = partial(
+                        localPIT_regression_sample, nb_samples=50, classifier=clf_mlp
+                    )
                 else:
-                    reg = partial(localPIT_regression_sample, nb_samples=50, classifier=clf_hist)
+                    reg = partial(
+                        localPIT_regression_sample, nb_samples=50, classifier=clf_hist
+                    )
 
             for m in shifts:
                 # for _ in range(n_trials):
@@ -134,23 +141,27 @@ def eval_classifier_for_localPIT(
                     shift.append(m)
                 total_cv_time = start - time.time()
                 for _ in range(n_trials):
-                    times.append(total_cv_time)      
+                    times.append(total_cv_time)
     else:
         for method in reg_methods:
             print(method)
-            if 'sample' in method:
+            if "sample" in method:
                 infer = partial(infer_r_alphas_amortized, alphas=alphas)
-                if 'mlp' in method:
-                    reg = partial(localPIT_regression_sample, nb_samples=50, classifier=clf_mlp)
+                if "mlp" in method:
+                    reg = partial(
+                        localPIT_regression_sample, nb_samples=50, classifier=clf_mlp
+                    )
                 else:
-                    reg = partial(localPIT_regression_sample, nb_samples=50, classifier=clf_hist)
+                    reg = partial(
+                        localPIT_regression_sample, nb_samples=50, classifier=clf_hist
+                    )
 
             for s in shifts:
                 # for _ in range(n_trials):
                 # Q_samples = norm().cdf(norm(loc=m).rvs(nb_samples))
                 Q_samples = (
                     D.MultivariateNormal(
-                        loc=torch.zeros(DIM), covariance_matrix=torch.eye(DIM)*s
+                        loc=torch.zeros(DIM), covariance_matrix=torch.eye(DIM) * s
                     )
                     .rsample((nb_samples,))
                     .numpy()
@@ -180,11 +191,15 @@ def eval_classifier_for_localPIT(
                     shift.append(s)
                 total_cv_time = start - time.time()
                 for _ in range(n_trials):
-                    times.append(total_cv_time)      
-
+                    times.append(total_cv_time)
 
     df = pd.DataFrame(
-        {f"{shift_object}_shift": shift, "eucledean_dist_to_gt": scores, "total_cv_time":times, "method": reg_method,}
+        {
+            f"{shift_object}_shift": shift,
+            "eucledean_dist_to_gt": scores,
+            "total_cv_time": times,
+            "method": reg_method,
+        }
     )
     filename = f"saved_experiments/{EXPERIMENT}/localPIT_eval_clfs/df_{shift_object}_{nb_samples}.pkl"
     torch.save(df, filename)
@@ -197,7 +212,7 @@ with executor.batch():
     tasks = []
     for n in [1000]:
         for shifts, s_object in zip(
-            [[0],[1]],
+            [[0], [1]],
             # [[0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10], np.linspace(1, 20, 10)],
             ["mean", "scale"],
         ):
@@ -207,7 +222,5 @@ with executor.batch():
                 "x_samples": x_samples[n],
                 "n_trials": 2,
             }
-            tasks.append(
-                executor.submit(eval_classifier_for_localPIT, **kwargs)
-            )
+            tasks.append(executor.submit(eval_classifier_for_localPIT, **kwargs))
 

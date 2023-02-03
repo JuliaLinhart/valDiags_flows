@@ -1,11 +1,11 @@
 from functools import partial
-from hnpe.misc import make_label
-from hnpe.inference import run_inference
-from hnpe.inference_lampe import run_inference_lampe
 
-from hnpe.posterior import build_flow, IdentityJRNMM, NPE_JRNMM_lampe_base
+from hnpe.misc import make_label
 from hnpe.summary import summary_JRNMM
-from hnpe.simulator import prior_JRNMM, simulator_JRNMM
+
+from tasks.jrnmm.posterior import build_flow, IdentityJRNMM, NPE_JRNMM_lampe_base
+from tasks.jrnmm.simulator import prior_JRNMM, simulator_JRNMM
+from tasks.jrnmm.inference import run_inference_lampe, run_inference_sbi
 
 import submitit
 
@@ -30,7 +30,7 @@ LIST_SINGLE_REC = [False]
 # fixed gain
 FIXED_GAIN = True
 
-# lampe ou pas 
+# lampe ou pas
 LAMPE = True
 
 # target folder path inside results folder for saving
@@ -140,7 +140,7 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
             n_layers=10,
         )
 
-        _ = run_inference(
+        _ = run_inference_sbi(
             simulator=simulator,
             prior=prior,
             build_nn_posterior=build_nn_posterior,

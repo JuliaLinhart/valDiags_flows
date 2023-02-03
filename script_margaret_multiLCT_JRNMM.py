@@ -1,23 +1,24 @@
 import submitit
+from functools import partial
+
 import torch
 import numpy as np
 import pandas as pd
 
-from data.feature_transforms import identity
-from sklearn.ensemble import HistGradientBoostingClassifier
+from scipy.stats import norm
 
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
-from diagnostics.pp_plots import multi_cde_pit_values
-from diagnostics.localPIT_regression import (
+
+from valdiags.pp_plots import multi_cde_pit_values
+from valdiags.localPIT_regression import (
     localPIT_regression_sample,
     localPIT_regression_baseline,
     local_correlation_regression,
 )
-from diagnostics.multi_local_test import multi_local_pit_regression, multivariate_lct
+from valdiags.multi_local_test import multi_local_pit_regression, multivariate_lct
 
-from functools import partial
-
-from scipy.stats import norm
+from tasks.toy_examples.embeddings import identity
 
 PATH_EXPERIMENT = "saved_experiments/JR-NMM/"
 METHOD = "naive"
@@ -33,7 +34,7 @@ POSTERIOR = torch.load(
 )
 
 # EXP_NAME = 'max_iter_exp'
-EXP_NAME = 'baseline'
+EXP_NAME = "baseline"
 # EXP_NAME = 't_stat_variance_exp'
 # EXP_NAME = "reg_eval"
 # EXP_NAME = 'histgrad30'
@@ -48,7 +49,7 @@ X_OBS_PCA = torch.load(
 )[1]
 X_OBS_GAIN = torch.load(
     PATH_EXPERIMENT + "gt_observations/nextra_0/gain_experiment_new.pkl"
-)[1][1:10,:,:]
+)[1][1:10, :, :]
 
 X_OBS_GAIN_NO_STOCH = torch.load(
     PATH_EXPERIMENT + "gt_observations/nextra_0/gain_experiment_no_stoch_new.pkl"
@@ -143,7 +144,9 @@ def train_classifiers(
                 # pit_values_train_null = [
                 #     np.random.uniform(size=pit_values_train_flow[0].shape)
                 # ] * theta_train.shape[-1]
-                pit_values_train_null = [np.random.uniform(size=pit_values_train_flow[0].shape)]
+                pit_values_train_null = [
+                    np.random.uniform(size=pit_values_train_flow[0].shape)
+                ]
                 _, trained_clfs_null_k = multi_local_pit_regression(
                     dim=len(pit_values_train_null),
                     pit_values_train=pit_values_train_null,
@@ -211,7 +214,9 @@ def compute_multi_lct_values(
         torch.save(lct_dict, filename)
 
 
-def compute_expected_pit(theta_train, x_train, x_evals, clf_list, method_name_list, method_name):
+def compute_expected_pit(
+    theta_train, x_train, x_evals, clf_list, method_name_list, method_name
+):
     n_eval = len(x_evals)
     E_hats = {}
     for i in range(NB_CLASSIFIERS):
@@ -246,22 +251,29 @@ def compute_expected_pit(theta_train, x_train, x_evals, clf_list, method_name_li
     filename = PATH_EXPERIMENT + f"reg_eval/expected_pit_list_{method_name}.pkl"
     torch.save(E_hats, filename)
 
+
 def train_null_correlation_regression(x_train, n_trials):
     n = len(x_train)
     null_df_list = []
     for k in range(n_trials):
-        null_df_list.append(pd.DataFrame({
-            'Z_1': norm().rvs(n),
-            'Z_2': norm().rvs(n),
-            'Z_3': norm().rvs(n),
-            'Z_4': norm().rvs(n),
-        }))
+        null_df_list.append(
+            pd.DataFrame(
+                {
+                    "Z_1": norm().rvs(n),
+                    "Z_2": norm().rvs(n),
+                    "Z_3": norm().rvs(n),
+                    "Z_4": norm().rvs(n),
+                }
+            )
+        )
     clfs_null = []
     for k in range(n_trials):
-        clfs, _ = local_correlation_regression(null_df_list[k], x_train[:,:,0])
-        clfs_null.append(clfs['12'])
-        torch.save(clfs_null, PATH_EXPERIMENT+f'clfs_correlation_null_n_trials_{n_trials}.pkl')
-
+        clfs, _ = local_correlation_regression(null_df_list[k], x_train[:, :, 0])
+        clfs_null.append(clfs["12"])
+        torch.save(
+            clfs_null,
+            PATH_EXPERIMENT + f"clfs_correlation_null_n_trials_{n_trials}.pkl",
+        )
 
 
 executor = get_executor_marg(f"work_localPIT")
@@ -278,14 +290,14 @@ with executor.batch():
     #         f"sample50_histgrad{max_iter}_{N_ALPHAS}_n_clf_{i}"
     #         for i in range(NB_CLASSIFIERS)
     #     ]
-        # kwargs = {
-        #     "theta_train": DATASETS["B_prime"]["theta"],
-        #     "x_train": DATASETS["B_prime"]["x"],
-        #     "null": False,
-        #     "method_name_list": method_name_list,
-        #     "clf_list": clf_list,
-        # }
-        # tasks.append(executor.submit(train_classifiers, **kwargs))
+    # kwargs = {
+    #     "theta_train": DATASETS["B_prime"]["theta"],
+    #     "x_train": DATASETS["B_prime"]["x"],
+    #     "null": False,
+    #     "method_name_list": method_name_list,
+    #     "clf_list": clf_list,
+    # }
+    # tasks.append(executor.submit(train_classifiers, **kwargs))
 
     # kwargs = {
     #         "theta_train": DATASETS["B_prime"]["theta"],
@@ -295,7 +307,6 @@ with executor.batch():
     #         "clf_list": CLF_LIST,
     #     }
     # tasks.append(executor.submit(train_classifiers, **kwargs))
-
 
     # for g, x in zip(GAIN_LIST, X_OBS_GAIN):
     #     kwargs = {
@@ -349,11 +360,9 @@ with executor.batch():
     #     }
     #     tasks.append(executor.submit(compute_expected_pit, **kwargs))
 
-    
     kwargs = {
         "x_train": DATASETS["B_prime"]["x"],
         "n_trials": 1000,
     }
     tasks.append(executor.submit(train_null_correlation_regression, **kwargs))
-
 

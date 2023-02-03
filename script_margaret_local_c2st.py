@@ -14,18 +14,18 @@ from sklearn.discriminant_analysis import (
 from sklearn.linear_model import LogisticRegression
 
 # from sbi.utils.metrics import c2st_scores
-from diagnostics.c2st_scores_modified import c2st_scores
+from valdiags.c2st_scores_modified import c2st_scores
 
-from diagnostics.localC2ST import local_flow_c2st, eval_local_flow_c2st
+from valdiags.localC2ST import local_flow_c2st, eval_local_flow_c2st
 
-from diagnostics.pp_plots import PP_vals
+from valdiags.pp_plots import PP_vals
 from sklearn.model_selection import KFold
 
 from scipy.stats import wasserstein_distance
 
 
-from data.data_generators import ConditionalGaussian1d
-from data.feature_transforms import first_dim_only
+from tasks.toy_examples.data_generators import ConditionalGaussian1d
+from tasks.toy_examples.embeddings import first_dim_only
 
 # EXPERIMENT = "Gaussian1d"
 EXPERIMENT = "JR-NMM/fixed_gain_3d"
@@ -34,7 +34,7 @@ jrnmm_data = torch.load("saved_experiments/JR-NMM/fixed_gain_3d/datasets_small.p
 
 # Data dimensions
 DIM = 3  # target data
-N_LIST = [1000, 2000, 5000, 10000, 20000] #, 50000]
+N_LIST = [1000, 2000, 5000, 10000, 20000]  # , 50000]
 #     1000,
 #     2000,
 #     # 3000,
@@ -366,36 +366,37 @@ with executor.batch():
 # with executor.batch():
 #     print("Submitting jobs...", end="", flush=True)
 #     tasks = []
-    #     # for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
-    #     #     kwargs = {
-    #     #         "flow_values_cal": samples,
-    #     #         "x_cal": x_cal,
-    #     #         "x_obs": x_0,
-    #     #         "flow_name": name,
-    #     #     }
-    #     #     tasks.append(executor.submit(score_lc2st_flow, **kwargs))
-    #     for x_0, g in zip(x_0_list, np.linspace(-25,25,11,dtype=int)):
-    #         kwargs = {
-    #             "flow_values_cal": flow_values_cal_jrnmm,
-    #             "x_cal": x_cal[:,:,0],
-    #             "x_obs": x_0,
-    #             "flow_name": f'jrnmm_g_{g}',
-    #             "n_trials": 1000,
-    #         }
-    #         tasks.append(executor.submit(score_lc2st_flow, **kwargs))
-    # for flow_name in ['jrnmm', 'null']:
-    # kwargs = {
-    #     "flow_values_cal": flow_values_cal_jrnmm,
-    #     "x_cal": x_cal[:, :, 0],
-    #     "flow_name": "jrnmm",
-    #     "n_trials": 1000,
-    # }
-    # tasks.append(executor.submit(train_classifiers, **kwargs))
-    # for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
-    #     kwargs = {
-    #                 "flow_values_cal": samples,
-    #                 "x_cal": x_cal,
-    #                 "flow_name": name,
-    #                 "n_trials": 1000,
-    #             }
-    #     tasks.append(executor.submit(train_classifiers, **kwargs))
+#     # for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
+#     #     kwargs = {
+#     #         "flow_values_cal": samples,
+#     #         "x_cal": x_cal,
+#     #         "x_obs": x_0,
+#     #         "flow_name": name,
+#     #     }
+#     #     tasks.append(executor.submit(score_lc2st_flow, **kwargs))
+#     for x_0, g in zip(x_0_list, np.linspace(-25,25,11,dtype=int)):
+#         kwargs = {
+#             "flow_values_cal": flow_values_cal_jrnmm,
+#             "x_cal": x_cal[:,:,0],
+#             "x_obs": x_0,
+#             "flow_name": f'jrnmm_g_{g}',
+#             "n_trials": 1000,
+#         }
+#         tasks.append(executor.submit(score_lc2st_flow, **kwargs))
+# for flow_name in ['jrnmm', 'null']:
+# kwargs = {
+#     "flow_values_cal": flow_values_cal_jrnmm,
+#     "x_cal": x_cal[:, :, 0],
+#     "flow_name": "jrnmm",
+#     "n_trials": 1000,
+# }
+# tasks.append(executor.submit(train_classifiers, **kwargs))
+# for name, samples in zip(['good', 'bad', 'null'], [flow_values_cal_good, flow_values_cal_bad, null_samples]):
+#     kwargs = {
+#                 "flow_values_cal": samples,
+#                 "x_cal": x_cal,
+#                 "flow_name": name,
+#                 "n_trials": 1000,
+#             }
+#     tasks.append(executor.submit(train_classifiers, **kwargs))
+

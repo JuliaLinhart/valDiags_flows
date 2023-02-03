@@ -10,8 +10,8 @@ import seaborn as sns
 
 from scipy.stats import binom, uniform
 
-from diagnostics.pp_plots import PP_vals
-from diagnostics.multi_local_test import get_lct_results
+from valdiags.pp_plots import PP_vals
+from valdiags.multi_local_test import get_lct_results
 
 
 def multi_global_consistency(

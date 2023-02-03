@@ -1,15 +1,15 @@
 from functools import partial
+import submitit
+import torch
 
 from hnpe.misc import make_label
-from hnpe.summary import summary_JRNMM
 
+from tasks.jrnmm.inference import run_inference_sbi, run_inference_lampe
 from tasks.jrnmm.posterior import build_flow, IdentityJRNMM, NPE_JRNMM_lampe_base
+from tasks.jrnmm.summary import summary_JRNMM
 from tasks.jrnmm.simulator import prior_JRNMM, simulator_JRNMM
-from tasks.jrnmm.inference import run_inference_lampe, run_inference_sbi
 
-import submitit
 
-import torch
 
 # we train for one round : amortized
 NB_ROUNDS = 1
@@ -30,11 +30,11 @@ LIST_SINGLE_REC = [False]
 # fixed gain
 FIXED_GAIN = True
 
-# lampe ou pas
+# lampe ou pas 
 LAMPE = True
 
 # target folder path inside results folder for saving
-PATH = "saved_experiments/JR-NMM/fixed_gain_3d/Flows_amortized/lampe/"
+PATH = "saved_experiments/JR-NMM/fixed_gain_3d/Flows_amortized/lampe/randperm/epochs_until_conv_100/"
 
 
 def get_executor_marg(job_name, timeout_hour=60, n_cpus=40):
@@ -161,10 +161,13 @@ def setup_inference(t_rec, n_extra, single_rec, num_workers=20):
             simulator=simulator,
             prior=prior,
             dataset_train=dataset_train,
-            estimator=NPE_JRNMM_lampe_base,
+            estimator=partial(NPE_JRNMM_lampe_base, randperm=True),
             meta_parameters=meta_parameters,
             summary_extractor=summary_extractor,
             save_rounds=True,
+            # training_batch_size=100,
+            # lr=5e-4,
+            epochs_until_convergence=100,
         )
 
 

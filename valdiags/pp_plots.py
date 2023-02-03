@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import pandas as pd
 import torch
 import torch.distributions as D
@@ -9,11 +8,9 @@ from matplotlib.lines import Line2D
 from scipy.stats import hmean, binom, uniform
 
 from nde.flows import cdf_flow
-from tasks.toy_examples.embeddings import identity
-
 
 def multi_cde_pit_values(
-    samples_theta, samples_x, flow, feature_transform=identity,
+    samples_theta, samples_x, flow, 
 ):
     """ Compute PIT-values for multivaraite target data,
     computed on N samples (theta, x) from the joint.
@@ -24,9 +21,7 @@ def multi_cde_pit_values(
     - flow: class based on pyknos.nflows.distributions.base.Distribution
         Pytorch neural network defining our Normalizing Flow, 
         hence conditional (posterior) density estimator.
-    - feature_transform: function 
-        Default is "identity": no feature transform on x.
-    
+
     outputs:
     - pit_values: list of length dim with numpy arrays of size (N, )
         List of pit-values for each dimension.
@@ -37,7 +32,7 @@ def multi_cde_pit_values(
         conditional_transform_1d = (
             D.Normal(0, 1)
             .cdf(
-                flow._transform(samples_theta, context=feature_transform(samples_x))[0][
+                flow._transform(samples_theta, context=samples_x)[0][
                     :, i
                 ]
             )
@@ -49,7 +44,7 @@ def multi_cde_pit_values(
 
 
 def cde_pit_values(
-    samples_theta, samples_x, flow, feature_transform=identity, local=False
+    samples_theta, samples_x, flow, local=False
 ):
     """ Compute global (resp. local) PIT-values for univariate (1D) target data,
     on N samples (theta, x) from the joint (resp. (theta, x_0) from the true posterior at x_0).
@@ -60,8 +55,7 @@ def cde_pit_values(
     - flow: class based on pyknos.nflows.distributions.base.Distribution
         Pytorch neural network defining our Normalizing Flow, 
         hence conditional (posterior) density estimator.
-    - feature_transform: function 
-        Default is "identity": no feature transform on x.
+
     -local: bool
         If True, compute the true local PIT values:
         - samples_theta are true posterior samples at x_0,
@@ -73,7 +67,7 @@ def cde_pit_values(
     """
     if local:
         pit_values = (
-            cdf_flow(samples_theta, context=feature_transform(samples_x), flow=flow)
+            cdf_flow(samples_theta, context=samples_x, flow=flow)
             .detach()
             .numpy()
         )
@@ -81,7 +75,7 @@ def cde_pit_values(
         pit_values = np.array(
             [
                 cdf_flow(samples_theta[i][None], context=x, flow=flow).detach().numpy()
-                for i, x in enumerate(feature_transform(samples_x))
+                for i, x in enumerate(samples_x)
             ]
         )
     return pit_values

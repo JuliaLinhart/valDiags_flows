@@ -18,8 +18,6 @@ from valdiags.localPIT_regression import (
 )
 from valdiags.multi_local_test import multi_local_pit_regression, multivariate_lct
 
-from tasks.toy_examples.embeddings import identity
-
 PATH_EXPERIMENT = "saved_experiments/JR-NMM/"
 METHOD = "naive"
 N_EXTRA = 0
@@ -116,13 +114,11 @@ def train_classifiers(
     method_name_list,
     clf_list,
     flow=POSTERIOR,
-    feature_transform=identity,
     n_trials=N_TRIALS,
     null=False,
 ):
     pit_values_train_flow = multi_cde_pit_values(
-        theta_train, x_train, flow, feature_transform=feature_transform
-    )
+        theta_train, x_train, flow)
     for i in range(NB_CLASSIFIERS):
         if not null:
 

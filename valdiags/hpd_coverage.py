@@ -50,7 +50,7 @@ def highest_density(flow, theta_test, x_test=None, n_samples=1000, nflows_flow=T
 
     Following the implementation from
     https://github.com/francois-rozet/lampe/blob/master/lampe/diagnostics.py
-    adapted to non-sbi distributions. 
+    adapted to non-lampe distributions. 
     """
     ranks = []
 

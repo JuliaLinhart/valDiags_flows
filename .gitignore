@@ -14,7 +14,7 @@ saved_experiments/JR-NMM/**/Flows_amortized
 saved_experiments/JR-NMM/fixed_gain_3d/datasets_train.pkl
 saved_experiments/JR-NMM/fixed_gain_3d/lc2st_results
 saved_experiments/JR-NMM/fixed_gain_3d/lc2st_eval_clfs
-# saved_experiments/JR-NMM/normal_4d/images_neurips
+saved_experiments/JR-NMM/normal_4d/images_neurips
 saved_experiments/JR-NMM/normal_4d/old_experiments
 saved_experiments/JR-NMM/normal_4d/datasets_naive.pkl
 saved_experiments/JR-NMM/normal_4d/datasets_hnpe.pkl

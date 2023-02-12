@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from sklearn.neural_network import MLPClassifier
 from scipy.stats import multivariate_normal as mvn
@@ -9,6 +10,7 @@ import sklearn
 
 from scipy.stats import wasserstein_distance
 from .pp_plots import PP_vals
+from .plot_utils import plot_distributions
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,7 +21,7 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def c2st_clf(ndim):
-    """ same setup as in :
+    """same setup as in :
     https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
     """
     return MLPClassifier(
@@ -32,6 +34,20 @@ def c2st_clf(ndim):
             "n_iter_no_change": 50,
         }
     )
+
+
+def c2st_kwargs(ndim):
+    """same setup as in :
+    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
+    """
+    return {
+        "activation": "relu",
+        "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+        "max_iter": 1000,
+        "solver": "adam",
+        "early_stopping": True,
+        "n_iter_no_change": 50,
+    }
 
 
 def local_flow_c2st(flow_samples_train, x_train, classifier="mlp"):
@@ -179,14 +195,14 @@ def lc2st_htest(
     null_dist,
     test_stats=["probas_mean"],
     n_trials_null=100,
-    n_ensembles=10,
+    n_ensemble=10,
     clf=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     probas_null=[],
 ):
     classifier = clf(**clf_kwargs)
     probas = []
-    for _ in range(n_ensembles):
+    for _ in range(n_ensemble):
         # train clf
         clf_n = train_lc2st(P_cal, Q_cal, x_cal, clf=classifier)
         # eval clf
@@ -297,7 +313,6 @@ def pp_plot_lc2st(probas, probas_null, labels, colors):
         plt.plot(alphas, pp_vals, label=l, color=c)
 
     plt.legend()
-    plt.show()
 
 
 def box_plot_lc2st(
@@ -317,7 +332,7 @@ def box_plot_lc2st(
     bp["boxes"][0].set_facecolor("lightgray")
     ax.set_label(r"95% confidence interval for $\mathcal{H}_0(x_0)$")
     ax.set_ylim(0.8, 1.2)
-    ax.set_xlim(stats["whislo"] - np.std(scores) / 2, max(scores) + np.std(scores) / 2)
+    ax.set_xlim(stats["whislo"] - np.std(data), max(scores) + np.std(data))
 
     for s, l, c in zip(scores, labels, colors):
         plt.text(s, 0.9, l, color=c)
@@ -325,7 +340,98 @@ def box_plot_lc2st(
 
     fig.set_size_inches(5, 2)
     plt.title(title)
-    plt.show()
+
+
+## =============== reference/ground-truth distributions ==============================
+
+
+def flow_vs_reference_distribution(samples_ref, samples_flow, z_space=True, dim=1):
+    if z_space:
+        title = (
+            r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)"
+        )
+        labels = [
+            r"Ref: $\mathcal{N}(0,1)$",
+            r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
+        ]
+    else:
+        title = r"True vs. Estimated distributions at $x_0$$"
+        labels = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p_Z(T_{\phi}(Z;x_0))$"]
+
+    plot_distributions(
+        [samples_ref, samples_flow],
+        colors=["grey", "red"],
+        labels=labels,
+        dim=dim,
+    )
+    plt.title(title)
+
+    if dim == 1:
+        plt.xlabel("z")
+        plt.xlim(-5, 5)
+
+    elif dim == 2:
+        plt.xlabel("z_1")
+        plt.ylabel("z_2")
+
+
+## =============== interpretability ==============================
+
+
+def z_space_with_proba_intensity(probas, probas_null, P_eval, theta_space=None, dim=1):
+    # define low and high thresholds w.r.t to null (95% confidence region)
+    low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
+    high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
+    # high/low proba regions for bad NF
+    df = pd.DataFrame({"probas": probas})
+    df["intensity"] = ["uncertain"] * len(df)
+    df.loc[df["probas"] > high, "intensity"] = (
+        r"high ($p \geq$ " + f"{np.round(high,2)})"
+    )
+    df.loc[df["probas"] < low, "intensity"] = r"low ($p \leq$ " + f"{np.round(low,2)})"
+
+    if dim == 1:
+        df = pd.DataFrame({"z": P_eval[:, 0], "probas": probas})
+        values = "z"
+        if theta_space is not None:
+            df["theta"] = theta_space
+            values = "theta"
+        df.pivot(columns="intensity", values=values).plot.hist(
+            bins=50, color=["red", "blue", "grey"], alpha=0.3
+        )
+    elif dim == 2:
+        df["z_1"] = P_eval[:, 0]
+        df["z_2"] = P_eval[:, 1]
+        if theta_space is not None:
+            df["theta_1"] = theta_space[:, 0]
+            df["theta_2"] = theta_space[:, 1]
+
+        cdict = {
+            "uncertain": "grey",
+            r"high ($p \geq$ " + f"{np.round(high,2)})": "red",
+            r"low ($p \leq$ " + f"{np.round(low,2)})": "blue",
+        }
+        groups = df.groupby("intensity")
+
+        _, ax = plt.subplots()
+        for name, group in groups:
+            x = group.z_1
+            y = group.z_2
+            if theta_space is not None:
+                x = group.theta_1
+                y = group.theta_2
+            ax.plot(
+                x,
+                y,
+                marker="o",
+                linestyle="",
+                alpha=0.3,
+                label=name,
+                color=cdict[name],
+            )
+        plt.legend()
+    else:
+        print("Not implemented.")
 
 
 ## =============== eval clfs : shift experiment ========================
@@ -441,3 +547,106 @@ def lc2st_scores_flow_zuko(
         clf_kwargs=clf_kwargs,
     )
 
+
+### =============== functions adapted to sbibm run.py script ==============
+def lc2st_sbibm(
+    P,
+    Q,
+    x_cal,
+    x_eval,
+    metric="accuracy",
+    n_folds=10,
+    classifier=None,
+):
+    ndim = P.shape[-1]
+    if classifier is None:
+        classifier = MLPClassifier(**c2st_kwargs(ndim))
+    scores, _ = lc2st_scores(
+        P,
+        Q,
+        x_cal,
+        x_eval,
+        metrics=[metric],
+        n_folds=n_folds,
+    )
+    return torch.tensor([np.mean(scores[metric])])
+
+
+## expected c2st score
+def expected_lc2st_sbibm(
+    P,
+    Q,
+    x_cal,
+    metric="accuracy",
+    n_folds=10,
+    clf_class=None,
+    clf_kwargs=None,
+):
+    if clf_class is None or clf_kwargs is None:
+        ndim = P.shape[-1]
+        clf_class = MLPClassifier
+        clf_kwargs = c2st_kwargs(ndim)
+
+    scores = expected_lc2st_scores(
+        P, Q, x_cal, clf_class=clf_class, clf_kwargs=clf_kwargs
+    )
+    score = np.mean(scores[metric])
+
+    return torch.tensor([score])
+
+
+def lc2st_htest_sbibm(
+    P_cal,
+    Q_cal,
+    x_cal,
+    P_eval,
+    x_eval,
+    null_dist,
+    test_stats=["probas_mean"],
+    n_trials_null=100,
+    n_ensemble=10,
+    clf=MLPClassifier,
+    clf_kwargs=None,
+    probas_null=[],
+):
+    if clf_kwargs is None:
+        ndim = P_eval.shape[-1]
+        classifier = MLPClassifier(**c2st_kwargs(ndim))
+    else:
+        classifier = clf(**clf_kwargs)
+
+    probas = []
+    for _ in range(n_ensemble):
+        # train clf
+        clf_n = train_lc2st(P_cal, Q_cal, x_cal, clf=classifier)
+        # eval clf
+        probas.append(eval_lc2st(P_eval, x_eval, clf=clf_n))
+
+    proba_ensemble = np.mean(probas, axis=0)
+    t_stats_ensemble = compute_metric(proba_ensemble, metrics=test_stats)
+
+    t_stats_null = {}
+    for m in test_stats:
+        t_stats_null[m] = []
+    for t in range(n_trials_null):
+        while len(probas_null) < n_trials_null:
+            null_samples = null_dist.sample(
+                len(x_cal)
+            )  ## different sampling method for sbi-objects
+            # train clf under null
+            clf_t = train_lc2st(P_cal, null_samples, x_cal, clf=classifier)
+            # eval clf
+            probas_null.append(eval_lc2st(P_eval, x_eval, clf=clf_t))
+
+        # compute test stat
+        scores = compute_metric(probas_null[t], metrics=test_stats)
+        for m in test_stats:
+            t_stats_null[m].append(scores[m])
+
+    p_values = {}
+    for m in test_stats:
+        p_values[m] = (
+            sum(1 * (t_stats_ensemble[m] < pd.Series(t_stats_null[m]))) / n_trials_null
+        )
+
+    return p_values, t_stats_ensemble, proba_ensemble, probas_null, t_stats_null

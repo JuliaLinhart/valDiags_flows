@@ -345,7 +345,9 @@ def box_plot_lc2st(
 ## =============== reference/ground-truth distributions ==============================
 
 
-def flow_vs_reference_distribution(samples_ref, samples_flow, z_space=True, dim=1):
+def flow_vs_reference_distribution(
+    samples_ref, samples_flow, z_space=True, dim=1, hist=False
+):
     if z_space:
         title = (
             r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)"
@@ -355,14 +357,19 @@ def flow_vs_reference_distribution(samples_ref, samples_flow, z_space=True, dim=
             r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
         ]
     else:
-        title = r"True vs. Estimated distributions at $x_0$$"
-        labels = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p_Z(T_{\phi}(Z;x_0))$"]
+        title = r"True vs. Estimated distributions at $x_0$"
+        labels = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
 
+    if hist:
+        colors = ["Blues", "Oranges"]
+    else:
+        colors = ["blue", "orange"]
     plot_distributions(
         [samples_ref, samples_flow],
-        colors=["grey", "red"],
+        colors=colors,
         labels=labels,
         dim=dim,
+        hist=hist,
     )
     plt.title(title)
 
@@ -371,14 +378,18 @@ def flow_vs_reference_distribution(samples_ref, samples_flow, z_space=True, dim=
         plt.xlim(-5, 5)
 
     elif dim == 2:
-        plt.xlabel("z_1")
-        plt.ylabel("z_2")
+        plt.xlabel(r"$z_1$")
+        plt.ylabel(r"$z_2$")
+    plt.legend()
 
 
 ## =============== interpretability ==============================
 
 
-def z_space_with_proba_intensity(probas, probas_null, P_eval, theta_space=None, dim=1):
+def z_space_with_proba_intensity(
+    probas, probas_null, P_eval, theta_space=None, dim=1, thresholding=False
+):
+
     # define low and high thresholds w.r.t to null (95% confidence region)
     low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
     high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
@@ -402,34 +413,46 @@ def z_space_with_proba_intensity(probas, probas_null, P_eval, theta_space=None, 
     elif dim == 2:
         df["z_1"] = P_eval[:, 0]
         df["z_2"] = P_eval[:, 1]
+        x, y = df.z_1, df.z_2
+        xlabel = r"$Z_1$"
+        ylabel = r"$Z_2$"
         if theta_space is not None:
             df["theta_1"] = theta_space[:, 0]
             df["theta_2"] = theta_space[:, 1]
+            x, y = df.theta_1, df.theta_2
+            xlabel = r"$\Theta_1 = T_{\phi,1}(Z; x_0)$"
+            ylabel = r"$\Theta_2 = T_{\phi,2}(Z; x_0)$"
+        if not thresholding:
+            plt.scatter(x, y, c=df.probas, cmap="bwr")
+            plt.colorbar(label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$")
+        else:
+            cdict = {
+                "uncertain": "grey",
+                r"high ($p \geq$ " + f"{np.round(high,2)})": "red",
+                r"low ($p \leq$ " + f"{np.round(low,2)})": "blue",
+            }
+            groups = df.groupby("intensity")
 
-        cdict = {
-            "uncertain": "grey",
-            r"high ($p \geq$ " + f"{np.round(high,2)})": "red",
-            r"low ($p \leq$ " + f"{np.round(low,2)})": "blue",
-        }
-        groups = df.groupby("intensity")
+            _, ax = plt.subplots()
+            for name, group in groups:
+                x = group.z_1
+                y = group.z_2
+                if theta_space is not None:
+                    x = group.theta_1
+                    y = group.theta_2
+                ax.plot(
+                    x,
+                    y,
+                    marker="o",
+                    linestyle="",
+                    alpha=0.3,
+                    label=name,
+                    color=cdict[name],
+                )
+            plt.legend(title=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$")
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
 
-        _, ax = plt.subplots()
-        for name, group in groups:
-            x = group.z_1
-            y = group.z_2
-            if theta_space is not None:
-                x = group.theta_1
-                y = group.theta_2
-            ax.plot(
-                x,
-                y,
-                marker="o",
-                linestyle="",
-                alpha=0.3,
-                label=name,
-                color=cdict[name],
-            )
-        plt.legend()
     else:
         print("Not implemented.")
 

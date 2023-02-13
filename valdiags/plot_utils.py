@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-def plot_distributions(dist_list, colors, labels, dim=1):
+def plot_distributions(dist_list, colors, labels, dim=1, hist=False):
     if dim == 1:
         for d, c, l in zip(dist_list, colors, labels):
             plt.hist(
@@ -15,13 +15,23 @@ def plot_distributions(dist_list, colors, labels, dim=1):
 
     elif dim == 2:
         for d, c, l in zip(dist_list, colors, labels):
-            plt.scatter(
-                d[:, 0],
-                d[:, 1],
-                color=c,
-                alpha=0.3,
-                label=l,
-            )
-
+            if not hist:
+                plt.scatter(
+                    d[:, 0],
+                    d[:, 1],
+                    color=c,
+                    alpha=0.3,
+                    label=l,
+                )
+            else:
+                plt.hist2d(
+                    d[:, 0].numpy(),
+                    d[:, 1].numpy(),
+                    bins=100,
+                    cmap=c,
+                    alpha=0.7,
+                    density=True,
+                    label=l,
+                )
     else:
         print("Not implemented.")

@@ -7,7 +7,7 @@ def multi_corner_plots(samples_list, legends, colors, title, **kwargs):
     fig = None
     for s, l, c in zip(samples_list, legends, colors):
         fig = corner(s, legend=l, color=c, figure=fig, smooth=2, **kwargs)
-        plt.title(title)
+        plt.suptitle(title)
 
 
 def plot_distributions(dist_list, colors, labels, dim=1, hist=False):

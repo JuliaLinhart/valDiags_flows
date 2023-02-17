@@ -389,12 +389,12 @@ def flow_vs_reference_distribution(
 def z_space_with_proba_intensity(
     probas, probas_null, P_eval, theta_space=None, dim=1, thresholding=False
 ):
+    df = pd.DataFrame({"probas": probas})
 
     # define low and high thresholds w.r.t to null (95% confidence region)
     low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
     high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
     # high/low proba regions for bad NF
-    df = pd.DataFrame({"probas": probas})
     df["intensity"] = ["uncertain"] * len(df)
     df.loc[df["probas"] > high, "intensity"] = (
         r"high ($p \geq$ " + f"{np.round(high,2)})"
@@ -402,14 +402,40 @@ def z_space_with_proba_intensity(
     df.loc[df["probas"] < low, "intensity"] = r"low ($p \leq$ " + f"{np.round(low,2)})"
 
     if dim == 1:
-        df = pd.DataFrame({"z": P_eval[:, 0], "probas": probas})
+        from matplotlib import cm
+
+        df["z"] = P_eval[:, 0]
         values = "z"
+        xlabel = r"$z$"
+        x = df.z
         if theta_space is not None:
             df["theta"] = theta_space
             values = "theta"
-        df.pivot(columns="intensity", values=values).plot.hist(
-            bins=50, color=["red", "blue", "grey"], alpha=0.3
-        )
+            xlabel = r"$\theta$"
+            x = df.theta
+
+        if thresholding:
+            df.pivot(columns="intensity", values=values).plot.hist(
+                bins=50, color=["red", "blue", "grey"], alpha=0.3
+            )
+        else:
+            _, bins, patches = plt.hist(x, 50, density=True, color="green")
+            bins[-1] = 10
+            df["bins"] = np.select([x <= i for i in bins[1:]], list(range(50)), 1000)
+
+            weights = df.groupby(["bins"]).mean().probas
+            id = list(set(range(50)) - set(df.bins))
+            patches = np.delete(patches, id)
+
+            cmap = plt.cm.get_cmap("bwr")
+            for c, p in zip(weights, patches):
+                plt.setp(p, "facecolor", cmap(c))
+            plt.colorbar(
+                cm.ScalarMappable(cmap=cmap),
+                label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$",
+            )
+        plt.xlabel(xlabel)
+
     elif dim == 2:
         df["z_1"] = P_eval[:, 0]
         df["z_2"] = P_eval[:, 1]
@@ -423,7 +449,7 @@ def z_space_with_proba_intensity(
             xlabel = r"$\Theta_1 = T_{\phi,1}(Z; x_0)$"
             ylabel = r"$\Theta_2 = T_{\phi,2}(Z; x_0)$"
         if not thresholding:
-            plt.scatter(x, y, c=df.probas, cmap="bwr")
+            plt.scatter(x, y, c=df.probas, cmap="bwr", alpha=0.3)
             plt.colorbar(label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$")
         else:
             cdict = {

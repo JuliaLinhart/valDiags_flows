@@ -76,7 +76,7 @@ def lc2st_scores(
     n_folds=10,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
-    P_eval=None,
+    Z_eval=None,
 ):
 
     classifier = clf_class(**clf_kwargs)
@@ -89,10 +89,10 @@ def lc2st_scores(
         scores[m] = []
     for train_index, val_index in kf.split(P):
         P_train = P[train_index]
-        if P_eval is None:
+        if Z_eval is None:
             P_eval = P[val_index]
         else:
-            P_eval = P_eval[val_index]
+            P_eval = Z_eval[val_index]
         Q_train = Q[train_index]
         x_train = x_cal[train_index]
 
@@ -555,13 +555,13 @@ def c2st_kwargs(ndim):
 
 
 def lc2st_sbibm(
-    P, Q, x_cal, x_eval, metric="accuracy", n_folds=10, classifier=None, P_eval=None
+    P, Q, x_cal, x_eval, metric="accuracy", n_folds=10, classifier=None, Z_eval=None
 ):
     ndim = P.shape[-1] + x_cal.shape[-1]
     if classifier is None:
         classifier = MLPClassifier(**c2st_kwargs(ndim))
     scores, _ = lc2st_scores(
-        P, Q, x_cal, x_eval, metrics=[metric], n_folds=n_folds, P_eval=P_eval
+        P, Q, x_cal, x_eval, metrics=[metric], n_folds=n_folds, Z_eval=Z_eval
     )
     return torch.tensor([np.mean(scores[metric])])
 

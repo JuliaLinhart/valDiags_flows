@@ -21,6 +21,7 @@ saved_experiments/JR-NMM/normal_4d/datasets_hnpe.pkl
 saved_experiments/JR-NMM/normal_4d/lct_results
 saved_experiments/JR-NMM/normal_4d/lc2st_results
 saved_experiments/JR-NMM/normal_4d/lc2st_eval_clfs
+script_margaret_local_c2st.py
 
 
 

@@ -20,86 +20,6 @@ import time
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
-def c2st_clf(ndim):
-    """same setup as in :
-    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
-    """
-    return MLPClassifier(
-        **{
-            "activation": "relu",
-            "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-            "max_iter": 1000,
-            "solver": "adam",
-            "early_stopping": True,
-            "n_iter_no_change": 50,
-        }
-    )
-
-
-def c2st_kwargs(ndim):
-    """same setup as in :
-    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
-    """
-    return {
-        "activation": "relu",
-        "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-        "max_iter": 1000,
-        "solver": "adam",
-        "early_stopping": True,
-        "n_iter_no_change": 50,
-    }
-
-
-def local_flow_c2st(flow_samples_train, x_train, classifier="mlp"):
-
-    N = len(x_train)
-    dim = flow_samples_train.shape[-1]
-    reference = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # base distribution
-
-    # flow_samples_train = flow._transform(theta_train, context=x_train)[0].detach().numpy()
-    ref_samples_train = reference.rvs(N)
-    if dim == 1:
-        ref_samples_train = ref_samples_train[:, None]
-
-    features_flow_train = np.concatenate([flow_samples_train, x_train], axis=1)
-    features_ref_train = np.concatenate([ref_samples_train, x_train], axis=1)
-    features_train = np.concatenate([features_ref_train, features_flow_train], axis=0)
-    labels_train = np.concatenate([np.array([0] * N), np.array([1] * N)]).ravel()
-    features_train, labels_train = shuffle(
-        features_train, labels_train, random_state=13
-    )
-
-    if classifier == "mlp":
-        clf = c2st_clf(features_train.shape[-1])
-    else:
-        clf = DEFAULT_CLF
-
-    clf.fit(X=features_train, y=labels_train)
-
-    return clf
-
-
-def eval_local_flow_c2st(clf, x_eval, dim, size=1000, z_values=None):
-    if z_values is not None:
-        z_values = z_values
-    else:
-        # sample from normal dist (class 0)
-        z_values = mvn(mean=np.zeros(dim), cov=np.eye(dim)).rvs(size)
-
-    if dim == 1 and z_values.ndim == 1:
-        z_values = z_values.reshape(-1, 1)
-
-    assert (z_values.shape[0] == size) and (z_values.shape[-1] == dim)
-
-    features_eval = np.concatenate([z_values, x_eval.repeat(size, 1)], axis=1)
-    proba = clf.predict_proba(features_eval)[:, 0]
-
-    return proba, z_values
-
-
-### ================ new functions ================
-
-
 def train_lc2st(P, Q, x, clf=DEFAULT_CLF):
     # joint samples
     joint_P_x = np.concatenate([P, x], axis=1)
@@ -156,6 +76,7 @@ def lc2st_scores(
     n_folds=10,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
+    P_eval=None,
 ):
 
     classifier = clf_class(**clf_kwargs)
@@ -168,7 +89,10 @@ def lc2st_scores(
         scores[m] = []
     for train_index, val_index in kf.split(P):
         P_train = P[train_index]
-        P_eval = P[val_index]
+        if P_eval is None:
+            P_eval = P[val_index]
+        else:
+            P_eval = P_eval[val_index]
         Q_train = Q[train_index]
         x_train = x_cal[train_index]
 
@@ -598,25 +522,46 @@ def lc2st_scores_flow_zuko(
 
 
 ### =============== functions adapted to sbibm run.py script ==============
+
+
+def c2st_clf(ndim):
+    """same setup as in :
+    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
+    """
+    return MLPClassifier(
+        **{
+            "activation": "relu",
+            "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+            "max_iter": 1000,
+            "solver": "adam",
+            "early_stopping": True,
+            "n_iter_no_change": 50,
+        }
+    )
+
+
+def c2st_kwargs(ndim):
+    """same setup as in :
+    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
+    """
+    return {
+        "activation": "relu",
+        "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+        "max_iter": 1000,
+        "solver": "adam",
+        "early_stopping": True,
+        "n_iter_no_change": 50,
+    }
+
+
 def lc2st_sbibm(
-    P,
-    Q,
-    x_cal,
-    x_eval,
-    metric="accuracy",
-    n_folds=10,
-    classifier=None,
+    P, Q, x_cal, x_eval, metric="accuracy", n_folds=10, classifier=None, P_eval=None
 ):
-    ndim = P.shape[-1]
+    ndim = P.shape[-1] + x_cal.shape[-1]
     if classifier is None:
         classifier = MLPClassifier(**c2st_kwargs(ndim))
     scores, _ = lc2st_scores(
-        P,
-        Q,
-        x_cal,
-        x_eval,
-        metrics=[metric],
-        n_folds=n_folds,
+        P, Q, x_cal, x_eval, metrics=[metric], n_folds=n_folds, P_eval=P_eval
     )
     return torch.tensor([np.mean(scores[metric])])
 
@@ -632,12 +577,17 @@ def expected_lc2st_sbibm(
     clf_kwargs=None,
 ):
     if clf_class is None or clf_kwargs is None:
-        ndim = P.shape[-1]
+        ndim = P.shape[-1] + x_cal.shape[-1]
         clf_class = MLPClassifier
         clf_kwargs = c2st_kwargs(ndim)
 
     scores = expected_lc2st_scores(
-        P, Q, x_cal, clf_class=clf_class, clf_kwargs=clf_kwargs
+        P,
+        Q,
+        x_cal,
+        clf_class=clf_class,
+        clf_kwargs=clf_kwargs,
+        n_folds=n_folds,
     )
     score = np.mean(scores[metric])
 
@@ -659,7 +609,7 @@ def lc2st_htest_sbibm(
     probas_null=[],
 ):
     if clf_kwargs is None:
-        ndim = P_eval.shape[-1]
+        ndim = P_eval.shape[-1] + x_cal.shape[-1]
         classifier = MLPClassifier(**c2st_kwargs(ndim))
     else:
         classifier = clf(**clf_kwargs)

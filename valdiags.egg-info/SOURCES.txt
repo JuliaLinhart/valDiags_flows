@@ -138,6 +138,7 @@ valdiags/hpd_coverage.py
 valdiags/localC2ST.py
 valdiags/localPIT_regression.py
 valdiags/multi_local_test.py
+valdiags/plot_utils.py
 valdiags/pp_plots.py
 valdiags/quantile_regression.py
 valdiags/uni_local_test_scripts.py

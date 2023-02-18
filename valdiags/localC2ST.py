@@ -407,6 +407,98 @@ def z_space_with_proba_intensity(
         print("Not implemented.")
 
 
+def eval_space_with_proba_intensity(
+    probas, probas_null, P_eval, dim=1, z_space=True, thresholding=False
+):
+    df = pd.DataFrame({"probas": probas})
+
+    # define low and high thresholds w.r.t to null (95% confidence region)
+    low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
+    high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
+    # high/low proba regions for bad NF
+    df["intensity"] = ["uncertain"] * len(df)
+    df.loc[df["probas"] > high, "intensity"] = (
+        r"high ($p \geq$ " + f"{np.round(high,2)})"
+    )
+    df.loc[df["probas"] < low, "intensity"] = r"low ($p \leq$ " + f"{np.round(low,2)})"
+
+    if dim == 1:
+        from matplotlib import cm
+
+        df["z"] = P_eval[:, 0]
+
+        if thresholding:
+            df.pivot(columns="intensity", values="z").plot.hist(
+                bins=50, color=["red", "blue", "grey"], alpha=0.3
+            )
+        else:
+            _, bins, patches = plt.hist(df.z, 50, density=True, color="green")
+            bins[-1] = 10
+            df["bins"] = np.select([x <= i for i in bins[1:]], list(range(50)), 1000)
+
+            weights = df.groupby(["bins"]).mean().probas
+            id = list(set(range(50)) - set(df.bins))
+            patches = np.delete(patches, id)
+
+            cmap = plt.cm.get_cmap("bwr")
+            for c, p in zip(weights, patches):
+                plt.setp(p, "facecolor", cmap(c))
+            plt.colorbar(
+                cm.ScalarMappable(cmap=cmap),
+                label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$",
+            )
+        if z_space:
+            xlabel = r"$z$"
+        else:
+            xlabel = r"$\theta$"
+        plt.xlabel(xlabel)
+
+    elif dim == 2:
+        if z_space:
+            xlabel = r"$Z_1$"
+            ylabel = r"$Z_2$"
+            legend = r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$"
+        else:
+            xlabel = r"$\Theta_1$"
+            ylabel = r"$\Theta_2$"
+            legend = r"$\hat{p}(\Theta\sim q_{\phi}(\theta \mid x_0) \mid x_0)$"
+
+        df["z_1"] = P_eval[:, 0]
+        df["z_2"] = P_eval[:, 1]
+
+        if not thresholding:
+            plt.scatter(df.z_1, df.z_2, c=df.probas, cmap="bwr", alpha=0.3)
+            plt.colorbar(label=legend)
+        else:
+            cdict = {
+                "uncertain": "grey",
+                r"high ($p \geq$ " + f"{np.round(high,2)})": "red",
+                r"low ($p \leq$ " + f"{np.round(low,2)})": "blue",
+            }
+            groups = df.groupby("intensity")
+
+            _, ax = plt.subplots()
+            for name, group in groups:
+                x = group.z_1
+                y = group.z_2
+                ax.plot(
+                    x,
+                    y,
+                    marker="o",
+                    linestyle="",
+                    alpha=0.3,
+                    label=name,
+                    color=cdict[name],
+                )
+            plt.legend(title=legend)
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+
+    else:
+        print("Not implemented.")
+
+
 ## =============== eval clfs : shift experiment ========================
 # like in c2st... gl2st...
 def eval_classifier_for_lc2st(
@@ -601,6 +693,7 @@ def lc2st_htest_sbibm(
     P_eval,
     x_eval,
     null_dist,
+    null_samples_list=None,
     test_stats=["probas_mean"],
     n_trials_null=100,
     n_ensemble=10,
@@ -629,9 +722,13 @@ def lc2st_htest_sbibm(
         t_stats_null[m] = []
     for t in range(n_trials_null):
         while len(probas_null) < n_trials_null:
-            null_samples = null_dist.sample(
-                len(x_cal)
-            )  ## different sampling method for sbi-objects
+            if null_samples_list is None:
+                try:
+                    null_samples = null_dist.sample(len(x_cal))
+                except TypeError:
+                    null_samples = null_dist.sample((len(x_cal),))
+            else:
+                null_samples = null_samples_list[t]
             # train clf under null
             clf_t = train_lc2st(P_cal, null_samples, x_cal, clf=classifier)
             # eval clf

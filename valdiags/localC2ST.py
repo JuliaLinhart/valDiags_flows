@@ -700,6 +700,7 @@ def lc2st_htest_sbibm(
     clf=MLPClassifier,
     clf_kwargs=None,
     probas_null=[],
+    trained_clfs=[],
 ):
     if clf_kwargs is None:
         ndim = P_eval.shape[-1] + x_cal.shape[-1]
@@ -708,9 +709,20 @@ def lc2st_htest_sbibm(
         classifier = clf(**clf_kwargs)
 
     probas = []
-    for _ in range(n_ensemble):
-        # train clf
-        clf_n = train_lc2st(P_cal, Q_cal, x_cal, clf=classifier)
+    clfs = []
+    run_time = 0
+    for n in range(n_ensemble):
+        try:
+            # load clf
+            clf_n = trained_clfs[n]
+            print("loaded clf")
+        except IndexError:
+            # train clf
+            print(f"training clf {n+1}/{n_ensemble}")
+            start = time.time()
+            clf_n = train_lc2st(P_cal, Q_cal, x_cal, clf=classifier)
+            run_time = time.time() - start
+        clfs.append(clf_n)
         # eval clf
         probas.append(eval_lc2st(P_eval, x_eval, clf=clf_n))
 
@@ -720,8 +732,10 @@ def lc2st_htest_sbibm(
     t_stats_null = {}
     for m in test_stats:
         t_stats_null[m] = []
+    print("Testing under null hypothesis...")
     for t in range(n_trials_null):
-        while len(probas_null) < n_trials_null:
+        print(f"...trial {t+1}/{n_trials_null}")
+        if len(probas_null) < n_trials_null:
             if null_samples_list is None:
                 try:
                     null_samples = null_dist.sample(len(x_cal))
@@ -745,4 +759,12 @@ def lc2st_htest_sbibm(
             sum(1 * (t_stats_ensemble[m] < pd.Series(t_stats_null[m]))) / n_trials_null
         )
 
-    return p_values, t_stats_ensemble, proba_ensemble, probas_null, t_stats_null
+    return (
+        p_values,
+        t_stats_ensemble,
+        proba_ensemble,
+        probas_null,
+        t_stats_null,
+        clfs,
+        run_time,
+    )

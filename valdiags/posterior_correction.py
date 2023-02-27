@@ -7,7 +7,7 @@ from valdiags.localC2ST import eval_lc2st
 ## Sampling
 
 
-def rejection_sampling(proposal_sampler, f, num_samples=10000):
+def rejection_sampling(proposal_sampler, f, num_samples=10000, approximate=False):
     """Sample from proposal_pdf*f via rejection sampling.
     (f only needs to be defined upto a multiplication constant)
 
@@ -22,12 +22,17 @@ def rejection_sampling(proposal_sampler, f, num_samples=10000):
 
         f_values = f(proposal_samples)
         if f_values.max() > 1:
-            print(f"WARNING: some values are > 1. Deviding by max_f = {f_values.max()}")
-
+            print(f"WARNING: some values are > 1.")
+            if approximate:
+                print("Approximate Rejection Sampling with weight clipping at 1.")
+                f_values = f_values * (f_values <= 1)
+            else:
+                print(f"Deviding by max_f = {f_values.max()}")
+                f_values /= f_values.max()
         u_rand = torch.rand(f_values.shape).numpy()
         acc_rej_samples.append(proposal_samples[f_values > u_rand])
         nb_acc_samples += len(acc_rej_samples[-1])
-        print(f"NB of accepted samples: {nb_acc_samples}")
+        print(f"NB of accepted samples: {len(acc_rej_samples[-1])}")
 
     acc_rej_samples = np.concatenate(acc_rej_samples, axis=0)
     print(f"Total NB of accepted samples: {nb_acc_samples}")

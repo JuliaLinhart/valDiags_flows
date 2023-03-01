@@ -37,20 +37,24 @@ def train_lc2st(P, Q, x, clf=DEFAULT_CLF):
     return clf
 
 
-def eval_lc2st(P, x, clf=DEFAULT_CLF):
+def eval_lc2st(P, x, y=None, clf=DEFAULT_CLF):
     # define eval features for classifier
     features_eval = np.concatenate([P, x.repeat(len(P), 1)], axis=1)
     # predict proba for class 0 (P_dist)
     proba = clf.predict_proba(features_eval)[:, 0]
-    return proba
+    # compute accuracy
+    if y is not None:
+        assert len(P) == len(y)
+        accuracy = clf.score(X=features_eval, y=y)
+        return proba, accuracy
+    else:
+        return proba
 
 
 def compute_metric(proba, metrics):
     scores = {}
     for m in metrics:
-        if m == "accuracy":
-            scores[m] = np.mean(proba >= 0.5)
-        elif m == "probas_mean":
+        if m == "probas_mean":
             scores[m] = np.mean(proba)
         elif m == "probas_std":
             scores[m] = np.std(proba)
@@ -76,7 +80,8 @@ def lc2st_scores(
     n_folds=10,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
-    Z_eval=None,
+    P_eval=None,
+    Q_eval=None,
 ):
 
     classifier = clf_class(**clf_kwargs)
@@ -89,10 +94,10 @@ def lc2st_scores(
         scores[m] = []
     for train_index, val_index in kf.split(P):
         P_train = P[train_index]
-        if Z_eval is None:
-            P_eval = P[val_index]
+        if P_eval is None:
+            P_val = P[val_index]
         else:
-            P_eval = Z_eval[val_index]
+            P_val = P_eval[val_index]
         Q_train = Q[train_index]
         x_train = x_cal[train_index]
 
@@ -100,12 +105,23 @@ def lc2st_scores(
         clf_n = train_lc2st(P_train, Q_train, x_train, clf=classifier)
 
         # eval n^th classifier
-        proba = eval_lc2st(P_eval, x_eval, clf=clf_n)
+        if Q_eval is not None:
+            Q_val = Q_eval[val_index]
+            features_val = np.concatenate([P_val, Q_val], axis=0)
+            labels_val = np.array([0] * len(P_val) + [1] * len(Q_val)).reshape(-1, 1)
+        else:
+            features_val = P_val
+            labels_val = np.array([0] * len(P_val)).reshape(-1, 1)
+
+        proba, accuracy = eval_lc2st(features_val, x_eval, y=labels_val, clf=clf_n)
         probas.append(proba)
-        score = compute_metric(proba, metrics=metrics)
 
         for m in metrics:
-            scores[m].append(score[m])
+            if m == "accuracy":
+                scores[m].append(accuracy)
+            else:
+                score = compute_metric(proba, metrics=[m])
+                scores[m].append(score[m])
 
     return scores, probas
 
@@ -125,6 +141,7 @@ def lc2st_htest(
     probas_null=[],
 ):
     classifier = clf(**clf_kwargs)
+
     probas = []
     for _ in range(n_ensemble):
         # train clf
@@ -181,27 +198,22 @@ def expected_lc2st_scores(
 
     for train_index, val_index in kf.split(P):
         P_train = P[train_index]
-        P_eval = P[val_index]
+        P_val = P[val_index]
         Q_train = Q[train_index]
-        Q_eval = Q[val_index]
+        Q_val = Q[val_index]
         x_train = x_cal[train_index]
-        x_eval = x_cal[val_index]
+        x_val = x_cal[val_index]
 
         # train n^th classifier
         clf_n = train_lc2st(P_train, Q_train, x_train, clf=classifier)
 
         # eval n^th classifier
-        # joint samples
-        joint_P_x = np.concatenate([P_eval, x_eval], axis=1)
-        joint_Q_x = np.concatenate([Q_eval, x_eval], axis=1)
+        joint_P_x = np.concatenate([P_val, x_val], axis=1)
+        joint_Q_x = np.concatenate([Q_val, x_val], axis=1)
+        features_val = np.concatenate([joint_P_x, joint_Q_x], axis=0)
+        labels_val = np.array([0] * len(P_val) + [1] * len(Q_val)).reshape(-1, 1)
 
-        # define features and labels for classification
-        features = np.concatenate([joint_P_x, joint_Q_x], axis=0)
-        labels = np.concatenate(
-            [np.array([0] * len(x_eval)), np.array([1] * len(x_eval))]
-        ).ravel()
-
-        accuracy = clf_n.score(features, labels)
+        accuracy = clf_n.score(features_val, labels_val)
         scores["accuracy"].append(accuracy)
 
         proba = clf_n.predict_proba(joint_P_x)[:, 0]

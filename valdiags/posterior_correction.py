@@ -52,12 +52,33 @@ def clf_ratio_obs(batch, x_obs, clfs, inv_flow_transform=None):
     return (1 - proba) / proba
 
 
-def corrected_pdf(batch, dist, x_obs, clfs, inv_flow_transform=None):
-    base_dist_pdf = dist.log_prob(batch).exp().detach().numpy()
+def corrected_pdf_old(
+    batch,
+    dist,
+    x_obs,
+    clfs,
+    inv_flow_transform=None,
+):
+    dist_pdf = dist.log_prob(batch).exp().detach().numpy()
+
     if inv_flow_transform is not None:
         batch = inv_flow_transform(batch)
+
     ratio = clf_ratio_obs(batch, x_obs, clfs)
-    return ratio * base_dist_pdf
+    return ratio * dist_pdf
+
+
+def corrected_pdf(batch, dist, x_obs, clfs, inv_flow_transform=None, z_space=True):
+    if inv_flow_transform is not None:
+        dist_pdf = dist.log_prob(inv_flow_transform(batch)).exp().detach().numpy()
+        if z_space:
+            ratio = clf_ratio_obs(inv_flow_transform(batch), x_obs, clfs)
+        else:
+            ratio = clf_ratio_obs(batch, x_obs, clfs)
+    else:
+        dist_pdf = dist.log_prob(batch).exp().detach().numpy()
+        ratio = clf_ratio_obs(batch, x_obs, clfs)
+    return ratio * dist_pdf
 
 
 ## samplers

@@ -46,7 +46,7 @@ def clf_ratio_obs(batch, x_obs, clfs, inv_flow_transform=None):
     if inv_flow_transform is not None:
         batch = inv_flow_transform(batch)
     proba = np.mean(
-        [eval_lc2st(batch.numpy(), x_obs, clf) for clf in clfs],
+        [eval_lc2st(batch.numpy(), x_obs, clf=clf) for clf in clfs],
         axis=0,
     )
     return (1 - proba) / proba

@@ -186,6 +186,7 @@ def expected_lc2st_scores(
     n_folds=10,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
+    only_one_class_for_eval=False,
 ):
 
     classifier = clf_class(**clf_kwargs)
@@ -209,16 +210,21 @@ def expected_lc2st_scores(
 
         # eval n^th classifier
         joint_P_x = np.concatenate([P_val, x_val], axis=1)
-        joint_Q_x = np.concatenate([Q_val, x_val], axis=1)
-        features_val = np.concatenate([joint_P_x, joint_Q_x], axis=0)
-        labels_val = np.array([0] * len(P_val) + [1] * len(Q_val)).reshape(-1, 1)
+        if only_one_class_for_eval:
+            features_val = joint_P_x
+            labels_val = np.array([0] * len(P_val)).reshape(-1, 1)
+        else:
+            joint_Q_x = np.concatenate([Q_val, x_val], axis=1)
+            features_val = np.concatenate([joint_P_x, joint_Q_x], axis=0)
+            labels_val = np.array([0] * len(P_val) + [1] * len(Q_val)).reshape(-1, 1)
 
         accuracy = clf_n.score(features_val, labels_val)
         scores["accuracy"].append(accuracy)
 
         proba = clf_n.predict_proba(joint_P_x)[:, 0]
         for m in metrics:
-            scores[m].append(compute_metric(proba, [m])[m])
+            if m != "accuracy":
+                scores[m].append(compute_metric(proba, [m])[m])
 
     return scores
 
@@ -522,6 +528,7 @@ def eval_classifier_for_lc2st(
     clf_kwargs,
     metrics=["probas_mean"],
     n_folds=10,
+    only_one_class_for_eval=False,
 ):
     shift_list = []
     scores = {}
@@ -540,6 +547,7 @@ def eval_classifier_for_lc2st(
             n_folds=n_folds,
             clf_class=clf_class,
             clf_kwargs=clf_kwargs,
+            only_one_class_for_eval=only_one_class_for_eval,
         )
 
         for m in metrics:
@@ -558,7 +566,7 @@ def eval_classifier_for_lc2st(
 ## =============== eval test-stats (precision under null) ========================
 def eval_null_lc2st(
     x_samples,
-    null_dist,
+    null_dist_samples,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     clf_name="mlp_base",
@@ -571,8 +579,8 @@ def eval_null_lc2st(
     for m in test_stats:
         scores[m] = []
 
-    P = null_dist.sample((n,))
-    Q = null_dist.sample((n,))
+    P, Q = null_dist_samples
+
     start = time.time()
 
     scores = expected_lc2st_scores(
@@ -583,6 +591,7 @@ def eval_null_lc2st(
         n_folds=n_folds,
         clf_class=clf_class,
         clf_kwargs=clf_kwargs,
+        only_one_class_for_eval=True,
     )
     total_cv_time = time.time() - start
 
@@ -659,13 +668,28 @@ def c2st_kwargs(ndim):
 
 
 def lc2st_sbibm(
-    P, Q, x_cal, x_eval, metric="accuracy", n_folds=10, classifier=None, Z_eval=None
+    P,
+    Q,
+    x_cal,
+    x_eval,
+    metric="accuracy",
+    n_folds=10,
+    classifier=None,
+    P_eval=None,
+    Q_eval=None,
 ):
     ndim = P.shape[-1] + x_cal.shape[-1]
     if classifier is None:
         classifier = MLPClassifier(**c2st_kwargs(ndim))
     scores, _ = lc2st_scores(
-        P, Q, x_cal, x_eval, metrics=[metric], n_folds=n_folds, Z_eval=Z_eval
+        P,
+        Q,
+        x_cal,
+        x_eval,
+        metrics=[metric],
+        n_folds=n_folds,
+        P_eval=P_eval,
+        Q_eval=Q_eval,
     )
     return torch.tensor([np.mean(scores[metric])])
 

@@ -132,13 +132,13 @@ tasks/toy_examples/data_generators.py
 tasks/toy_examples/embeddings.py
 tasks/toy_examples/posterior.py
 valdiags/__init__.py
-valdiags/c2st_scores_modified.py
 valdiags/confidence_regions.py
 valdiags/hpd_coverage.py
 valdiags/localC2ST.py
 valdiags/localPIT_regression.py
 valdiags/multi_local_test.py
 valdiags/plot_utils.py
+valdiags/posterior_correction.py
 valdiags/pp_plots.py
 valdiags/quantile_regression.py
 valdiags/uni_local_test_scripts.py

@@ -65,6 +65,10 @@ def compute_metric(proba, metrics):
             pp_vals_dirac = pd.Series(PP_vals([0.5] * len(proba), alphas))
             pp_vals = PP_vals(proba, alphas)
             scores[m] = ((pp_vals - pp_vals_dirac) ** 2).sum() / len(alphas)
+        elif m == "div":
+            mask = proba > 1 / 2
+            max_proba = np.concatenate([proba[mask], 1 - proba[~mask]])
+            scores[m] = np.mean(max_proba)
         else:
             scores[m] = None
             print(f'metric "{m}" not implemented')
@@ -213,15 +217,23 @@ def expected_lc2st_scores(
         if only_one_class_for_eval:
             features_val = joint_P_x
             labels_val = np.array([0] * len(P_val)).reshape(-1, 1)
+            proba = clf_n.predict_proba(joint_P_x)[:, 0]
         else:
             joint_Q_x = np.concatenate([Q_val, x_val], axis=1)
             features_val = np.concatenate([joint_P_x, joint_Q_x], axis=0)
             labels_val = np.array([0] * len(P_val) + [1] * len(Q_val)).reshape(-1, 1)
+            proba = np.concatenate(
+                [
+                    clf_n.predict_proba(joint_P_x)[:, 0],
+                    clf_n.predict_proba(joint_Q_x)[:, 1],
+                ],
+                axis=0,
+            )
 
         accuracy = clf_n.score(features_val, labels_val)
         scores["accuracy"].append(accuracy)
 
-        proba = clf_n.predict_proba(joint_P_x)[:, 0]
+        # proba = clf_n.predict_proba(joint_P_x)[:, 0]
         for m in metrics:
             if m != "accuracy":
                 scores[m].append(compute_metric(proba, [m])[m])

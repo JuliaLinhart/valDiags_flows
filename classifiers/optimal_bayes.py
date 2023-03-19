@@ -54,37 +54,38 @@ if __name__ == "__main__":
     # # uncomment this to do the scale-shift experiment
     # shifts = np.linspace(0.01, 10, 20)
 
-    # # ref norm samples
-    # ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+    # ref norm samples
+    ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
 
-    # shifted_samples = [
-    #     mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES) for s in shifts
-    # ]
+    shifted_samples = [
+        mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES) for s in shifts
+    ]
 
     # # uncomment this to do the scale-shift experiment
     # shifted_samples = [
     #     mvn(mean=np.zeros(DIM), cov=np.eye(DIM) * s).rvs(N_SAMPLES) for s in shifts
     # ]
 
-    # uncomment this to do the student mean-shift experiment
-    # ref student samples
-    ref_samples = t(df=2, loc=0, scale=1).rvs(N_SAMPLES)
-    shifted_samples = [t(df=2, loc=s, scale=1).rvs(N_SAMPLES) for s in shifts]
+    # # uncomment this to do the student mean-shift experiment
+    # # ref student samples
+    # ref_samples = t(df=2, loc=0, scale=1).rvs(N_SAMPLES)
+    # shifted_samples = [t(df=2, loc=s, scale=1).rvs(N_SAMPLES) for s in shifts]
 
     accuracies = []
     probas_mean = []
     div = []
+    mse = []
     single_class_eval = []
     shift_list = []
 
     for s, s_samples in zip(shifts, shifted_samples):
         # # uncomment this to do the mean-shift experiment
-        # clf = AnalyticGaussianLQDA(dim=DIM, mu=s)
+        clf = AnalyticGaussianLQDA(dim=DIM, mu=s)
         # # uncomment this to do the scale-shift experiment
         # clf = AnalyticGaussianLQDA(dim=DIM, sigma=s)
 
         # uncomment this to do the student mean-shift experiment
-        clf = AnalyticStudentClassifier(mu=s)
+        # clf = AnalyticStudentClassifier(mu=s)
 
         for b in [True, False]:
             single_class_eval.append(b)
@@ -104,33 +105,35 @@ if __name__ == "__main__":
                 proba_1 = clf.predict_proba(s_samples)[:, 1]
                 proba = np.concatenate([proba, proba_1], axis=0)
 
-            scores = compute_metric(proba, metrics=["probas_mean", "div"])
+            scores = compute_metric(proba, metrics=["probas_mean", "div", "mse"])
 
             accuracies.append(accuracy)
             probas_mean.append(scores["probas_mean"])
             div.append(scores["div"])
+            mse.append(scores["mse"])
 
-    # df = pd.DataFrame(
-    #     {
-    #         "mean_shift": shift_list,
-    #         "accuracy": accuracies,
-    #         "probas_mean": probas_mean,
-    #         "div": div,
-    #         "single_class_eval": single_class_eval,
-    #     }
-    # )
+    df = pd.DataFrame(
+        {
+            "mean_shift": shift_list,
+            "accuracy": accuracies,
+            "probas_mean": probas_mean,
+            "div": div,
+            "mse": mse,
+            "single_class_eval": single_class_eval,
+        }
+    )
 
-    # for metric in ["accuracy", "probas_mean", "div"]:
-    #     sns.relplot(
-    #         data=df,
-    #         x="mean_shift",
-    #         y=metric,
-    #         hue="single_class_eval",
-    #         style="single_class_eval",
-    #         kind="line",
-    #     )
-    #     plt.savefig(f"lqda_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
-    #     plt.show()
+    for metric in ["accuracy", "probas_mean", "div", "mse"]:
+        sns.relplot(
+            data=df,
+            x="mean_shift",
+            y=metric,
+            hue="single_class_eval",
+            style="single_class_eval",
+            kind="line",
+        )
+        plt.savefig(f"lqda_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
+        plt.show()
 
     # # uncomment this to do the scale-shift experiment
     # df = pd.DataFrame(
@@ -139,11 +142,12 @@ if __name__ == "__main__":
     #         "accuracy": accuracies,
     #         "probas_mean": probas_mean,
     #         "div": div,
+    #         "mse": mse,
     #         "single_class_eval": single_class_eval,
     #     }
     # )
 
-    # for metric in ["accuracy", "probas_mean", "div"]:
+    # for metric in ["accuracy", "probas_mean", "div", "mse"]:
     #     sns.relplot(
     #         data=df,
     #         x="scale_shift",
@@ -155,26 +159,27 @@ if __name__ == "__main__":
     #     plt.savefig(f"lqda_scale_shift_n_{N_SAMPLES}_{metric}.pdf")
     #     plt.show()
 
-    # uncomment this to do the student mean-shift experiment
-    df = pd.DataFrame(
-        {
-            "mean_shift": shift_list,
-            "accuracy": accuracies,
-            "probas_mean": probas_mean,
-            "div": div,
-            "single_class_eval": single_class_eval,
-        }
-    )
+    # # uncomment this to do the student mean-shift experiment
+    # df = pd.DataFrame(
+    #     {
+    #         "mean_shift": shift_list,
+    #         "accuracy": accuracies,
+    #         "probas_mean": probas_mean,
+    #         "div": div,
+    #         "mse": mse,
+    #         "single_class_eval": single_class_eval,
+    #     }
+    # )
 
-    for metric in ["accuracy", "probas_mean", "div"]:
-        sns.relplot(
-            data=df,
-            x="mean_shift",
-            y=metric,
-            hue="single_class_eval",
-            style="single_class_eval",
-            kind="line",
-        )
-        plt.savefig(f"student_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
-        plt.show()
+    # for metric in ["accuracy", "probas_mean", "div", "mse"]:
+    #     sns.relplot(
+    #         data=df,
+    #         x="mean_shift",
+    #         y=metric,
+    #         hue="single_class_eval",
+    #         style="single_class_eval",
+    #         kind="line",
+    #     )
+    #     plt.savefig(f"student_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
+    #     plt.show()
 

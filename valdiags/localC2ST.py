@@ -69,6 +69,8 @@ def compute_metric(proba, metrics):
             mask = proba > 1 / 2
             max_proba = np.concatenate([proba[mask], 1 - proba[~mask]])
             scores[m] = np.mean(max_proba)
+        elif m == "mse":
+            scores[m] = ((proba - [0.5] * len(proba)) ** 2).mean()
         else:
             scores[m] = None
             print(f'metric "{m}" not implemented')
@@ -319,11 +321,7 @@ def flow_vs_reference_distribution(
     else:
         colors = ["blue", "orange"]
     plot_distributions(
-        [samples_ref, samples_flow],
-        colors=colors,
-        labels=labels,
-        dim=dim,
-        hist=hist,
+        [samples_ref, samples_flow], colors=colors, labels=labels, dim=dim, hist=hist,
     )
     plt.title(title)
 
@@ -708,13 +706,7 @@ def lc2st_sbibm(
 
 ## expected c2st score
 def expected_lc2st_sbibm(
-    P,
-    Q,
-    x_cal,
-    metric="accuracy",
-    n_folds=10,
-    clf_class=None,
-    clf_kwargs=None,
+    P, Q, x_cal, metric="accuracy", n_folds=10, clf_class=None, clf_kwargs=None,
 ):
     if clf_class is None or clf_kwargs is None:
         ndim = P.shape[-1] + x_cal.shape[-1]
@@ -722,12 +714,7 @@ def expected_lc2st_sbibm(
         clf_kwargs = c2st_kwargs(ndim)
 
     scores = expected_lc2st_scores(
-        P,
-        Q,
-        x_cal,
-        clf_class=clf_class,
-        clf_kwargs=clf_kwargs,
-        n_folds=n_folds,
+        P, Q, x_cal, clf_class=clf_class, clf_kwargs=clf_kwargs, n_folds=n_folds,
     )
     score = np.mean(scores[metric])
 

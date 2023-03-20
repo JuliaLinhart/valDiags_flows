@@ -42,7 +42,7 @@ class AnalyticStudentClassifier:
         return np.mean(self.predict(x) == y)
 
 
-def clf_scores(
+def opt_bayes_scores(
     P, Q, clf, metrics=["accuracy", "probas_mean", "div", "mse"], single_class_eval=True
 ):
     N_SAMPLES = len(P)
@@ -76,7 +76,7 @@ def t_stats_opt_bayes(
     t_stat_data = {}
     t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
 
-    scores_data = clf_scores(P=P, Q=Q, metrics=metrics, clf=clf_data, **kwargs)
+    scores_data = opt_bayes_scores(P=P, Q=Q, metrics=metrics, clf=clf_data, **kwargs)
     for m in metrics:
         t_stat_data[m] = np.mean(scores_data[m])
     for i in tqdm(
@@ -84,7 +84,7 @@ def t_stats_opt_bayes(
         desc="Testing under the null",
         disable=(not verbose),
     ):
-        scores_null = clf_scores(
+        scores_null = opt_bayes_scores(
             P=P, Q=null_samples_list[i], metrics=metrics, clf=clf_null, **kwargs,
         )
         for m in metrics:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
             single_class.append(b)
             shift_list.append(s)
 
-            scores = clf_scores(
+            scores = opt_bayes_scores(
                 P=ref_samples, Q=s_samples, clf=clf, single_class_eval=b
             )
 
@@ -223,41 +223,4 @@ if __name__ == "__main__":
     #     )
     #     plt.savefig(f"student_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
     #     plt.show()
-
-    from valdiags.test_utils import empirical_error_htest
-
-    D = 5
-    ref_samples = mvn(mean=np.array([0] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
-    s = np.sqrt(0.05)
-    shift_samples = mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
-    clf_s = AnalyticGaussianLQDA(dim=DIM, mu=s)
-    null_samples_list = [
-        mvn(mean=np.array([0] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
-        for _ in range(100)
-    ]
-    metrics = ["accuracy", "div", "mse"]
-
-    power = dict(zip(metrics, [[] for _ in range(len(metrics))]))
-    for alpha in np.linspace(0, 1, 20):
-        print(f"alpha={alpha}")
-        power_a = empirical_error_htest(
-            t_stats_estimator=t_stats_opt_bayes,
-            metrics=metrics,
-            conf_alpha=alpha,
-            P=ref_samples,
-            Q=shift_samples,
-            null_samples_list=null_samples_list,
-            clf_data=clf_s,
-            clf_null=AnalyticGaussianLQDA(dim=DIM),
-            single_class_eval=True,
-            n_runs=300,
-            verbose=False,
-        )
-        for m in metrics:
-            power[m].append(power_a[m])
-
-    for m in metrics:
-        plt.plot(np.linspace(0, 1, 5), power[m], label=str(m))
-    plt.legend()
-    plt.show()
 

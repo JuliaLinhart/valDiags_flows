@@ -145,9 +145,18 @@ def t_stats_lc2st(
     )
     for m in metrics:
         t_stat_data[m] = np.mean(scores_data[m])
-    for i in tqdm(range(len(null_samples_list)), desc="Testing under the null", disable=(not verbose)):
+    for i in tqdm(
+        range(len(null_samples_list)),
+        desc="Testing under the null",
+        disable=(not verbose),
+    ):
         scores_null, _ = lc2st_scores(
-            P=P, Q=null_samples_list[i], x_cal=x_cal, x_eval=x_eval, metrics=metrics, **kwargs,
+            P=P,
+            Q=null_samples_list[i],
+            x_cal=x_cal,
+            x_eval=x_eval,
+            metrics=metrics,
+            **kwargs,
         )
         for m in metrics:
             t_stats_null[m].append(np.mean(scores_null[m]))

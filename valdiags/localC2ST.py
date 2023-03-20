@@ -9,6 +9,7 @@ from sklearn.model_selection import KFold
 import sklearn
 
 from scipy.stats import wasserstein_distance
+from .test_utils import compute_pvalue
 from .pp_plots import PP_vals
 from .plot_utils import plot_distributions
 
@@ -16,6 +17,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import time
+from tqdm import tqdm
 
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
@@ -132,6 +134,27 @@ def lc2st_scores(
     return scores, probas
 
 
+def t_stats_lc2st(
+    P, Q, x_cal, x_eval, null_samples_list, metrics=["accuracy"], verbose=True, **kwargs
+):
+    t_stat_data = {}
+    t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+
+    scores_data, _ = lc2st_scores(
+        P=P, Q=Q, x_cal=x_cal, x_eval=x_eval, metrics=metrics, **kwargs
+    )
+    for m in metrics:
+        t_stat_data[m] = np.mean(scores_data[m])
+    for i in tqdm(range(len(null_samples_list)), desc="Testing under the null", disable=(not verbose)):
+        scores_null, _ = lc2st_scores(
+            P=P, Q=null_samples_list[i], x_cal=x_cal, x_eval=x_eval, metrics=metrics, **kwargs,
+        )
+        for m in metrics:
+            t_stats_null[m].append(np.mean(scores_null[m]))
+
+    return t_stat_data, t_stats_null
+
+
 def lc2st_htest(
     P_cal,
     Q_cal,
@@ -176,9 +199,10 @@ def lc2st_htest(
 
     p_values = {}
     for m in test_stats:
-        p_values[m] = (
-            sum(1 * (t_stats_ensemble[m] < pd.Series(t_stats_null[m]))) / n_trials_null
-        )
+        # p_values[m] = (
+        #     sum(1 * (t_stats_ensemble[m] < pd.Series(t_stats_null[m]))) / n_trials_null
+        # )
+        p_values[m] = compute_pvalue(t_stats_ensemble[m], np.array(t_stats_null[m]))
 
     return p_values, t_stats_ensemble, proba_ensemble, probas_null, t_stats_null
 

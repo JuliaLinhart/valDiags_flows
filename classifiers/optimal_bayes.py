@@ -2,6 +2,9 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from scipy.stats import t
 
+from valdiags.localC2ST import compute_metric
+from tqdm import tqdm
+
 
 class AnalyticGaussianLQDA:
     def __init__(self, dim, mu=0, sigma=1) -> None:
@@ -39,8 +42,58 @@ class AnalyticStudentClassifier:
         return np.mean(self.predict(x) == y)
 
 
+def clf_scores(
+    P, Q, clf, metrics=["accuracy", "probas_mean", "div", "mse"], single_class_eval=True
+):
+    N_SAMPLES = len(P)
+    if single_class_eval:
+        X_val = P
+        y_val = np.array([0] * (N_SAMPLES))
+    else:
+        X_val = np.concatenate([P, Q], axis=0)
+        y_val = np.array([0] * N_SAMPLES + [1] * N_SAMPLES)
+
+    accuracy = clf.score(X_val, y_val)
+
+    proba = clf.predict_proba(P)[:, 0]
+    if not single_class_eval:
+        proba_1 = clf.predict_proba(Q)[:, 1]
+        proba = np.concatenate([proba, proba_1], axis=0)
+
+    scores = dict(zip(metrics, [None] * len(metrics)))
+    for m in metrics:
+        if m == "accuracy":
+            scores["accuracy"] = accuracy
+        else:
+            scores[m] = compute_metric(proba, metrics=[m])[m]
+
+    return scores
+
+
+def t_stats_opt_bayes(
+    P, Q, null_samples_list, metrics, clf_data, clf_null, verbose=True, **kwargs
+):
+    t_stat_data = {}
+    t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+
+    scores_data = clf_scores(P=P, Q=Q, metrics=metrics, clf=clf_data, **kwargs)
+    for m in metrics:
+        t_stat_data[m] = np.mean(scores_data[m])
+    for i in tqdm(
+        range(len(null_samples_list)),
+        desc="Testing under the null",
+        disable=(not verbose),
+    ):
+        scores_null = clf_scores(
+            P=P, Q=null_samples_list[i], metrics=metrics, clf=clf_null, **kwargs,
+        )
+        for m in metrics:
+            t_stats_null[m].append(np.mean(scores_null[m]))
+
+    return t_stat_data, t_stats_null
+
+
 if __name__ == "__main__":
-    from valdiags.localC2ST import compute_metric
 
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -75,7 +128,7 @@ if __name__ == "__main__":
     probas_mean = []
     div = []
     mse = []
-    single_class_eval = []
+    single_class = []
     shift_list = []
 
     for s, s_samples in zip(shifts, shifted_samples):
@@ -88,26 +141,14 @@ if __name__ == "__main__":
         # clf = AnalyticStudentClassifier(mu=s)
 
         for b in [True, False]:
-            single_class_eval.append(b)
+            single_class.append(b)
             shift_list.append(s)
 
-            if b:
-                X_val = ref_samples
-                y_val = np.array([0] * (N_SAMPLES))
-            else:
-                X_val = np.concatenate([ref_samples, s_samples], axis=0)
-                y_val = np.array([0] * N_SAMPLES + [1] * N_SAMPLES)
+            scores = clf_scores(
+                P=ref_samples, Q=s_samples, clf=clf, single_class_eval=b
+            )
 
-            accuracy = clf.score(X_val, y_val)
-
-            proba = clf.predict_proba(ref_samples)[:, 0]
-            if not b:
-                proba_1 = clf.predict_proba(s_samples)[:, 1]
-                proba = np.concatenate([proba, proba_1], axis=0)
-
-            scores = compute_metric(proba, metrics=["probas_mean", "div", "mse"])
-
-            accuracies.append(accuracy)
+            accuracies.append(scores["accuracy"])
             probas_mean.append(scores["probas_mean"])
             div.append(scores["div"])
             mse.append(scores["mse"])
@@ -119,7 +160,7 @@ if __name__ == "__main__":
             "probas_mean": probas_mean,
             "div": div,
             "mse": mse,
-            "single_class_eval": single_class_eval,
+            "single_class_eval": single_class,
         }
     )
 
@@ -182,4 +223,41 @@ if __name__ == "__main__":
     #     )
     #     plt.savefig(f"student_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
     #     plt.show()
+
+    from valdiags.test_utils import empirical_error_htest
+
+    D = 5
+    ref_samples = mvn(mean=np.array([0] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+    s = np.sqrt(0.05)
+    shift_samples = mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+    clf_s = AnalyticGaussianLQDA(dim=DIM, mu=s)
+    null_samples_list = [
+        mvn(mean=np.array([0] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+        for _ in range(100)
+    ]
+    metrics = ["accuracy", "div", "mse"]
+
+    power = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+    for alpha in np.linspace(0, 1, 20):
+        print(f"alpha={alpha}")
+        power_a = empirical_error_htest(
+            t_stats_estimator=t_stats_opt_bayes,
+            metrics=metrics,
+            conf_alpha=alpha,
+            P=ref_samples,
+            Q=shift_samples,
+            null_samples_list=null_samples_list,
+            clf_data=clf_s,
+            clf_null=AnalyticGaussianLQDA(dim=DIM),
+            single_class_eval=True,
+            n_runs=300,
+            verbose=False,
+        )
+        for m in metrics:
+            power[m].append(power_a[m])
+
+    for m in metrics:
+        plt.plot(np.linspace(0, 1, 5), power[m], label=str(m))
+    plt.legend()
+    plt.show()
 

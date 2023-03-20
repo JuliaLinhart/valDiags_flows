@@ -31,7 +31,7 @@ def train_lc2st(P, Q, x, clf=DEFAULT_CLF):
     features = np.concatenate([joint_P_x, joint_Q_x], axis=0)
     labels = np.concatenate([np.array([0] * len(x)), np.array([1] * len(x))]).ravel()
 
-    features, labels = shuffle(features, labels, random_state=1)
+    features, labels = shuffle(features, labels)
 
     # train classifier
     clf = sklearn.base.clone(clf)
@@ -94,7 +94,7 @@ def lc2st_scores(
 
     classifier = clf_class(**clf_kwargs)
 
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=1)
+    kf = KFold(n_splits=n_folds, shuffle=True)
 
     probas = []
     scores = {}
@@ -230,7 +230,7 @@ def expected_lc2st_scores(
 
     classifier = clf_class(**clf_kwargs)
 
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=1)
+    kf = KFold(n_splits=n_folds, shuffle=True)
 
     scores = {"accuracy": []}
     for m in metrics:

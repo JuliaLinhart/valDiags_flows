@@ -13,10 +13,12 @@ from tqdm import tqdm
 
 ### =========== empirical power as in [Lee et al. (2018)] ============
 
-DIM = 5
 N_SAMPLES = 100
 
+DIM = 5
 mu = np.sqrt(0.05)
+# DIM = 20
+# mu = np.sqrt(0.01)
 
 metrics = ["accuracy", "div", "mse"]
 n_alpha = 20
@@ -61,7 +63,7 @@ for i, alpha in enumerate(np.linspace(0, 1, n_alpha)):
 for m in metrics:
     plt.plot(np.linspace(0, 1, n_alpha), power[m], label=str(m), marker="o")
 plt.legend()
-plt.savefig(f"emp_power_lqda_single_class.pdf")
+plt.savefig(f"emp_power_lqda_single_class_dim_{DIM}.pdf")
 plt.show()
 
 # # OPIMAL BAYES LDA

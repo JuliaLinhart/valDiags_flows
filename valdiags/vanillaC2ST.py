@@ -69,7 +69,7 @@ def c2st_scores(
 
     scores = dict(zip(metrics, [[] for _ in range(len(metrics))]))
 
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=1)
+    kf = KFold(n_splits=n_folds, shuffle=True)
     for train_index, val_index in kf.split(P):
         P_train = P[train_index]
         P_val = P[val_index]
@@ -90,10 +90,10 @@ def c2st_scores(
 
         accuracy = clf_n.score(X_val, y_val)
 
-        proba = clf_n.predict_proba(P_val)[:, 0]
-        if not single_class_eval:
-            proba_1 = clf_n.predict_proba(Q_val)[:, 1]
-            proba = np.concatenate([proba, proba_1], axis=0)
+        proba = clf_n.predict_proba(X_val)[:, 0]
+        # if not single_class_eval:
+        #     proba_1 = clf_n.predict_proba(Q_val)[:, 1]
+        #     proba = np.concatenate([proba, proba_1], axis=0)
 
         for m in metrics:
             if m == "accuracy":

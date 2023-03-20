@@ -59,10 +59,9 @@ for i, alpha in enumerate(np.linspace(0, 1, n_alpha)):
         power[m].append(power_a[m])
 
 for m in metrics:
-    plt.plot(
-        np.linspace(0, 1, n_alpha), power[m], label=str(m),
-    )
+    plt.plot(np.linspace(0, 1, n_alpha), power[m], label=str(m), marker="o")
 plt.legend()
+plt.savefig(f"emp_power_lqda_single_class.pdf")
 plt.show()
 
 # # OPIMAL BAYES LDA

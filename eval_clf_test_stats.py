@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     # compute empirical power for each metric with `eval_c2st_lda``
     emp_power = empirical_power_c2st_mean_shift(
-        eval_htest_fn=eval_c2st_lda, metrics=metrics, metrics_cv=metrics_cv
+        eval_c2st_fn=eval_c2st_lda, metrics=metrics, metrics_cv=metrics_cv
     )
 
     # plot empirical power for each metric

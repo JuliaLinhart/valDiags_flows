@@ -30,6 +30,22 @@ def train_c2st(P, Q, clf=DEFAULT_CLF):
     return clf
 
 
+def eval_c2st(P, Q, clf, single_class_eval=False):
+    # eval n^th classifier
+    n_samples = len(P)
+    if single_class_eval:
+        X_val = P
+        y_val = np.array([0] * (n_samples))
+    else:
+        X_val = np.concatenate([P, Q], axis=0)
+        y_val = np.array([0] * n_samples + [1] * n_samples)
+
+    accuracy = clf.score(X_val, y_val)
+
+    proba = clf.predict_proba(X_val)[:, 0]
+    return accuracy, proba
+
+
 def compute_metric(proba, metrics):
     scores = {}
     for m in metrics:
@@ -64,42 +80,55 @@ def c2st_scores(
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     single_class_eval=False,
+    cross_val=True,
 ):
     classifier = clf_class(**clf_kwargs)
 
-    scores = dict(zip(metrics, [[] for _ in range(len(metrics))]))
-
-    kf = KFold(n_splits=n_folds, shuffle=True)
-    for train_index, val_index in kf.split(P):
-        P_train = P[train_index]
-        P_val = P[val_index]
-        Q_train = Q[train_index]
-        Q_val = Q[val_index]
-
-        # train n^th classifier
-        clf_n = train_c2st(P_train, Q_train, clf=classifier)
-
-        # eval n^th classifier
-        n_samples = len(P_val)
-        if single_class_eval:
-            X_val = P_val
-            y_val = np.array([0] * (n_samples))
-        else:
-            X_val = np.concatenate([P_val, Q_val], axis=0)
-            y_val = np.array([0] * n_samples + [1] * n_samples)
-
-        accuracy = clf_n.score(X_val, y_val)
-
-        proba = clf_n.predict_proba(X_val)[:, 0]
-        # if not single_class_eval:
-        #     proba_1 = clf_n.predict_proba(Q_val)[:, 1]
-        #     proba = np.concatenate([proba, proba_1], axis=0)
-
+    if not cross_val:
+        scores = {}
+        clf = train_c2st(P, Q, clf=classifier)
+        accuracy, proba = eval_c2st(P, Q, clf=clf, single_class_eval=single_class_eval)
         for m in metrics:
-            if m == "accuracy":
-                scores["accuracy"].append(accuracy)
+            if "accuracy" in m:
+                scores[m] = accuracy
             else:
-                scores[m].append(compute_metric(proba, metrics=[m])[m])
+                scores[m] = compute_metric(proba, metrics=[m])[m]
+
+    else:
+
+        scores = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+
+        kf = KFold(n_splits=n_folds, shuffle=True)
+        for train_index, val_index in kf.split(P):
+            P_train = P[train_index]
+            P_val = P[val_index]
+            Q_train = Q[train_index]
+            Q_val = Q[val_index]
+
+            # train n^th classifier
+            clf_n = train_c2st(P_train, Q_train, clf=classifier)
+
+            # eval n^th classifier
+            n_samples = len(P_val)
+            if single_class_eval:
+                X_val = P_val
+                y_val = np.array([0] * (n_samples))
+            else:
+                X_val = np.concatenate([P_val, Q_val], axis=0)
+                y_val = np.array([0] * n_samples + [1] * n_samples)
+
+            accuracy = clf_n.score(X_val, y_val)
+
+            proba = clf_n.predict_proba(X_val)[:, 0]
+            # if not single_class_eval:
+            #     proba_1 = clf_n.predict_proba(Q_val)[:, 1]
+            #     proba = np.concatenate([proba, proba_1], axis=0)
+
+            for m in metrics:
+                if "accuracy" in m:
+                    scores[m].append(accuracy)
+                else:
+                    scores[m].append(compute_metric(proba, metrics=[m])[m])
 
     return scores
 

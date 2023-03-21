@@ -1,36 +1,58 @@
+# Implementation of the local C2ST method
+# Author: Julia Linhart
+# Institution: Inria Paris-Saclay (MIND team)
+
 import numpy as np
 import torch
+import pandas as pd
+import matplotlib.pyplot as plt
 
 from sklearn.neural_network import MLPClassifier
-from scipy.stats import multivariate_normal as mvn
-from scipy.stats import norm
 from sklearn.utils import shuffle
 from sklearn.model_selection import KFold
 import sklearn
 
-from scipy.stats import wasserstein_distance
 from .test_utils import compute_pvalue
 from .pp_plots import PP_vals
+from .c2st_utils import compute_metric
 from .plot_utils import plot_distributions
-
-import pandas as pd
-import matplotlib.pyplot as plt
 
 import time
 from tqdm import tqdm
 
+# define default classifier
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def train_lc2st(P, Q, x, clf=DEFAULT_CLF):
-    # joint samples
+    """ Trains a classifier to distinguish between data from P,x and Q,x.
+
+    Args:
+        P (numpy.array): data drawn from P 
+            of size (n_samples, dim).
+        Q (numpy.array): data drawn from Q  
+            of size (n_samples, dim).
+        x (numpy.array): data drawn from x
+            of size (n_samples, n_features).
+        clf (sklearn model, optional): needs to have a method `.fit(X,y)`.
+            Defaults to DEFAULT_CLF.
+    
+    Returns:
+        (sklearn model): trained classifier (cloned from clf).
+    """
+    # concatenate P and Q with x to get samples from P,x and Q,x
+    # of size (n_samples, dim + n_features)
     joint_P_x = np.concatenate([P, x], axis=1)
     joint_Q_x = np.concatenate([Q, x], axis=1)
 
-    # define features and labels for classification
-    features = np.concatenate([joint_P_x, joint_Q_x], axis=0)
-    labels = np.concatenate([np.array([0] * len(x)), np.array([1] * len(x))]).ravel()
-
+    # define features and labels
+    features = np.concatenate(
+        [joint_P_x, joint_Q_x], axis=0
+    )  # (2*n_samples, dim + n_features)
+    labels = np.concatenate(
+        [np.array([0] * len(x)), np.array([1] * len(x))]
+    ).ravel()  # (2*n_samples,)
+    # shuffle features and labels
     features, labels = shuffle(features, labels)
 
     # train classifier
@@ -40,43 +62,35 @@ def train_lc2st(P, Q, x, clf=DEFAULT_CLF):
 
 
 def eval_lc2st(P, x, y=None, clf=DEFAULT_CLF):
-    # define eval features for classifier
+    """Evaluates a classifier on data from P and for a given x.
+
+    Args:
+        P (numpy.array): data drawn from P|x (or just P if independent of x)
+            of size (n_samples, dim).
+        x (numpy.array): a fixed observation
+            of size (n_features,).
+        y (numpy.array, optional): labels for P
+            of size (n_samples,). Defaults to None.
+        clf (sklearn model, optional): needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
+            Defaults to DEFAULT_CLF.
+    
+    Returns:
+        (numpy.array): predicted probabilities for class 0 (P|x) (and accuracy if y is not None).
+        
+    """
+    # concatenate P with repeated x to get samples from P|x
     features_eval = np.concatenate([P, x.repeat(len(P), 1)], axis=1)
-    # predict proba for class 0 (P_dist)
+
+    # predict probabilities for class 0 (P|x)
     proba = clf.predict_proba(features_eval)[:, 0]
-    # compute accuracy
+
+    # compute accuracy if labels are given
     if y is not None:
         assert len(P) == len(y)
         accuracy = clf.score(X=features_eval, y=y)
         return proba, accuracy
     else:
         return proba
-
-
-def compute_metric(proba, metrics):
-    scores = {}
-    for m in metrics:
-        if m == "probas_mean":
-            scores[m] = np.mean(proba)
-        elif m == "probas_std":
-            scores[m] = np.std(proba)
-        elif m == "w_dist":  # wasserstein distance to dirac
-            scores[m] = wasserstein_distance([0.5] * len(proba), proba)
-        elif m == "TV":  # total variation: distance between cdfs of dirac and probas
-            alphas = np.linspace(0, 1, 100)
-            pp_vals_dirac = pd.Series(PP_vals([0.5] * len(proba), alphas))
-            pp_vals = PP_vals(proba, alphas)
-            scores[m] = ((pp_vals - pp_vals_dirac) ** 2).sum() / len(alphas)
-        elif m == "div":
-            mask = proba > 1 / 2
-            max_proba = np.concatenate([proba[mask], 1 - proba[~mask]])
-            scores[m] = np.mean(max_proba)
-        elif m == "mse":
-            scores[m] = ((proba - [0.5] * len(proba)) ** 2).mean()
-        else:
-            scores[m] = None
-            print(f'metric "{m}" not implemented')
-    return scores
 
 
 def lc2st_scores(
@@ -91,6 +105,36 @@ def lc2st_scores(
     P_eval=None,
     Q_eval=None,
 ):
+    """Computes scores for a classifier trained on P,x_cal and Q,x_cal 
+    and evaluated at a fixed observation x_eval.
+
+    Args:
+        P (numpy.array): data drawn from P
+            of size (n_samples, dim).
+        Q (numpy.array): data drawn from Q
+            of size (n_samples, dim).
+        x_cal (numpy.array): data drawn from x
+            of size (n_samples, n_features).
+        x_eval (numpy.array): a fixed observation
+            of size (n_features,).
+        metrics (list, optional): list of metrics to compute.
+            Defaults to ["probas_mean"].
+        n_folds (int, optional): number of folds for cross-validation.
+            Defaults to 10.
+        clf_class (sklearn model, optional): needs to have a method `.fit(X,y)`, 
+            `.score(X,y)` and `.predict_proba(X)`. 
+            Defaults to MLPClassifier.
+        clf_kwargs (dict, optional): keyword arguments for clf_class.
+            Defaults to {"alpha": 0, "max_iter": 25000}.
+        P_eval (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x_eval)   
+            of size (n_samples, dim). Defaults to None.
+        Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x_eval)
+            of size (n_samples, dim). Defaults to None.
+    
+    Returns:
+        (dict): dictionary with scores for each metric.
+        
+    """
 
     classifier = clf_class(**clf_kwargs)
 

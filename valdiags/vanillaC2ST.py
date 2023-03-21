@@ -10,10 +10,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import KFold
 import sklearn
 
-from scipy.stats import wasserstein_distance
-from .pp_plots import PP_vals
-
-import pandas as pd
+from .c2st_utils import compute_metric
 
 from tqdm import tqdm
 
@@ -26,9 +23,9 @@ def train_c2st(P, Q, clf=DEFAULT_CLF):
 
     Args:
         P (numpy.array): data drawn from P
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         clf (sklearn model, optional): needs to have a method `.fit(X,y)`. 
             Defaults to DEFAULT_CLF.
 
@@ -37,7 +34,7 @@ def train_c2st(P, Q, clf=DEFAULT_CLF):
     """
 
     # define features and labels
-    features = np.concatenate([P, Q], axis=0)  # (2*n_samples, n_features)
+    features = np.concatenate([P, Q], axis=0)  # (2*n_samples, dim)
     labels = np.concatenate(
         [np.array([0] * len(P)), np.array([1] * len(Q))]
     ).ravel()  # (2*n_samples,)
@@ -57,9 +54,9 @@ def eval_c2st(P, Q, clf, single_class_eval=False):
     
     Args:
         P (numpy.array): data drawn from P
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         clf (sklearn model): needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
         single_class_eval (bool, optional): if True, only evaluate on P.
             Defaults to False.
@@ -89,59 +86,6 @@ def eval_c2st(P, Q, clf, single_class_eval=False):
     return accuracy, proba
 
 
-def compute_metric(proba, metrics):
-    """Computes metrics on classifier-predicted class probabilities.
-
-    Args:
-        proba (numpy.array): predicted probability for class 0.
-        metrics (list of str): list of names of metrics to compute.
-
-    Returns:
-        (dict): dictionary of computed metrics.
-    """
-    scores = {}
-    for m in metrics:
-        # mean of probas
-        if m == "probas_mean":
-            scores[m] = np.mean(proba)
-
-        # std of probas
-        elif m == "probas_std":
-            scores[m] = np.std(proba)
-
-        # wasserstein distance between dirac and probas
-        elif m == "w_dist":
-            scores[m] = wasserstein_distance([0.5] * len(proba), proba)
-
-        # total variation distance between dirac and probas
-        elif m == "TV":
-            alphas = np.linspace(0, 1, 100)
-            pp_vals_dirac = pd.Series(
-                PP_vals([0.5] * len(proba), alphas)
-            )  # cdf of dirac
-            pp_vals = PP_vals(proba, alphas)  # cdf of probas
-            scores[m] = ((pp_vals - pp_vals_dirac) ** 2).sum() / len(
-                alphas
-            )  # TV: mean squared error between cdfs
-
-        # 'custom divergence': mean of max probas
-        elif m == "div":
-            mask = proba > 1 / 2
-            max_proba = np.concatenate([proba[mask], 1 - proba[~mask]])
-            scores[m] = np.mean(max_proba)
-
-        # mean squared error between probas and dirac (cf. [Lee et al. (2018)]
-        elif m == "mse":
-            scores[m] = ((proba - [0.5] * len(proba)) ** 2).mean()
-
-        # not implemented
-        else:
-            scores[m] = None
-            print(f'metric "{m}" not implemented')
-
-    return scores
-
-
 def c2st_scores(
     P,
     Q,
@@ -157,9 +101,9 @@ def c2st_scores(
     
     Args:
         P (numpy.array): data drawn from P
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         metrics (list of str, optional): list of names of metrics to compute.
             Defaults to ["accuracy"].
         n_folds (int, optional): number of folds for cross-validation.
@@ -228,11 +172,11 @@ def t_stats_c2st(P, Q, null_samples_list, metrics=["accuracy"], verbose=True, **
 
     Args:
         P (numpy.array): data drawn from P
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         null_samples_list (list of numpy.array): list of samples from P (= Q under the null)
-            of size (n_samples, n_features).
+            of size (n_samples, dim).
         metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
             Defaults to ["accuracy"].
         verbose (bool, optional): if True, display progress bar. 

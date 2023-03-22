@@ -129,8 +129,7 @@ def empirical_power_c2st_mean_shift(
 
 if __name__ == "__main__":
     from valdiags.test_utils import eval_htest
-    from valdiags.c2st_utils import t_stats_c2st
-    from valdiags.vanillaC2ST import c2st_scores
+    from valdiags.vanillaC2ST import c2st_scores, t_stats_c2st
 
     from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
@@ -148,7 +147,7 @@ if __name__ == "__main__":
     # define function to evaluate the test
     eval_c2st_lda = partial(
         eval_htest,
-        t_stats_estimator=partial(t_stats_c2st, scores_fn=c2st_scores),
+        t_stats_estimator=t_stats_c2st,
         clf_class=LinearDiscriminantAnalysis,
         clf_kwargs={},
         single_class_eval=single_class_eval,
@@ -169,33 +168,4 @@ if __name__ == "__main__":
         f"emp_power_lqda_dim_{DIM}_nruns_{N_RUNS}_single_class_{single_class_eval}.pdf"
     )
     plt.show()
-
-    # # OPIMAL BAYES LDA
-
-    # from classifiers.optimal_bayes import AnalyticGaussianLQDA, opt_bayes_scores
-
-    # scores_fn_null = partial(opt_bayes_scores, clf=AnalyticGaussianLQDA(dim=DIM, mu=0))
-    # scores_fn = partial(opt_bayes_scores, clf=AnalyticGaussianLQDA(dim=DIM, mu=mu))
-
-    # eval_c2st_opt_bayes = partial(
-    #     eval_htest,
-    #     t_stats_estimator=partial(
-    #         t_stats_c2st, scores_fn=scores_fn, scores_fn_null=scores_fn_null
-    #     ),
-    #     single_class_eval=True,
-    #     verbose=False,
-    # )
-
-    # # compute empirical power for each metric with `eval_c2st_opt_bayes`
-    # emp_power = empirical_power_c2st_mean_shift(
-    #     eval_c2st_fn=eval_c2st_opt_bayes, metrics=metrics, metrics_cv=None
-    # )
-
-    # # plot empirical power for each metric
-    # for m in metrics:
-    #     plt.plot(np.linspace(0, 1, N_ALPHA), emp_power[m], label=str(m), marker="o")
-    # plt.legend()
-    # # save plot
-    # plt.savefig(f"emp_power_opt_bayes_dim_{DIM}_single_class{single_class_eval}.pdf")
-    # plt.show()
 

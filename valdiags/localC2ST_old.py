@@ -12,9 +12,10 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import KFold
 import sklearn
 
+from scipy.stats import wasserstein_distance
+
 from .test_utils import compute_pvalue
 from .pp_plots import PP_vals
-from .c2st_utils import compute_metric
 from .plot_utils import plot_distributions
 
 import time
@@ -91,6 +92,65 @@ def eval_lc2st(P, x, y=None, clf=DEFAULT_CLF):
         return proba, accuracy
     else:
         return proba
+
+
+def compute_metric(proba, metrics, single_class_eval=False):
+    """Computes metrics on classifier-predicted class probabilities.
+
+    Args:
+        proba (numpy.array): predicted probability for class 0.
+        metrics (list of str): list of names of metrics to compute.
+
+    Returns:
+        (dict): dictionary of computed metrics.
+    """
+
+    scores = {}
+    for m in metrics:
+        # mean of success probas (predicting the right class)
+        if m == "probas_mean":
+            if single_class_eval:
+                scores[m] = np.mean(proba)
+            else:
+                proba_mean_0 = np.mean(proba[: len(proba) // 2])
+                proba_mean_1 = 1 - np.mean(proba[len(proba) // 2 :])
+                scores[m] = 1 / 2 * (proba_mean_0 + proba_mean_1)
+
+        # std of probas
+        elif m == "probas_std":
+            scores[m] = np.std(proba)
+
+        # wasserstein distance between dirac and probas
+        elif m == "w_dist":
+            scores[m] = wasserstein_distance([0.5] * len(proba), proba)
+
+        # total variation distance between dirac and probas
+        elif m == "TV":
+            alphas = np.linspace(0, 1, 100)
+            pp_vals_dirac = np.array(
+                PP_vals([0.5] * len(proba), alphas)
+            )  # cdf of dirac
+            pp_vals = PP_vals(proba, alphas)  # cdf of probas
+            scores[m] = ((pp_vals - pp_vals_dirac) ** 2).sum() / len(
+                alphas
+            )  # TV: mean squared error between cdfs
+
+        # 'custom divergence': mean of max probas
+        elif m == "div":
+            mask = proba > 1 / 2
+            max_proba = np.concatenate([proba[mask], 1 - proba[~mask]])
+            scores[m] = np.mean(max_proba)
+
+        # mean squared error between probas and dirac (cf. [Lee et al. (2018)]
+        elif m == "mse":
+            scores[m] = ((proba - [0.5] * len(proba)) ** 2).mean()
+
+        # not implemented
+        else:
+            scores[m] = None
+            print(f'metric "{m}" not implemented')
+
+    return scores
 
 
 def lc2st_scores(

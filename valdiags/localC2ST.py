@@ -1,4 +1,5 @@
-# Implementation of the local C2ST method simpler version based on the vanilla C2ST method
+# ==== C2ST: local version ====
+# Implementation based on the vanilla C2ST method.
 # Author: Julia Linhart
 # Institution: Inria Paris-Saclay (MIND team)
 
@@ -8,12 +9,14 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 
 from .test_utils import compute_pvalue
-from .c2st_utils import compute_metric
 
-from .vanillaC2ST import train_c2st, eval_c2st
+from .vanillaC2ST import train_c2st, eval_c2st, compute_metric
 
 # define default classifier
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
+
+
+# ==== train / eval functions for the classifier used in L-C2ST ====
 
 
 def train_lc2st(P, Q, x_P, x_Q, clf=DEFAULT_CLF):
@@ -100,6 +103,15 @@ def eval_lc2st(P, x_eval, clf, Q=None, single_class_eval=True):
     )
 
     return accuracy, proba
+
+
+# ==== L-C2ST test functions ====
+# - estimate the test statistics by computing the c2st metrics on a data sample
+#   (ensemble in-sample / out-sample or cross-validation)
+# - perform the test by computing
+#       * the (ensemble) L-C2ST test statistics on observed data (not cross-val, not in-sample)
+#       * a sample of test statistics under the null hypothesis (not cross-val, not in-sample)
+# - infer test statistics on observed data and under the null (+ probabilities used to compute them)
 
 
 def lc2st_scores(
@@ -258,7 +270,7 @@ def lc2st_scores(
     return scores, probas
 
 
-def lc2st_htest(
+def t_stats_lc2st(
     P,
     Q,
     x_P,
@@ -268,13 +280,13 @@ def lc2st_htest(
     list_null_samples_P,
     list_null_samples_x_P,
     test_stats=["probas_mean"],
-    n_ensemble=10,
-    clf_class=MLPClassifier,
-    clf_kwargs={"alpha": 0, "max_iter": 25000},
+    n_ensemble_obs=10,
     precomputed_probas_null=None,
     Q_eval=None,
     P_eval_null=None,
     single_class_eval=True,
+    return_probas=True,
+    **kwargs,
 ):
     """Performs hypothesis test for LC2ST.
 
@@ -297,12 +309,8 @@ def lc2st_htest(
             Each element of the list is a numpy.array of size (n_samples, n_features).
         test_stats (list of str, optional): list of names of test statistics to compute.
             Defaults to ["probas_mean"] (better than accuracyfor single_class_eval).
-        n_ensemble (int, optional): number of classifiers to train and average over to build an ensemble model.
+        n_ensemble_obs (int, optional): number of classifiers to build an ensemble model on observed data.
             Defaults to 10.
-        clf_class (sklearn classifier class, optional): classifier class to use.
-            Defaults to MLPClassifier.  
-        clf_kwargs (dict, optional): keyword arguments for classifier.
-            Defaults to {"alpha": 0, "max_iter": 25000}.
         precomputed_probas_null (list, optional): list of precomputed predicted probabilities under the null. 
             Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
@@ -311,15 +319,17 @@ def lc2st_htest(
             of size (n_test_samples, dim). Defaults to None.
         single_class_eval (bool, optional): whether to evaluate the classifier only on P or on P and Q.
             Defaults to True.
+        return_probas (bool, optional): whether to return predicted probabilities.
+            Defaults to True.
+        kwargs: keyword arguments for `lc2st_scores`.
     
     Returns:
-        p_values (dict): p-values for each test statistic.
-            computed as the empirical probability that the test statistic under the null hypothesis 
-            is greater than the test statistic estimated on the observed data.
         t_stats_ensemble (dict): test statistics for the ensemble model.
         proba_ensemble (numpy.array): predicted probabilities of class 0 for the ensemble model.
-        probas_null (list): list of predicted probabilities under the null hypothesis.
+            only returned if return_probas is True.
         t_stats_null (list of dict): list of test statistics computed under the null hypothesis.
+        probas_null (list of numpy.array): list of predicted probabilities under the null hypothesis.
+            only returned if return_probas is True.
     """
 
     t_stats_ensemble, proba_ensemble = lc2st_scores(
@@ -331,12 +341,9 @@ def lc2st_htest(
         P_eval,
         Q_eval,
         metrics=test_stats,
-        clf_class=clf_class,
-        clf_kwargs=clf_kwargs,
         single_class_eval=single_class_eval,
-        cross_val=False,
-        in_sample=False,
-        n_ensemble=n_ensemble,
+        n_ensemble=n_ensemble_obs,
+        **kwargs,
     )
 
     t_stats_null = dict(zip(test_stats, [[] for _ in range(len(test_stats))]))
@@ -359,12 +366,9 @@ def lc2st_htest(
                 P_eval=P_eval,
                 Q_eval=P_eval_null,
                 metrics=test_stats,
-                clf_class=clf_class,
-                clf_kwargs=clf_kwargs,
                 single_class_eval=single_class_eval,
-                cross_val=False,
-                in_sample=False,
-                n_ensemble=1,
+                n_ensemble=1,  # only one classifier
+                **kwargs,
             )
             probas_null.append(proba_t)
 
@@ -372,9 +376,8 @@ def lc2st_htest(
         for m in test_stats:
             t_stats_null[m].append(scores_t[m])
 
-    p_values = {}
-    for m in test_stats:
-        p_values[m] = compute_pvalue(t_stats_ensemble[m], np.array(t_stats_null[m]))
-
-    return p_values, t_stats_ensemble, proba_ensemble, probas_null, t_stats_null
+    if return_probas:
+        return t_stats_ensemble, proba_ensemble, t_stats_null, probas_null
+    else:
+        return t_stats_ensemble, t_stats_null
 

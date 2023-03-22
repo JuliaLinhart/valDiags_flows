@@ -7,8 +7,7 @@ import numpy as np
 from scipy.stats import multivariate_normal as mvn
 from scipy.stats import t
 
-from valdiags.c2st_utils import compute_metric, t_stats_c2st
-from valdiags.vanillaC2ST import eval_c2st
+from valdiags.vanillaC2ST import eval_c2st, compute_metric
 
 from tqdm import tqdm
 from functools import partial

@@ -64,7 +64,14 @@ def compute_metric(proba, metrics):
 
 
 def t_stats_c2st(
-    scores_fn, P, Q, null_samples_list, metrics=["accuracy"], verbose=True, **kwargs
+    scores_fn,
+    P,
+    Q,
+    null_samples_list,
+    metrics=["accuracy"],
+    scores_fn_null=None,
+    verbose=True,
+    **kwargs,
 ):
     """Computes the C2ST test statistics estimated on P and Q, 
     as well as on several samples of data from P to simulate the null hypothesis (Q=P).
@@ -100,6 +107,8 @@ def t_stats_c2st(
     for m in metrics:
         t_stat_data[m] = np.mean(scores_data[m])
 
+    if scores_fn_null is None:
+        scores_fn_null = scores_fn
     # loop over trials under the null hypothesis
     for i in tqdm(
         range(len(null_samples_list)),
@@ -107,7 +116,9 @@ def t_stats_c2st(
         disable=(not verbose),
     ):
         # compute test statistics on P and null_samples_list[i] (=P_i)
-        scores_null = scores_fn(P=P, Q=null_samples_list[i], metrics=metrics, **kwargs,)
+        scores_null = scores_fn_null(
+            P=P, Q=null_samples_list[i], metrics=metrics, **kwargs,
+        )
         # compute their mean (useful if cross_val=True)
         for m in metrics:
             t_stats_null[m].append(np.mean(scores_null[m]))

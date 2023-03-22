@@ -90,7 +90,12 @@ class AnalyticStudentClassifier(OptimalBayesClassifier):
 
 
 def opt_bayes_scores(
-    P, Q, clf, metrics=["accuracy", "div", "mse"], single_class_eval=True
+    P,
+    Q,
+    clf,
+    metrics=["accuracy", "div", "mse"],
+    single_class_eval=True,
+    cross_val=False,
 ):
     """Compute the scores of the optimal Bayes classifier on the data from P and Q.
     These scores can be used as test statistics for the C2ST test.
@@ -106,6 +111,7 @@ def opt_bayes_scores(
             Defaults to ["accuracy", "div", "mse"].
         single_class_eval (bool, optional): if True, the classifier is evaluated on P only.
             Defaults to True.
+        cross_val (bool, optional): never used. Defaults to False.
 
     Returns:
         dict: dictionary of scores for each metric.
@@ -122,9 +128,6 @@ def opt_bayes_scores(
             scores[m] = compute_metric(proba, metrics=[m])[m]
 
     return scores
-
-
-# t_stats_opt_bayes = partial(t_stats_c2st, scores_fn=opt_bayes_scores)
 
 
 if __name__ == "__main__":

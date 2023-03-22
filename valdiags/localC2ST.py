@@ -17,12 +17,12 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def train_lc2st(P, Q, x_P, x_Q, clf=DEFAULT_CLF):
-    """ Trains a classifier to distinguish between data from the joint distributions
+    """ Trains a classifier to distinguish between data from two joint distributions
     
         - P,x = P * x|P (where x|P is denoted as x_P)
         - Q,x = Q * x|Q (where x|Q is denoted as x_Q)
     
-    This function is built on the `train_c2st`, adapting it to joint distributions.
+    This function is built on the original `train_c2st`, adapting it to joint distributions.
     
     Example for SBI:
     ----------------
@@ -111,14 +111,67 @@ def lc2st_scores(
     P_eval=None,
     Q_eval=None,
     metrics=["accuracy"],
-    n_folds=10,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     single_class_eval=True,
     cross_val=True,
+    n_folds=10,
     in_sample=False,
     n_ensemble=1,
 ):
+    """Computes the scores of a classifier 
+        - trained on data from the joint distributions P,x and Q,x
+        - evaluated on data from the conditional distributions P|x and/or Q|x 
+        at a fixed observation x=x_eval.
+    
+    They represent the test statistics of the local C2ST test between P|x and Q|x at x=x_eval.
+
+    If at least one of the classes (P or Q) is independent of x, we don't need extra data 
+    P_eval and/or Q_eval during cross-validation. We can directly use the validation split of 
+    P and/or Q to evaluate the classifier. This is the default behavior.
+
+    By default, we only evaluate on P|x: `single_class_eval` is set to `True`.
+    This is typically the case in SBI, where we generally do not have access to data from the 
+    class representing the true posterior.
+
+
+    Args:
+        P (numpy.array): data drawn from P
+            of size (n_samples, dim).
+        Q (numpy.array): data drawn from Q
+            of size (n_samples, dim).
+        x_P (numpy.array): data drawn from p(x), such that [P ,x_P] ~ p(P,x)
+            of size (n_samples, n_features)
+        x_Q (numpy.array): data drawn from p(x), such that [Q ,x_Q] ~ p(Q,x)
+            of size (n_samples, n_features).
+        x_eval (numpy.array): a fixed observation
+            of size (n_features,).
+        P_eval (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x)
+            of size (n_test_samples, dim). 
+            Defaults to None.
+        Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
+            of size (n_test_samples, dim).
+            Defaults to None.
+        metrics (list of str, optional): list of metric names to compute.
+            Defaults to ["accuracy"].
+        clf_class (sklearn model class, optional): the class of the lassifier to use.
+            Defaults to MLPClassifier.
+        clf_kwargs (dict, optional): the keyword arguments for the classifier.
+            Defaults to {"alpha": 0, "max_iter": 25000}.
+        single_class_eval (bool, optional): whether to evaluate on P only (True) or on P and Q (False).
+            Defaults to True.
+        cross_val (bool, optional): whether to perform cross-validation (True) or not (False).
+            Defaults to True.
+        n_folds (int, optional): number of folds for cross-validation.
+            Defaults to 10.
+        in_sample (bool, optional): whether to evaluate on the training data (True) or on test data (False).
+            Defaults to False.
+        n_ensemble (int, optional): number of classifiers to train and average over to build an ensemble model.
+            Defaults to 1.
+    
+    Returns:
+        (dict): dictionary of scores (accuracy, proba, etc.) for each metric.
+    """
 
     # initialize classifier
     classifier = clf_class(**clf_kwargs)
@@ -223,6 +276,51 @@ def lc2st_htest(
     P_eval_null=None,
     single_class_eval=True,
 ):
+    """Performs hypothesis test for LC2ST.
+
+    Args:
+        P (numpy.array): data drawn from P
+            of size (n_samples, dim).
+        Q (numpy.array): data drawn from Q
+            of size (n_samples, dim).
+        x_P (numpy.array): data drawn from P
+            of size (n_samples, n_features).
+        x_Q (numpy.array): data drawn from Q
+            of size (n_samples, n_features).
+        P_eval (numpy.array): data drawn from P|x_eval (or just P if independent of x)
+            of size (n_test_samples, dim).
+        x_eval (numpy.array): observed data
+            of size (n_features,).
+        list_null_samples_P (list): list of samples from P used to test under the null hypothesis.
+            Each element of the list is a numpy.array of size (n_samples, dim).
+        list_null_samples_x_P (list): list of samples like x_P used to test under the null hypothesis.
+            Each element of the list is a numpy.array of size (n_samples, n_features).
+        test_stats (list of str, optional): list of names of test statistics to compute.
+            Defaults to ["probas_mean"] (better than accuracyfor single_class_eval).
+        n_ensemble (int, optional): number of classifiers to train and average over to build an ensemble model.
+            Defaults to 10.
+        clf_class (sklearn classifier class, optional): classifier class to use.
+            Defaults to MLPClassifier.  
+        clf_kwargs (dict, optional): keyword arguments for classifier.
+            Defaults to {"alpha": 0, "max_iter": 25000}.
+        precomputed_probas_null (list, optional): list of precomputed predicted probabilities under the null. 
+            Defaults to None.
+        Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
+            of size (n_test_samples, dim). Defaults to None.
+        P_eval_null (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x)
+            of size (n_test_samples, dim). Defaults to None.
+        single_class_eval (bool, optional): whether to evaluate the classifier only on P or on P and Q.
+            Defaults to True.
+    
+    Returns:
+        p_values (dict): p-values for each test statistic.
+            computed as the empirical probability that the test statistic under the null hypothesis 
+            is greater than the test statistic estimated on the observed data.
+        t_stats_ensemble (dict): test statistics for the ensemble model.
+        proba_ensemble (numpy.array): predicted probabilities of class 0 for the ensemble model.
+        probas_null (list): list of predicted probabilities under the null hypothesis.
+        t_stats_null (list of dict): list of test statistics computed under the null hypothesis.
+    """
 
     t_stats_ensemble, proba_ensemble = lc2st_scores(
         P,

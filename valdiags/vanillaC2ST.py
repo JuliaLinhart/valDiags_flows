@@ -82,9 +82,6 @@ def eval_c2st(P, Q, clf, single_class_eval=False):
     accuracy = clf.score(X_val, y_val)  # accuracy
     proba = clf.predict_proba(X_val)[:, 0]  # proba of class 0
 
-    # proba_1 = clf_n.predict_proba(Q_val)[:, 1]
-    # proba = np.concatenate([proba, proba_1], axis=0)
-
     return accuracy, proba
 
 

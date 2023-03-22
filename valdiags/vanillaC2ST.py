@@ -58,7 +58,7 @@ def eval_c2st(P, Q, clf, single_class_eval=False):
             of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
-        clf (sklearn model): the trained classifier.
+        clf (sklearn model): the trained classifier on both classes.
             needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
         single_class_eval (bool, optional): if True, only evaluate on P.
             Defaults to False.
@@ -137,14 +137,16 @@ def c2st_scores(
             if "accuracy" in m:
                 scores[m] = accuracy
             else:
-                scores[m] = compute_metric(proba, metrics=[m])[m]
+                scores[m] = compute_metric(
+                    proba, metrics=[m], single_class_eval=single_class_eval
+                )[m]
 
     else:
         # initialize scores as dict of empty lists
         scores = dict(zip(metrics, [[] for _ in range(len(metrics))]))
 
         # cross-validation
-        kf = KFold(n_splits=n_folds, shuffle=True)
+        kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
         for train_index, val_index in kf.split(P):
             # split data into train and val sets for n^th cv-fold
             P_train = P[train_index]
@@ -163,58 +165,11 @@ def c2st_scores(
                 if "accuracy" in m:
                     scores[m].append(accuracy)
                 else:
-                    scores[m].append(compute_metric(proba, metrics=[m])[m])
+                    scores[m].append(
+                        compute_metric(
+                            proba, metrics=[m], single_class_eval=single_class_eval
+                        )[m]
+                    )
 
     return scores
-
-
-# def t_stats_c2st(P, Q, null_samples_list, metrics=["accuracy"], verbose=True, **kwargs):
-#     """Computes the C2ST test statistics estimated on P and Q,
-#     as well as on several samples of data from P to simulate the null hypothesis (Q=P).
-
-#     Args:
-#         P (numpy.array): data drawn from P
-#             of size (n_samples, dim).
-#         Q (numpy.array): data drawn from Q
-#             of size (n_samples, dim).
-#         null_samples_list (list of numpy.array): list of samples from P (= Q under the null)
-#             of size (n_samples, dim).
-#         metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
-#             Defaults to ["accuracy"].
-#         verbose (bool, optional): if True, display progress bar.
-#             Defaults to True.
-#         **kwargs: keyword arguments for c2st_scores.
-
-#     Returns:
-#         (tuple): tuple containing:
-#             - t_stat_data (dict): dictionary of test statistics estimated on P and Q.
-#                 keys are the names of the metrics. values are floats.
-#             - t_stats_null (dict): dictionary of test statistics estimated on P and `null_samples_list`.
-#                 keys are the names of the metrics. values are lists of length `len(null_samples_list)`.
-#     """
-#     # initialize dicts
-#     t_stat_data = {}
-#     t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
-
-#     # compute test statistics on P and Q
-#     scores_data = c2st_scores(P=P, Q=Q, metrics=metrics, **kwargs)
-#     # compute their mean (useful if cross_val=True)
-#     for m in metrics:
-#         t_stat_data[m] = np.mean(scores_data[m])
-
-#     # loop over trials under the null hypothesis
-#     for i in tqdm(
-#         range(len(null_samples_list)),
-#         desc="Testing under the null",
-#         disable=(not verbose),
-#     ):
-#         # compute test statistics on P and null_samples_list[i] (=P_i)
-#         scores_null = c2st_scores(
-#             P=P, Q=null_samples_list[i], metrics=metrics, **kwargs,
-#         )
-#         # compute their mean (useful if cross_val=True)
-#         for m in metrics:
-#             t_stats_null[m].append(np.mean(scores_null[m]))
-
-#     return t_stat_data, t_stats_null
 

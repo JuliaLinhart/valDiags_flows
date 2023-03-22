@@ -10,7 +10,7 @@ from .pp_plots import PP_vals
 from tqdm import tqdm
 
 
-def compute_metric(proba, metrics):
+def compute_metric(proba, metrics, single_class_eval=False):
     """Computes metrics on classifier-predicted class probabilities.
 
     Args:
@@ -20,11 +20,17 @@ def compute_metric(proba, metrics):
     Returns:
         (dict): dictionary of computed metrics.
     """
+
     scores = {}
     for m in metrics:
-        # mean of probas
+        # mean of success probas (predicting the right class)
         if m == "probas_mean":
-            scores[m] = np.mean(proba)
+            if single_class_eval:
+                scores[m] = np.mean(proba)
+            else:
+                proba_mean_0 = np.mean(proba[: len(proba) // 2])
+                proba_mean_1 = 1 - np.mean(proba[len(proba) // 2 :])
+                scores[m] = 1 / 2 * (proba_mean_0 + proba_mean_1)
 
         # std of probas
         elif m == "probas_std":

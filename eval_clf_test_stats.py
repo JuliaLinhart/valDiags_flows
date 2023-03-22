@@ -4,8 +4,6 @@
 import numpy as np
 from scipy.stats import multivariate_normal as mvn
 
-from valdiags.test_utils import eval_htest
-
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from functools import partial
@@ -13,14 +11,14 @@ from functools import partial
 # GLOBALS
 N_SAMPLES = 100  # number of samples from P and Q ('n0 = n1' in [Lee et al. (2018)])
 N_TRIALS_NULL = 100  # number of samples of the test statistic under (H0) ('B' in [Lee et al. (2018)])
-N_RUNS = 300  # number of test runs to compute the empirical power
+N_RUNS = 500  # number of test runs to compute the empirical power
 N_ALPHA = 20  # number of significance levels alpha in (0,1)
 
-DIM = 5  # dimension of the Gaussians
-mu = np.sqrt(0.05)  # mean shift between P and Q
+# DIM = 5  # dimension of the Gaussians
+# mu = np.sqrt(0.05)  # mean shift between P and Q
 
-# DIM = 20 # dimension of the Gaussians
-# mu = np.sqrt(0.01) # mean shift between P and Q
+DIM = 20  # dimension of the Gaussians
+mu = np.sqrt(0.01)  # mean shift between P and Q
 
 
 def empirical_power_c2st_mean_shift(
@@ -130,6 +128,7 @@ def empirical_power_c2st_mean_shift(
 
 
 if __name__ == "__main__":
+    from valdiags.test_utils import eval_htest
     from valdiags.c2st_utils import t_stats_c2st
     from valdiags.vanillaC2ST import c2st_scores
 
@@ -141,7 +140,7 @@ if __name__ == "__main__":
 
     # whether to use single class evaluation
     single_class_eval = (
-        True  # if True, we evaluate the classifier on samples from P only
+        False  # if True, we evaluate the classifier on samples from P only
     )
 
     # ESTIMATED LDA
@@ -166,7 +165,9 @@ if __name__ == "__main__":
         plt.plot(np.linspace(0, 1, N_ALPHA), emp_power[m], label=str(m), marker="o")
     plt.legend()
     # save plot
-    plt.savefig(f"emp_power_lqda_dim_{DIM}_single_class{single_class_eval}.pdf")
+    plt.savefig(
+        f"emp_power_lqda_dim_{DIM}_nruns_{N_RUNS}_single_class_{single_class_eval}.pdf"
+    )
     plt.show()
 
     # # OPIMAL BAYES LDA

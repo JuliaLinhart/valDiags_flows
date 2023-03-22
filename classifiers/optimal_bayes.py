@@ -93,7 +93,7 @@ def opt_bayes_scores(
     P,
     Q,
     clf,
-    metrics=["accuracy", "div", "mse"],
+    metrics=["accuracy", "probas_mean", "div", "mse"],
     single_class_eval=True,
     cross_val=False,
 ):
@@ -125,7 +125,9 @@ def opt_bayes_scores(
         if m == "accuracy":
             scores["accuracy"] = accuracy  # already computed
         else:
-            scores[m] = compute_metric(proba, metrics=[m])[m]
+            scores[m] = compute_metric(
+                proba, metrics=[m], single_class_eval=single_class_eval
+            )[m]
 
     return scores
 
@@ -162,7 +164,7 @@ if __name__ == "__main__":
     shifted_samples = [t(df=2, loc=s, scale=1).rvs(N_SAMPLES) for s in shifts]
 
     accuracies = []
-    # probas_mean = []
+    probas_mean = []
     div = []
     mse = []
     single_class = []
@@ -186,7 +188,7 @@ if __name__ == "__main__":
             )
 
             accuracies.append(scores["accuracy"])
-            # probas_mean.append(scores["probas_mean"])
+            probas_mean.append(scores["probas_mean"])
             div.append(scores["div"])
             mse.append(scores["mse"])
 
@@ -242,14 +244,14 @@ if __name__ == "__main__":
         {
             "mean_shift": shift_list,
             "accuracy": accuracies,
-            # "probas_mean": probas_mean,
+            "probas_mean": probas_mean,
             "div": div,
             "mse": mse,
             "single_class_eval": single_class,
         }
     )
 
-    for metric in ["accuracy", "div", "mse"]:
+    for metric in ["accuracy", "probas_mean", "div", "mse"]:
         sns.relplot(
             data=df,
             x="mean_shift",

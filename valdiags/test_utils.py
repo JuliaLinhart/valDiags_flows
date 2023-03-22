@@ -1,4 +1,4 @@
-# Utils for hypothesis testing:
+# Utils for general hypothesis testing:
 # - compute p-value
 # - evaluate hypothesis test
 
@@ -48,5 +48,4 @@ def eval_htest(t_stats_estimator, metrics, conf_alpha=0.05, **kwargs):
         reject[m] = p_value < conf_alpha  # True = reject
 
     return reject
-
 

@@ -14,9 +14,10 @@ from sklearn.discriminant_analysis import (
 from sklearn.linear_model import LogisticRegression
 
 # from sbi.utils.metrics import c2st_scores
-from valdiags.c2st_scores_modified import c2st_scores
+# from valdiags.c2st_scores_modified import c2st_scores
+from valdiags.vanillaC2ST import c2st_scores
 
-from valdiags.localC2ST import local_flow_c2st, eval_local_flow_c2st
+from valdiags.localC2ST_old import local_flow_c2st, eval_local_flow_c2st
 
 from valdiags.pp_plots import PP_vals
 from sklearn.model_selection import KFold

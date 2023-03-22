@@ -26,7 +26,8 @@ def train_c2st(P, Q, clf=DEFAULT_CLF):
             of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
-        clf (sklearn model, optional): needs to have a method `.fit(X,y)`. 
+        clf (sklearn model, optional): the initialized classifier to use.
+            needs to have a method `.fit(X,y)`. 
             Defaults to DEFAULT_CLF.
 
     Returns:
@@ -57,7 +58,8 @@ def eval_c2st(P, Q, clf, single_class_eval=False):
             of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
-        clf (sklearn model): needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
+        clf (sklearn model): the trained classifier.
+            needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
         single_class_eval (bool, optional): if True, only evaluate on P.
             Defaults to False.
     
@@ -108,8 +110,8 @@ def c2st_scores(
             Defaults to ["accuracy"].
         n_folds (int, optional): number of folds for cross-validation.
             Defaults to 10.
-        clf_class (sklearn model class, optional): needs to have a methods `.fit(X,y)`, 
-            score(X,y)` and `.predict_proba(X)`.
+        clf_class (sklearn model class, optional): the class of classifier to use.
+            needs to have a methods `.fit(X,y)`, score(X,y)` and `.predict_proba(X)`.
             Defaults to MLPClassifier.
         clf_kwargs (dict, optional): keyword arguments for clf_class.
             Defaults to {"alpha": 0, "max_iter": 25000}.
@@ -166,53 +168,53 @@ def c2st_scores(
     return scores
 
 
-def t_stats_c2st(P, Q, null_samples_list, metrics=["accuracy"], verbose=True, **kwargs):
-    """Computes the C2ST test statistics estimated on P and Q, 
-    as well as on several samples of data from P to simulate the null hypothesis (Q=P).
+# def t_stats_c2st(P, Q, null_samples_list, metrics=["accuracy"], verbose=True, **kwargs):
+#     """Computes the C2ST test statistics estimated on P and Q,
+#     as well as on several samples of data from P to simulate the null hypothesis (Q=P).
 
-    Args:
-        P (numpy.array): data drawn from P
-            of size (n_samples, dim).
-        Q (numpy.array): data drawn from Q
-            of size (n_samples, dim).
-        null_samples_list (list of numpy.array): list of samples from P (= Q under the null)
-            of size (n_samples, dim).
-        metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
-            Defaults to ["accuracy"].
-        verbose (bool, optional): if True, display progress bar. 
-            Defaults to True.
-        **kwargs: keyword arguments for c2st_scores.
-    
-    Returns:
-        (tuple): tuple containing:
-            - t_stat_data (dict): dictionary of test statistics estimated on P and Q.
-                keys are the names of the metrics. values are floats.
-            - t_stats_null (dict): dictionary of test statistics estimated on P and `null_samples_list`.
-                keys are the names of the metrics. values are lists of length `len(null_samples_list)`.
-    """
-    # initialize dicts
-    t_stat_data = {}
-    t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+#     Args:
+#         P (numpy.array): data drawn from P
+#             of size (n_samples, dim).
+#         Q (numpy.array): data drawn from Q
+#             of size (n_samples, dim).
+#         null_samples_list (list of numpy.array): list of samples from P (= Q under the null)
+#             of size (n_samples, dim).
+#         metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
+#             Defaults to ["accuracy"].
+#         verbose (bool, optional): if True, display progress bar.
+#             Defaults to True.
+#         **kwargs: keyword arguments for c2st_scores.
 
-    # compute test statistics on P and Q
-    scores_data = c2st_scores(P=P, Q=Q, metrics=metrics, **kwargs)
-    # compute their mean (useful if cross_val=True)
-    for m in metrics:
-        t_stat_data[m] = np.mean(scores_data[m])
+#     Returns:
+#         (tuple): tuple containing:
+#             - t_stat_data (dict): dictionary of test statistics estimated on P and Q.
+#                 keys are the names of the metrics. values are floats.
+#             - t_stats_null (dict): dictionary of test statistics estimated on P and `null_samples_list`.
+#                 keys are the names of the metrics. values are lists of length `len(null_samples_list)`.
+#     """
+#     # initialize dicts
+#     t_stat_data = {}
+#     t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
 
-    # loop over trials under the null hypothesis
-    for i in tqdm(
-        range(len(null_samples_list)),
-        desc="Testing under the null",
-        disable=(not verbose),
-    ):
-        # compute test statistics on P and null_samples_list[i] (=P_i)
-        scores_null = c2st_scores(
-            P=P, Q=null_samples_list[i], metrics=metrics, **kwargs,
-        )
-        # compute their mean (useful if cross_val=True)
-        for m in metrics:
-            t_stats_null[m].append(np.mean(scores_null[m]))
+#     # compute test statistics on P and Q
+#     scores_data = c2st_scores(P=P, Q=Q, metrics=metrics, **kwargs)
+#     # compute their mean (useful if cross_val=True)
+#     for m in metrics:
+#         t_stat_data[m] = np.mean(scores_data[m])
 
-    return t_stat_data, t_stats_null
+#     # loop over trials under the null hypothesis
+#     for i in tqdm(
+#         range(len(null_samples_list)),
+#         desc="Testing under the null",
+#         disable=(not verbose),
+#     ):
+#         # compute test statistics on P and null_samples_list[i] (=P_i)
+#         scores_null = c2st_scores(
+#             P=P, Q=null_samples_list[i], metrics=metrics, **kwargs,
+#         )
+#         # compute their mean (useful if cross_val=True)
+#         for m in metrics:
+#             t_stats_null[m].append(np.mean(scores_null[m]))
+
+#     return t_stat_data, t_stats_null
 

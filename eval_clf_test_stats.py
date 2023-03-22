@@ -127,7 +127,9 @@ def empirical_power_c2st_mean_shift(
 
 
 if __name__ == "__main__":
-    from valdiags.vanillaC2ST import t_stats_c2st
+    from valdiags.c2st_utils import t_stats_c2st
+    from valdiags.vanillaC2ST import c2st_scores
+
     from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
     # metrics / test statistics
@@ -144,7 +146,7 @@ if __name__ == "__main__":
     # define function to evaluate the test
     eval_c2st_lda = partial(
         eval_htest,
-        t_stats_estimator=t_stats_c2st,
+        t_stats_estimator=partial(t_stats_c2st, scores_fn=c2st_scores),
         clf_class=LinearDiscriminantAnalysis,
         clf_kwargs={},
         single_class_eval=single_class_eval,
@@ -166,11 +168,11 @@ if __name__ == "__main__":
 
     # # OPIMAL BAYES LDA
     #
-    # from classifiers.optimal_bayes import AnalyticGaussianLQDA, t_stats_opt_bayes
+    # from classifiers.optimal_bayes import AnalyticGaussianLQDA, opt_bayes_scores
 
     # eval_c2st_opt_bayes = partial(
     #     eval_htest,
-    #     t_stats_estimator=t_stats_opt_bayes,
+    #     t_stats_estimator=partial(t_stats_c2st, scores_fn=opt_bayes_scores),
     #     clf_data = AnalyticGaussianLQDA(dim=DIM, mu=mu),
     #     clf_null = AnalyticGaussianLQDA(dim=DIM, mu=0),
     #     single_class_eval=True,

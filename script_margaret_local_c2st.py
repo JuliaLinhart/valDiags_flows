@@ -1,3 +1,8 @@
+### ==== DEPRECIATED script ==== ###
+# look at lc2st_gaussian_shift.py and lc2st_null_hyp_precision.py
+# for the new version of the used functions,
+# or at classifers.optimal_bayes.py for another example of the shift experiment.
+
 import submitit
 
 import numpy as np
@@ -13,9 +18,7 @@ from sklearn.discriminant_analysis import (
 )
 from sklearn.linear_model import LogisticRegression
 
-# from sbi.utils.metrics import c2st_scores
-# from valdiags.c2st_scores_modified import c2st_scores
-from valdiags.vanillaC2ST import c2st_scores
+from sbi.utils.metrics import c2st_scores  # will not work
 
 from valdiags.localC2ST_old import local_flow_c2st, eval_local_flow_c2st
 

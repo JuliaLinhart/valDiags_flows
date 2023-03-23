@@ -17,10 +17,6 @@ from matplotlib.lines import Line2D
 
 from scipy.stats import hmean, uniform
 
-from nde.flows import cdf_flow
-
-import time
-
 
 # ==== Functions applicable for both tests ====
 
@@ -70,6 +66,14 @@ def box_plot_lc2st(
 
 
 # ==== 1. (Local) Coverage Tests based on PIT-values for conditional Normalizing Flows ====
+
+
+# CDF function of a (conditional) flow (nflows) evaluated in x: F_{Q|context}(x)
+
+
+def cdf_flow(x, context, flow, base_dist=D.Normal(0, 1)):
+    return base_dist.cdf(flow._transform(x, context=context)[0])
+
 
 # PIT values for 1D and multi-D target data
 

@@ -10,7 +10,7 @@ import seaborn as sns
 
 from scipy.stats import binom, uniform
 
-from valdiags.pp_plots import PP_vals
+from valdiags.graphical_valdiags import PP_vals
 from valdiags.multi_local_test import get_lct_results
 
 
@@ -26,8 +26,8 @@ def multi_global_consistency(
     ylabel_sbc=r"empirical CDF",
     confidence_int=True,
     conf_alpha=0.05,
-    n_trials = 1000,
-    hpd_values = None,
+    n_trials=1000,
+    hpd_values=None,
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
     plt.rcParams["figure.figsize"] = (15, 5)
@@ -50,7 +50,7 @@ def multi_global_consistency(
         ax.plot(lims, lims, "--", color="black", alpha=0.75)
         if confidence_int:
             if i == 0:
-                conf_alpha = conf_alpha/len(multi_PIT_values) # bonferonni correction
+                conf_alpha = conf_alpha / len(multi_PIT_values)  # bonferonni correction
             # Construct uniform histogram.
             N = len(multi_PIT_values[0])
             u_pp_values = {}
@@ -115,17 +115,19 @@ def multi_global_consistency(
     axs[1].set_title("SBC")
     axs[1].legend(loc="upper left")
 
-    # hpd_values 
+    # hpd_values
     if hpd_values is not None:
         alphas = torch.linspace(0.0, 1.0, len(hpd_values))
-        axs[2].plot(alphas, hpd_values, color='#1f77b4', label=r'$HPD(\mathbf{\theta})$')
-        axs[2].set_ylabel(r'MC-est. $\mathbb{P}(HPD \leq \alpha)$')
+        axs[2].plot(
+            alphas, hpd_values, color="#1f77b4", label=r"$HPD(\mathbf{\theta})$"
+        )
+        axs[2].set_ylabel(r"MC-est. $\mathbb{P}(HPD \leq \alpha)$")
         axs[2].set_ylim(0, 1)
         axs[2].set_xlim(0, 1)
         axs[2].set_xlabel(r"$\alpha$")
         axs[2].set_title("Global HPD")
         axs[2].legend(loc="upper left")
-        
+
     return fig
 
 

@@ -14,7 +14,7 @@ from valdiags.localPIT_regression import (
     localPIT_regression_sample,
     infer_r_alphas_amortized,
 )
-from valdiags.pp_plots import PP_vals
+from valdiags.graphical_valdiags import PP_vals
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier
 

@@ -10,7 +10,7 @@ from scipy.stats import norm
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 
-from valdiags.pp_plots import multi_cde_pit_values
+from valdiags.graphical_valdiags import multi_cde_pit_values
 from valdiags.localPIT_regression import (
     localPIT_regression_sample,
     localPIT_regression_baseline,

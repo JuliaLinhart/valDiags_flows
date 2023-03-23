@@ -19,7 +19,7 @@ from valdiags.vanillaC2ST import c2st_scores
 
 from valdiags.localC2ST_old import local_flow_c2st, eval_local_flow_c2st
 
-from valdiags.pp_plots import PP_vals
+from valdiags.graphical_valdiags import PP_vals
 from sklearn.model_selection import KFold
 
 from scipy.stats import wasserstein_distance

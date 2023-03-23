@@ -7,7 +7,7 @@ from .localPIT_regression import (
     infer_r_alphas_baseline,
     infer_r_alphas_amortized,
 )
-from .pp_plots import multi_cde_pit_values
+from .graphical_valdiags import multi_cde_pit_values
 
 from tasks.toy_examples.embeddings import identity
 

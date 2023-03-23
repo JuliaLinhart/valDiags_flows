@@ -15,8 +15,8 @@ import sklearn
 from scipy.stats import wasserstein_distance
 
 from .test_utils import compute_pvalue
-from .pp_plots import PP_vals
-from .plot_utils import plot_distributions
+from .graphical_valdiags import PP_vals
+from .plot_pdfs import plot_distributions
 
 import time
 from tqdm import tqdm

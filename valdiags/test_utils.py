@@ -42,10 +42,11 @@ def eval_htest(t_stats_estimator, metrics, conf_alpha=0.05, **kwargs):
         dict: contains the result of the hypothesis test for each metric
     """
     reject = {}
+    p_value = {}
     t_stat_data, t_stats_null = t_stats_estimator(metrics=metrics, **kwargs)
     for m in metrics:
-        p_value = compute_pvalue(t_stat_data[m], t_stats_null[m])
-        reject[m] = p_value < conf_alpha  # True = reject
+        p_value[m] = compute_pvalue(t_stat_data[m], t_stats_null[m])
+        reject[m] = p_value[m] < conf_alpha  # True = reject
 
-    return reject
+    return reject, p_value
 

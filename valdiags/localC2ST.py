@@ -363,8 +363,8 @@ def t_stats_lc2st(
                 x_P=x_P,
                 x_Q=list_null_samples_x_P[t],
                 x_eval=x_eval,
-                P_eval=P_eval,
-                Q_eval=P_eval_null,
+                P_eval=P_eval,  # a new sample for each trial?
+                Q_eval=P_eval_null,  # a new sample for each trial?
                 metrics=test_stats,
                 single_class_eval=single_class_eval,
                 n_ensemble=1,  # only one classifier

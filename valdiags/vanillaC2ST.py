@@ -73,7 +73,7 @@ def eval_c2st(P, Q, clf, single_class_eval=False):
 
     n_samples = len(P)
     # define features and labels
-    if single_class_eval:
+    if single_class_eval or Q is None:  # if Q is None, only evaluate on P
         X_val = P  # only evaluate on P
         y_val = np.array([0] * (n_samples))  # labels are all 0
     else:
@@ -158,11 +158,11 @@ def c2st_scores(
     P,
     Q,
     metrics=["accuracy"],
-    n_folds=10,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     single_class_eval=False,
     cross_val=True,
+    n_folds=10,
     in_sample=False,
     P_eval=None,
     Q_eval=None,
@@ -177,8 +177,6 @@ def c2st_scores(
             of size (n_samples, dim).
         metrics (list of str, optional): list of names of metrics to compute.
             Defaults to ["accuracy"].
-        n_folds (int, optional): number of folds for cross-validation.
-            Defaults to 10.
         clf_class (sklearn model class, optional): the class of classifier to use.
             needs to have a methods `.fit(X,y)`, score(X,y)` and `.predict_proba(X)`.
             Defaults to MLPClassifier.
@@ -188,6 +186,14 @@ def c2st_scores(
             Defaults to False.
         cross_val (bool, optional): if True, perform cross-validation.
             Defaults to True.
+        n_folds (int, optional): number of folds for cross-validation.
+            Defaults to 10.
+        in_sample (bool, optional): if True, evaluate on P and Q.
+            Defaults to False.
+        P_eval (numpy.array, optional): data drawn from P for out-of-sample evaluation.
+            Defaults to None.
+        Q_eval (numpy.array, optional): data drawn from Q for out-of-sample evaluation.
+            Defaults to None.
     
     Returns:
         (dict): dictionary of computed scores, i.e. estimated test statistics on P and Q.
@@ -203,6 +209,11 @@ def c2st_scores(
         if in_sample:
             P_eval, Q_eval = P, Q
 
+        elif P_eval is None:
+            raise ValueError(
+                "If cross_val=False and in-sample=False, at least P_eval must be provided.\
+                In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
+            )
         accuracy, proba = eval_c2st(
             P=P_eval, Q=Q_eval, clf=clf, single_class_eval=single_class_eval,
         )
@@ -254,13 +265,12 @@ def t_stats_c2st(
     P,
     Q,
     n_trials_null=100,
-    null_samples_list=None,
     scores_fn=c2st_scores,
     metrics=["accuracy"],
     verbose=True,
     P_eval=None,
     Q_eval=None,
-    P_eval_null=None,
+    scores_null=None,
     **kwargs,
 ):
     """Computes the C2ST test statistics estimated on P and Q, 
@@ -275,10 +285,6 @@ def t_stats_c2st(
         n_trials_null (int, optional): number of trials to simulate the null hypothesis,
             i.e. number of times to compute the test statistics under the null hypothesis.
             Defaults to 100.
-        null_samples_list (list of numpy.array): list of samples from P (= Q under the null)
-            of size (n_samples, dim).
-            If None, the permutation method is used to simulate the null hypothesis.
-            Defaults to None. 
         metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
             Defaults to ["accuracy"].
         verbose (bool, optional): if True, display progress bar. 
@@ -287,9 +293,8 @@ def t_stats_c2st(
             If None, cross-val is performed or P is used. Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q to evaluate the classifier.
             If None, cross-val is performed or Q is used. Defaults to None.
-        P_eval_null (numpy.array, optional): data drawn from P to evaluate the classifier
-            when simulating the null hypothesis.
-            If None, cross-val is performed or P is used. Defaults to None.
+        scores_null (dict, optional): dictionary of precomputed scores under the null hypothesis.
+            If None, they are computed via permutations. Defaults to None.
         **kwargs: keyword arguments for scores_fn.
     
     Returns:
@@ -311,36 +316,41 @@ def t_stats_c2st(
     for m in metrics:
         t_stat_data[m] = np.mean(scores_data[m])
 
-    # loop over trials under the null hypothesis
-    for i in tqdm(
-        range(n_trials_null), desc="Testing under the null", disable=(not verbose),
-    ):
-        if null_samples_list is None:
-            # simualte the null by permuting the data (directly related to permuting the labels)
+    if scores_null is None:
+        # loop over trials under the null hypothesis
+        for _ in tqdm(
+            range(n_trials_null),
+            desc="Testing under (H0) via permutations",
+            disable=(not verbose),
+        ):
+
+            # simualte the null by permuting the data (same as permuting the labels)
             X = np.concatenate([P, Q], axis=0)
             X = np.random.permutation(X)
-            P_i = X[: len(P)]
-            Q_i = X[len(P) :]
+            P_t = X[: len(P)]
+            Q_t = X[len(P) :]
 
+            # if P_eval and Q_eval are not None, permute them as well
             if P_eval is not None and Q_eval is not None:
                 X_eval = np.concatenate([P_eval, Q_eval], axis=0)
                 X_eval = np.random.permutation(X_eval)
-                P_eval_i = X[: len(P_eval)]
-                Q_eval_i = X[len(P_eval) :]
+                P_eval_t = X[: len(P_eval)]
+                Q_eval_t = X[len(P_eval) :]
             else:
-                P_eval_i = None
-                Q_eval_i = None
-        else:
-            # use samples from P provided by the user
-            P_i = P
-            Q_i = null_samples_list[i]
-            P_eval_i = P_eval
-            Q_eval_i = P_eval_null
+                # otherwise, set them to None.
+                # In this case scores_fn will use P and Q (via in-sample or cross validation)
+                P_eval_t = None
+                Q_eval_t = None
 
-        # compute test statistics on P and null_samples_list[i] (=P_i)
-        scores_null = scores_fn(
-            P=P_i, Q=Q_i, metrics=metrics, P_eval=P_eval_i, Q_eval=Q_eval_i, **kwargs,
-        )
+            # compute test statistics on permuted data (i.e. under the null hypothesis)
+            scores_null = scores_fn(
+                P=P_t,
+                Q=Q_t,
+                metrics=metrics,
+                P_eval=P_eval_t,
+                Q_eval=Q_eval_t,
+                **kwargs,
+            )
         # compute their mean (useful if cross_val=True)
         for m in metrics:
             t_stats_null[m].append(np.mean(scores_null[m]))

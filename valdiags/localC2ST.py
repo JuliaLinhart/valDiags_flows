@@ -128,8 +128,8 @@ def lc2st_scores(
     single_class_eval=True,
     cross_val=True,
     n_folds=10,
-    in_sample=False,
     n_ensemble=1,
+    in_sample=False,
 ):
     """Computes the scores of a classifier 
         - trained on data from the joint distributions P,x and Q,x
@@ -160,6 +160,7 @@ def lc2st_scores(
             of size (n_features,).
         P_eval (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x)
             of size (n_test_samples, dim). 
+            Has to be provided if P is not independent of x.
             Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
             of size (n_test_samples, dim).
@@ -176,10 +177,11 @@ def lc2st_scores(
             Defaults to True.
         n_folds (int, optional): number of folds for cross-validation.
             Defaults to 10.
-        in_sample (bool, optional): whether to evaluate on the training data (True) or on test data (False).
-            Defaults to False.
         n_ensemble (int, optional): number of classifiers to train and average over to build an ensemble model.
             Defaults to 1.
+        in_sample (bool, optional): whether to evaluate on training data (True) or not (False).
+            Can only be used if P is independent of x.
+            Defaults to False. 
     
     Returns:
         (dict): dictionary of scores (accuracy, proba, etc.) for each metric.
@@ -196,8 +198,14 @@ def lc2st_scores(
             clf = train_lc2st(P, Q, x_P, x_Q, clf=classifier)
 
             # eval classifier
-            if in_sample:
-                P_eval, Q_eval = P, Q
+            if in_sample:  # evaluate on training data
+                P_eval, Q_eval = P, None  # ok if P is independent of x
+
+            elif P_eval is None:
+                raise ValueError(
+                    "If cross_val=False and in-sample=False, at least P_eval must be provided.\
+                    In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
+                )
 
             accuracy, proba = eval_lc2st(
                 P=P_eval,
@@ -234,14 +242,15 @@ def lc2st_scores(
         for train_index, val_index in kf.split(P):
             # split data into train and val sets for n^th cv-fold
             P_train, x_P_train = P[train_index], x_P[train_index]
-            P_val = P[val_index]
+            P_val = P[val_index]  # ok if P is independent of x
             if P_eval is not None:
                 P_val = P_eval[val_index]
 
             Q_train, x_Q_train = Q[train_index], x_Q[train_index]
-            Q_val = Q[val_index]
             if Q_eval is not None:
                 Q_val = Q_eval[val_index]
+            else:
+                Q_val = None
 
             # train n^th classifier
             clf_n = train_lc2st(
@@ -277,46 +286,67 @@ def t_stats_lc2st(
     x_Q,
     P_eval,
     x_eval,
-    list_null_samples_P,
-    list_null_samples_x_P,
+    Q_eval=None,
     test_stats=["probas_mean"],
     n_ensemble_obs=10,
-    precomputed_probas_null=None,
-    Q_eval=None,
-    P_eval_null=None,
+    n_trials_null=100,
+    scores_null=None,
+    list_null_samples_P=None,
+    list_null_samples_x_P=None,
+    list_P_eval_null=None,
     single_class_eval=True,
     return_probas=True,
     **kwargs,
 ):
     """Performs hypothesis test for LC2ST.
+    We compute the test statistic for the observed data and compare it to the test statistic of the null 
+    distribution. 
+
+    - For the observed data, we compute the test statistic using `lc2st_scores`.
+    - Under the null distribution, we either use the pre-computed scores (if `scores_null` is provided)
+    or we compute the test statistics for each trial using `lc2st_scores` on each element of the provided
+    lists of null samples. 
+    
+    In sbi, we typically do not have access to data from both classes during evaluation, therefore we cannot 
+    use the permutation method to simulate the null hypothesis as in the classical c2st setting.
+    This is why this method is not implemented here. (we could add it in the future if needed with a 
+    statement "if Q_eval is not None: ... else: ...").
 
     Args:
         P (numpy.array): data drawn from P
             of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
-        x_P (numpy.array): data drawn from P
+        x_P (numpy.array): data drawn from from p(x), such that [P ,x_P] ~ p(P,x)
             of size (n_samples, n_features).
-        x_Q (numpy.array): data drawn from Q
+        x_Q (numpy.array): data drawn from from p(x), such that [Q ,x_Q] ~ p(Q,x)
             of size (n_samples, n_features).
         P_eval (numpy.array): data drawn from P|x_eval (or just P if independent of x)
             of size (n_test_samples, dim).
         x_eval (numpy.array): observed data
             of size (n_features,).
-        list_null_samples_P (list): list of samples from P used to test under the null hypothesis.
-            Each element of the list is a numpy.array of size (n_samples, dim).
-        list_null_samples_x_P (list): list of samples like x_P used to test under the null hypothesis.
-            Each element of the list is a numpy.array of size (n_samples, n_features).
+        Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
+            of size (n_test_samples, dim). If None, Q_eval, we only evaluate on P_eval (single_class_eval=True).
+            Defaults to None.
         test_stats (list of str, optional): list of names of test statistics to compute.
             Defaults to ["probas_mean"] (better than accuracyfor single_class_eval).
         n_ensemble_obs (int, optional): number of classifiers to build an ensemble model on observed data.
             Defaults to 10.
-        precomputed_probas_null (list, optional): list of precomputed predicted probabilities under the null. 
+        n_trials_null (int, optional): number of trials to perform for null hypothesis.
+            Defaults to 100.
+        scores_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each 
+            metric under the null hypothesis. 
             Defaults to None.
-        Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
-            of size (n_test_samples, dim). Defaults to None.
-        P_eval_null (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x)
-            of size (n_test_samples, dim). Defaults to None.
+        list_null_samples_P (list): list of samples from P used as "P" and "Q" to test under the null 
+            hypothesis. 
+            Of size (2*n_trials_null, n_samples, dim).
+            Defaults to None.
+        list_null_samples_x_P (list): list of samples like x_P used as x_P and x_Q to test under the null 
+            hypothesis. Of size (2*n_trials_null, n_samples, n_features).
+            Defaults to None.
+        list_P_eval_null (list): list of samples from P_eval used as "P_eval" and "Q_eval" to test under the 
+            null hypothesis. Of size (2*n_trials_null, n_test_samples, dim).
+            Defaults to None.
         single_class_eval (bool, optional): whether to evaluate the classifier only on P or on P and Q.
             Defaults to True.
         return_probas (bool, optional): whether to return predicted probabilities.
@@ -347,24 +377,19 @@ def t_stats_lc2st(
     )
 
     t_stats_null = dict(zip(test_stats, [[] for _ in range(len(test_stats))]))
-    n_trials_null = len(list_null_samples_P)
     probas_null = []
-    for t in range(n_trials_null):
-        if precomputed_probas_null is not None:
-            probas_null.append(precomputed_probas_null[t])
-            # compute test stat
-            scores_t = compute_metric(
-                probas_null[t], metrics=test_stats, single_class_eval=single_class_eval
-            )
-        else:
+    if scores_null is None:
+        for t in range(n_trials_null):
             scores_t, proba_t = lc2st_scores(
-                P=P,
-                Q=list_null_samples_P[t],
-                x_P=x_P,
-                x_Q=list_null_samples_x_P[t],
+                P=list_null_samples_P[t],
+                Q=list_null_samples_P[n_trials_null + t],
+                x_P=list_null_samples_x_P[t],
+                x_Q=list_null_samples_x_P[n_trials_null + t],
                 x_eval=x_eval,
-                P_eval=P_eval,  # a new sample for each trial?
-                Q_eval=P_eval_null,  # a new sample for each trial?
+                P_eval=list_P_eval_null[t],  # a new sample for each trial?
+                Q_eval=list_P_eval_null[
+                    n_trials_null + t
+                ],  # a new sample for each trial?
                 metrics=test_stats,
                 single_class_eval=single_class_eval,
                 n_ensemble=1,  # only one classifier
@@ -372,9 +397,9 @@ def t_stats_lc2st(
             )
             probas_null.append(proba_t)
 
-        # append test stat to list
-        for m in test_stats:
-            t_stats_null[m].append(scores_t[m])
+            # append test stat to list
+            for m in test_stats:
+                t_stats_null[m].append(scores_t[m])
 
     if return_probas:
         return t_stats_ensemble, proba_ensemble, t_stats_null, probas_null

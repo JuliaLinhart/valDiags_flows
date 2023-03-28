@@ -9,9 +9,13 @@ from functools import partial
 
 # GLOBALS
 N_SAMPLES = 1000  # number of samples from P and Q ('n0 = n1' in [Lee et al. (2018)]) (same for train and evaluation)
-N_TRIALS_NULL = 100  # number of times to compute the test statistic under (H0) (nb of permuations 'B' in [Lee et al. (2018)])
-N_RUNS = 1000  # number of test runs to compute the empirical power
+N_TRIALS_NULL = 1000  # number of times to compute the test statistic under (H0) (nb of permuations 'B' in [Lee et al. (2018)])
+N_RUNS = 100  # number of test runs to compute the empirical power
+# (=300 to reproduce the results in [Lee et al. (2018)])
+# (=100 to reproduce results from [Lopez-Paz et al. (2016)])
+
 ALPHA_LIST = np.linspace(0, 1, 100)  # significance levels alpha in (0,1)
+# (=np.linspace(0, 1, 100) to reproduce the results in [Lee et al. (2018)])
 
 use_permutation = True
 in_sample = False
@@ -28,6 +32,7 @@ def c2st_p_values_tfpr(
     n_runs=N_RUNS,
     alpha_list=ALPHA_LIST,
     compute_FPR=True,
+    compute_TPR=True,
 ):
     """Computes the p-values, TPR and FPR over several runs of the Classifier Two Sample Test (C2ST)
     between two distributions P and Q:
@@ -89,21 +94,22 @@ def c2st_p_values_tfpr(
         else:
             null_samples_list = None
 
-        # evaluate test under (H1)
-        _, p_value = eval_c2st_fn(
-            metrics=metrics,
-            P=P,
-            Q=Q,
-            null_samples_list=null_samples_list,
-            n_trials_null=N_TRIALS_NULL,
-            cross_val=False,
-            in_sample=in_sample,
-            P_eval=P_eval,
-            Q_eval=Q_eval,
-        )
-        # update the empirical power at alpha for each metric
-        for m in metrics:
-            p_values_H1[m].append(p_value[m])
+        if compute_TPR:
+            # evaluate test under (H1)
+            _, p_value = eval_c2st_fn(
+                metrics=metrics,
+                P=P,
+                Q=Q,
+                null_samples_list=null_samples_list,
+                n_trials_null=N_TRIALS_NULL,
+                cross_val=False,
+                in_sample=in_sample,
+                P_eval=P_eval,
+                Q_eval=Q_eval,
+            )
+            # update the empirical power at alpha for each metric
+            for m in metrics:
+                p_values_H1[m].append(p_value[m])
 
         if compute_FPR:
             # evaluate test under (H0)
@@ -123,20 +129,20 @@ def c2st_p_values_tfpr(
                 p_values_H0[m].append(p_value[m])
 
         if metrics_cv is not None:
-
-            # evaluate test under (H1) over several cross-val folds
-            _, p_value_cv = eval_c2st_fn(
-                metrics=metrics_cv,
-                P=P,
-                Q=Q,
-                null_samples_list=null_samples_list,
-                n_trials_null=N_TRIALS_NULL,
-                cross_val=True,
-                n_folds=2,
-            )
-            # update the empirical power at alpha for each cv-metric
-            for m in metrics_cv:
-                p_values_H1[m].append(p_value_cv[m])
+            if compute_TPR:
+                # evaluate test under (H1) over several cross-val folds
+                _, p_value_cv = eval_c2st_fn(
+                    metrics=metrics_cv,
+                    P=P,
+                    Q=Q,
+                    null_samples_list=null_samples_list,
+                    n_trials_null=N_TRIALS_NULL,
+                    cross_val=True,
+                    n_folds=2,
+                )
+                # update the empirical power at alpha for each cv-metric
+                for m in metrics_cv:
+                    p_values_H1[m].append(p_value_cv[m])
 
             if compute_FPR:
                 # evaluate test under (H0) over several cross-val folds
@@ -154,13 +160,17 @@ def c2st_p_values_tfpr(
                     p_values_H0[m].append(p_value_cv[m])
 
     # compute TPR and TPF at every alpha
-    TPR = dict(zip(all_metrics, [[0] for _ in range(len(all_metrics))]))
-    FPR = dict(zip(all_metrics, [[0] for _ in range(len(all_metrics))]))
+    TPR = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
+    FPR = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
     for alpha in alpha_list:
         # append TPR/TPF at alpha for each metric
         for m in all_metrics:
-            TPR[m].append(np.mean(np.array(p_values_H1[m]) < alpha))
-            FPR[m].append(np.mean(np.array(p_values_H0[m]) < alpha))
+            if alpha == 0:
+                TPR[m].append(0)
+                FPR[m].append(0)
+            else:
+                TPR[m].append(np.mean(np.array(p_values_H1[m]) <= alpha))
+                FPR[m].append(np.mean(np.array(p_values_H0[m]) <= alpha))
 
     return TPR, FPR, p_values_H1, p_values_H0
 
@@ -185,69 +195,123 @@ if __name__ == "__main__":
 
     # define distributions P and Q
     dim = 5  # data dimension
+    # (= 5/20 in [Lee et al. 2018])
     P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))
-    mu = 0.07  # mean shift between P and Q
+    mu = 0.1  # mean shift between P and Q
+    # (= sqrt(0.05)/sqrt(0.01) in [Lee et al. 2018])
     Q_dist = mvn(mean=np.array([mu] * dim), cov=np.eye(dim))
 
     # metrics / test statistics
     metrics = ["accuracy", "div", "mse"]
     metrics_cv = ["accuracy_cv", "div_cv", "mse_cv"]
 
-    # compute p_value at alpha=0.05, for each metric with `eval_c2st_lda`
-    TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
-        eval_c2st_fn=eval_c2st_lda,
-        P_dist=P_dist,
-        Q_dist=Q_dist,
-        metrics=metrics,
-        metrics_cv=metrics_cv,
-        compute_FPR=True,
-        alpha_list=ALPHA_LIST,
-    )
+    # # compute p_value at alpha=0.05, for each metric with `eval_c2st_lda`
+    # TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
+    #     eval_c2st_fn=eval_c2st_lda,
+    #     P_dist=P_dist,
+    #     Q_dist=Q_dist,
+    #     metrics=metrics,
+    #     metrics_cv=metrics_cv,
+    #     alpha_list=ALPHA_LIST,
+    # )
 
-    # plot p-values for each metric
+    # # plot p-values for each metric
+
+    # for m in metrics + metrics_cv:
+    #     p_values = np.concatenate(
+    #         [p_values_H1[m], p_values_H0[m]]
+    #     )  # concatenate H1 and H0 p-values
+    #     index = np.concatenate(
+    #         [np.ones(N_RUNS), np.zeros(N_RUNS)]
+    #     )  # 1 for H1, 0 for H0
+    #     sorter = np.argsort(p_values)  # sort p-values
+    #     sorted_index = index[sorter]  # sort index
+    #     idx_0 = np.where(sorted_index == 0)[0]  # find index of H0 p-values
+    #     idx_1 = np.where(sorted_index == 1)[0]  # find index of H1 p-values
+
+    #     plt.plot(np.sort(p_values), color="blue", label="p-values")
+
+    #     plt.scatter(
+    #         np.arange(2 * N_RUNS)[idx_1],
+    #         np.sort(p_values)[idx_1],
+    #         c="g",
+    #         label=f"H1 (mu={np.round(mu,2)})",
+    #         alpha=0.3,
+    #     )
+    #     plt.scatter(
+    #         np.arange(2 * N_RUNS)[idx_0],
+    #         np.sort(p_values)[idx_0],
+    #         c="r",
+    #         label="H0",
+    #         alpha=0.3,
+    #     )
+    #     plt.legend()
+    #     plt.title(f"C2ST-{m}, single_class/out-of-sample (N={N_SAMPLES}, dim={dim})")
+    #     plt.savefig(
+    #         f"c2st_results/p_values_{m}_lqda_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{single_class_eval}_permutation_{use_permutation}_insample_{in_sample}.pdf"
+    #     )
+    #     plt.show()
+
+    # # plot TPR for each metric
+    # for m in metrics + metrics_cv:
+    #     plt.plot(ALPHA_LIST, TPR[m], label=m)
+    # plt.legend()
+    # plt.title(
+    #     f"TPR for C2ST, (H1): mu={np.round(mu,2)}, single_class/out-of-sample (N={N_SAMPLES}, dim={dim})"
+    # )
+    # plt.savefig(
+    #     f"c2st_results/tpr_lqda_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{single_class_eval}_permutation_{use_permutation}_insample_{in_sample}.pdf"
+    # )
+    # plt.show()
+
+    # # plot FPR for each metric
+    # for m in metrics + metrics_cv:
+    #     plt.plot(ALPHA_LIST, FPR[m], label=m)
+    # plt.legend()
+    # plt.title(
+    #     f"FPR for C2ST, (H1): mu={np.round(mu,2)}, single_class/out-of-sample (N={N_SAMPLES}, dim={dim})"
+    # )
+    # plt.savefig(
+    #     f"c2st_results/fpr_lqda_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{single_class_eval}_permutation_{use_permutation}_insample_{in_sample}.pdf"
+    # )
+    # plt.show()
+
+    # # roc curve
+    # for m in metrics + metrics_cv:
+    #     plt.plot(FPR[m], TPR[m], label=m)
+    # plt.legend()
+    # plt.title(
+    #     f"ROC for C2ST, (H1): mu={np.round(mu,2)}, single_class/out-of-sample (N={N_SAMPLES}, dim={dim})"
+    # )
+    # plt.savefig(
+    #     f"c2st_results/roc_lqda_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{single_class_eval}_permutation_{use_permutation}_insample_{in_sample}.pdf"
+    # )
+    # plt.show()
+
+    # type I error as a function of n_samples at alpha (as in [Lopez-Paz et al. 2016])
+    n_samples_list = [25, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+    FPR_n = dict(zip(metrics + metrics_cv, [[] for _ in metrics + metrics_cv]))
+    for n in n_samples_list:
+        print(f"n={n}:")
+        _, FPR, _, p_values_H0 = c2st_p_values_tfpr(
+            eval_c2st_fn=eval_c2st_lda,
+            P_dist=P_dist,
+            Q_dist=Q_dist,
+            metrics=metrics,
+            metrics_cv=metrics_cv,
+            compute_TPR=False,
+            n_samples=n,
+            n_runs=100,
+            alpha_list=[0.05],
+        )
+        for m in metrics + metrics_cv:
+            FPR_n[m].append(FPR[m][0])
+            print(min(p_values_H0[m]), FPR[m])
 
     for m in metrics + metrics_cv:
-        p_values = np.concatenate(
-            [p_values_H1[m], p_values_H0[m]]
-        )  # concatenate H1 and H0 p-values
-        index = np.concatenate(
-            [np.ones(N_RUNS), np.zeros(N_RUNS)]
-        )  # 1 for H1, 0 for H0
-        sorter = np.argsort(p_values)  # sort p-values
-        sorted_index = index[sorter]  # sort index
-        idx_0 = np.where(sorted_index == 0)[0]  # find index of H0 p-values
-        idx_1 = np.where(sorted_index == 1)[0]  # find index of H1 p-values
-
-        plt.plot(np.sort(p_values), color="blue", label="p-values")
-
-        plt.scatter(
-            np.arange(2 * N_RUNS)[idx_1],
-            np.sort(p_values)[idx_1],
-            c="g",
-            label=f"H1 (mu={mu})",
-            alpha=0.3,
-        )
-        plt.scatter(
-            np.arange(2 * N_RUNS)[idx_0],
-            np.sort(p_values)[idx_0],
-            c="r",
-            label="H0",
-            alpha=0.3,
-        )
-        plt.legend()
-        plt.title(f"C2ST-{m}, single-class (N={N_SAMPLES})")
-        plt.savefig(
-            f"p_values_{m}_lqda_mu_{mu}_dim_{dim}_nruns_{N_RUNS}_single_class_{single_class_eval}_permutation_{use_permutation}_insample_{in_sample}.pdf"
-        )
-        plt.show()
-
-    # roc curve
-    for m in metrics + metrics_cv:
-        plt.plot(FPR[m], TPR[m], label=m)
+        plt.plot(n_samples_list, FPR_n[m], label=m)
     plt.legend()
-    plt.title(f"ROC for C2ST (H1): mu={mu}, single-class, (N={N_SAMPLES})")
-    plt.savefig(
-        f"roc_lqda_mu_{mu}_dim_{dim}_nruns_{N_RUNS}_single_class_{single_class_eval}_permutation_{use_permutation}_insample_{in_sample}.pdf"
-    )
+    plt.title(f"C2ST Type I error as a function of n_samples (dim={dim})")
+    plt.savefig(f"c2st_results/type_I_error_n_dim_{dim}.pdf")
     plt.show()
 

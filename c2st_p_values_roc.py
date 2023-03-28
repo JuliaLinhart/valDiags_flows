@@ -190,6 +190,7 @@ if __name__ == "__main__":
         clf_class=LinearDiscriminantAnalysis,
         clf_kwargs={},
         single_class_eval=single_class_eval,
+        use_permutation=use_permutation,
         verbose=False,
     )
 

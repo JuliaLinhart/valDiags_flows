@@ -271,6 +271,9 @@ def t_stats_c2st(
     P_eval=None,
     Q_eval=None,
     scores_null=None,
+    use_permutation=True,
+    list_null_samples_P=None,
+    list_P_eval_null=None,
     **kwargs,
 ):
     """Computes the C2ST test statistics estimated on P and Q, 
@@ -295,6 +298,16 @@ def t_stats_c2st(
             If None, cross-val is performed or Q is used. Defaults to None.
         scores_null (dict, optional): dictionary of precomputed scores under the null hypothesis.
             If None, they are computed via permutations. Defaults to None.
+        use_permutation (bool, optional): if True, use permutation to simulate the null hypothesis.
+            Defaults to True.
+        list_null_samples_P (list of numpy.array, optional): list of samples from P to 
+            train the clasifier under the null hypothesis.
+            Of size (2*n_trials_null, n_samples, dim).
+            Defaults to None.
+        list_P_eval_null (list of numpy.array, optional): list of samples from P to 
+        evaluate the classifier under the null hypothesis.
+            Of size (2*n_trials_null, n_samples, dim).
+            Defaults to None.
         **kwargs: keyword arguments for scores_fn.
     
     Returns:
@@ -318,29 +331,35 @@ def t_stats_c2st(
 
     if scores_null is None:
         # loop over trials under the null hypothesis
-        for _ in tqdm(
+        for t in tqdm(
             range(n_trials_null),
             desc="Testing under (H0) via permutations",
             disable=(not verbose),
         ):
+            # approxiamte the null by permuting the data (same as permuting the labels)
+            if use_permutation:
+                X = np.concatenate([P, Q], axis=0)
+                X = np.random.permutation(X)
+                P_t = X[: len(P)]
+                Q_t = X[len(P) :]
 
-            # simualte the null by permuting the data (same as permuting the labels)
-            X = np.concatenate([P, Q], axis=0)
-            X = np.random.permutation(X)
-            P_t = X[: len(P)]
-            Q_t = X[len(P) :]
-
-            # if P_eval and Q_eval are not None, permute them as well
-            if P_eval is not None and Q_eval is not None:
-                X_eval = np.concatenate([P_eval, Q_eval], axis=0)
-                X_eval = np.random.permutation(X_eval)
-                P_eval_t = X[: len(P_eval)]
-                Q_eval_t = X[len(P_eval) :]
+                # if P_eval and Q_eval are not None, permute them as well
+                if P_eval is not None and Q_eval is not None:
+                    X_eval = np.concatenate([P_eval, Q_eval], axis=0)
+                    X_eval = np.random.permutation(X_eval)
+                    P_eval_t = X[: len(P_eval)]
+                    Q_eval_t = X[len(P_eval) :]
+                else:
+                    # otherwise, set them to None.
+                    # In this case scores_fn will use P and Q (via in-sample or cross validation)
+                    P_eval_t = None
+                    Q_eval_t = None
+            # directly use the samples from P to test under the null hypothesis
             else:
-                # otherwise, set them to None.
-                # In this case scores_fn will use P and Q (via in-sample or cross validation)
-                P_eval_t = None
-                Q_eval_t = None
+                P_t = list_null_samples_P[t]
+                Q_t = list_null_samples_P[n_trials_null + t]
+                P_eval_t = list_P_eval_null[t]
+                Q_eval_t = list_P_eval_null[n_trials_null + t]
 
             # compute test statistics on permuted data (i.e. under the null hypothesis)
             scores_null = scores_fn(

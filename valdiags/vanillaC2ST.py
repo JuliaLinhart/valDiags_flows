@@ -1,5 +1,5 @@
 # Implementation of vanilla C2ST (Classifier Two Sample Test)
-# - [Lopez et al. (2017)](https://arxiv.org/abs/1610.06545)
+# - [Lopez et al. (2016)](https://arxiv.org/abs/1610.06545)
 # - [Lee et al. (2018)](https://arxiv.org/abs/1812.08927)
 
 import numpy as np
@@ -264,39 +264,40 @@ def c2st_scores(
 def t_stats_c2st(
     P,
     Q,
-    n_trials_null=100,
-    scores_fn=c2st_scores,
-    metrics=["accuracy"],
-    verbose=True,
     P_eval=None,
     Q_eval=None,
-    scores_null=None,
+    scores_fn=c2st_scores,
+    metrics=["accuracy"],
+    n_trials_null=100,
+    t_stats_null=None,
     use_permutation=True,
-    list_null_samples_P=None,
+    list_P_null=None,
     list_P_eval_null=None,
+    verbose=True,
     **kwargs,
 ):
     """Computes the C2ST test statistics estimated on P and Q, 
     as well as on several samples of data from P to simulate the null hypothesis (Q=P).
 
     Args:
-        scores_fn (function): function to compute metrics on classifier-predicted class probabilities.
         P (numpy.array): data drawn from P
             of size (n_samples, dim).
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
+        P_eval (numpy.array, optional): data drawn from P to evaluate the classifier.
+            If None, cross-val is performed or P is used. 
+            Defaults to None.
+        Q_eval (numpy.array, optional): data drawn from Q to evaluate the classifier.
+            If None, cross-val is performed or Q is used. 
+            Defaults to None.
+        scores_fn (function): function to compute metrics on classifier-predicted class probabilities.
+            Defaults to c2st_scores.
+        metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
+            Defaults to ["accuracy"].
         n_trials_null (int, optional): number of trials to simulate the null hypothesis,
             i.e. number of times to compute the test statistics under the null hypothesis.
             Defaults to 100.
-        metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
-            Defaults to ["accuracy"].
-        verbose (bool, optional): if True, display progress bar. 
-            Defaults to True.
-        P_eval (numpy.array, optional): data drawn from P to evaluate the classifier.
-            If None, cross-val is performed or P is used. Defaults to None.
-        Q_eval (numpy.array, optional): data drawn from Q to evaluate the classifier.
-            If None, cross-val is performed or Q is used. Defaults to None.
-        scores_null (dict, optional): dictionary of precomputed scores under the null hypothesis.
+        t_stats_null (dict, optional): dictionary of precomputed scores under the null hypothesis.
             If None, they are computed via permutations. Defaults to None.
         use_permutation (bool, optional): if True, use permutation to simulate the null hypothesis.
             Defaults to True.
@@ -305,9 +306,11 @@ def t_stats_c2st(
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
         list_P_eval_null (list of numpy.array, optional): list of samples from P to 
-        evaluate the classifier under the null hypothesis.
+            evaluate the classifier under the null hypothesis.
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
+        verbose (bool, optional): if True, display progress bar. 
+            Defaults to True.
         **kwargs: keyword arguments for scores_fn.
     
     Returns:
@@ -317,9 +320,9 @@ def t_stats_c2st(
             - t_stats_null (dict): dictionary of test statistics estimated on P and `null_samples_list`.
                 keys are the names of the metrics. values are lists of length `len(null_samples_list)`.
     """
-    # initialize dicts
+
+    # initialize dict
     t_stat_data = {}
-    t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
 
     # compute test statistics on P and Q
     scores_data = scores_fn(
@@ -329,12 +332,13 @@ def t_stats_c2st(
     for m in metrics:
         t_stat_data[m] = np.mean(scores_data[m])
 
-    if scores_null is None:
+    # loop over trials under the null hypothesis
+    if t_stats_null is None:
+        # initialize dict
+        t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
         # loop over trials under the null hypothesis
         for t in tqdm(
-            range(n_trials_null),
-            desc="Testing under (H0) via permutations",
-            disable=(not verbose),
+            range(n_trials_null), desc="Computing T under (H0)", disable=(not verbose),
         ):
             # approxiamte the null by permuting the data (same as permuting the labels)
             if use_permutation:
@@ -356,13 +360,13 @@ def t_stats_c2st(
                     Q_eval_t = None
             # directly use the samples from P to test under the null hypothesis
             else:
-                P_t = list_null_samples_P[t]
-                Q_t = list_null_samples_P[n_trials_null + t]
+                P_t = list_P_null[t]
+                Q_t = list_P_null[n_trials_null + t]
                 P_eval_t = list_P_eval_null[t]
                 Q_eval_t = list_P_eval_null[n_trials_null + t]
 
             # compute test statistics on permuted data (i.e. under the null hypothesis)
-            scores_null = scores_fn(
+            scores_t = scores_fn(
                 P=P_t,
                 Q=Q_t,
                 metrics=metrics,
@@ -370,9 +374,12 @@ def t_stats_c2st(
                 Q_eval=Q_eval_t,
                 **kwargs,
             )
-        # compute their mean (useful if cross_val=True)
-        for m in metrics:
-            t_stats_null[m].append(np.mean(scores_null[m]))
+
+            # append the score to list
+            for m in metrics:
+                t_stats_null[m].append(
+                    np.mean(scores_t[m])
+                )  # compute their mean (useful if cross_val=True)
 
     return t_stat_data, t_stats_null
 

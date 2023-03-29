@@ -290,9 +290,9 @@ def t_stats_lc2st(
     test_stats=["probas_mean"],
     n_ensemble_obs=10,
     n_trials_null=100,
-    scores_null=None,
-    list_null_samples_P=None,
-    list_null_samples_x_P=None,
+    t_stats_null=None,
+    list_P_null=None,
+    list_x_P_null=None,
     list_P_eval_null=None,
     single_class_eval=True,
     return_probas=True,
@@ -303,7 +303,7 @@ def t_stats_lc2st(
     distribution. 
 
     - For the observed data, we compute the test statistic using `lc2st_scores`.
-    - Under the null distribution, we either use the pre-computed scores (if `scores_null` is provided)
+    - Under the null distribution, we either use the pre-computed scores (if `t_stats_null` is provided)
     or we compute the test statistics for each trial using `lc2st_scores` on each element of the provided
     lists of null samples. 
     
@@ -334,14 +334,14 @@ def t_stats_lc2st(
             Defaults to 10.
         n_trials_null (int, optional): number of trials to perform for null hypothesis.
             Defaults to 100.
-        scores_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each 
+        t_stats_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each 
             metric under the null hypothesis. 
             Defaults to None.
-        list_null_samples_P (list): list of samples from P used as "P" and "Q" to test under the null 
+        list_P_null (list): list of samples from P used as "P" and "Q" to test under the null 
             hypothesis. 
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
-        list_null_samples_x_P (list): list of samples like x_P used as x_P and x_Q to test under the null 
+        list_x_P_null (list): list of samples like x_P used as x_P and x_Q to test under the null 
             hypothesis. Of size (2*n_trials_null, n_samples, n_features).
             Defaults to None.
         list_P_eval_null (list): list of samples from P_eval used as "P_eval" and "Q_eval" to test under the 
@@ -376,15 +376,15 @@ def t_stats_lc2st(
         **kwargs,
     )
 
-    t_stats_null = dict(zip(test_stats, [[] for _ in range(len(test_stats))]))
     probas_null = []
-    if scores_null is None:
+    if t_stats_null is None:
+        t_stats_null = dict(zip(test_stats, [[] for _ in range(len(test_stats))]))
         for t in range(n_trials_null):
             scores_t, proba_t = lc2st_scores(
-                P=list_null_samples_P[t],
-                Q=list_null_samples_P[n_trials_null + t],
-                x_P=list_null_samples_x_P[t],
-                x_Q=list_null_samples_x_P[n_trials_null + t],
+                P=list_P_null[t],
+                Q=list_P_null[n_trials_null + t],
+                x_P=list_x_P_null[t],
+                x_Q=list_x_P_null[n_trials_null + t],
                 x_eval=x_eval,
                 P_eval=list_P_eval_null[t],  # a new sample for each trial?
                 Q_eval=list_P_eval_null[
@@ -399,7 +399,9 @@ def t_stats_lc2st(
 
             # append test stat to list
             for m in test_stats:
-                t_stats_null[m].append(scores_t[m])
+                t_stats_null[m].append(
+                    np.mean(scores_t[m])
+                )  # compute their mean (useful if cross_val=True)
 
     if return_probas:
         return t_stats_ensemble, proba_ensemble, t_stats_null, probas_null

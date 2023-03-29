@@ -1,4 +1,14 @@
-# P-values and ROC curves
+# This is a general script to perform evaluations on the Classifier Two Sample Test (C2ST).
+# =======================
+# We define a utility function that computes the p-values, TPR and FPR over several runs of the C2ST
+# and depending on different parameters of the experiment (e.g. the data distributions P and Q,
+# the number of samples, the test statistics, whether to use only one class during evalaution, etc.).
+# =======================
+# In the main function, we define the parameters of the experiment and call the function to compute the p-values, TPR and FPR.
+# The implemented experiments that can be run with this script are:
+#   - plot the p-values/TPR/FPR/ROC curves for each metric over a grid of alpha values (significance levels).
+#   - evaluate the type 1 error rate (FPR) for a given significance level alpha as a function of the sample size.
+# Other experiments can be added.
 
 import numpy as np
 from tqdm import tqdm

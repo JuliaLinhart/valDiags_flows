@@ -1,4 +1,4 @@
-# Experiments from [Lee et al. 2018](https://arxiv.org/abs/1805.12114) ~ Figure 2;
+# Reproduce experiments from [Lee et al. 2018](https://arxiv.org/abs/1805.12114) ~ Figure 2;
 #
 # Empirical power of LDA-based C2ST test between two multivariate Gaussian distributions
 # with different means and equal variances:

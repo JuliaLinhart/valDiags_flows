@@ -207,7 +207,7 @@ if __name__ == "__main__":
     cross_val_folds = 2
 
     # parse arguments
-    # default values according to [Lee et al. 2018](https://arxiv.org/abs/1805.12114)
+    # default values according to [Lee et al. 2018](https://arxiv.org/abs/1812.08927)
     parser = argparse.ArgumentParser()
 
     # data parameters

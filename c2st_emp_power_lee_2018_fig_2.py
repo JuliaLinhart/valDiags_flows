@@ -147,7 +147,9 @@ if __name__ == "__main__":
             plt.legend()
             plt.title(f"C2ST-{m}, in-sample eval (N={N_SAMPLES}, dim={dim})")
             # plt.title(f"C2ST-{m}, single_class/out-of-sample (N={N_SAMPLES}, dim={dim})")
-            plt.savefig(PATH_EXPERIMENT + f"p_values_mu_{np.round(mu,2)}_dim_{dim}.pdf")
+            plt.savefig(
+                PATH_EXPERIMENT + f"p_values_{m}_mu_{np.round(mu,2)}_dim_{dim}.pdf"
+            )
             plt.show()
 
     # plot TPR for each metric

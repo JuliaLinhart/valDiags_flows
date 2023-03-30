@@ -22,7 +22,7 @@ def c2st_p_values_tfpr(
     Q_dist,
     n_samples,
     metrics,
-    metrics_cv=None,
+    metrics_cv=[],
     n_folds=2,
     compute_FPR=True,
     compute_TPR=True,
@@ -69,10 +69,9 @@ def c2st_p_values_tfpr(
         TPR (dict): dict of TPR for each metric at each alpha in alpha_list
         FPR (dict): dict of FPR for each metric at each alpha in alpha_list
     """
-    all_metrics = metrics
-    if metrics_cv is not None:
-        # combine metrics and metrics_cv
-        all_metrics = metrics + metrics_cv
+
+    # combine metrics and metrics_cv
+    all_metrics = metrics + metrics_cv
 
     if scores_null is None:
         t_stats_null = None
@@ -129,7 +128,7 @@ def c2st_p_values_tfpr(
             for m in metrics:
                 p_values_H0[m].append(p_value[m])
 
-        if metrics_cv is not None:
+        if len(metrics_cv) > 0:
             if compute_TPR:
                 # evaluate test under (H1) over several cross-val folds
                 _, p_value_cv = eval_c2st_fn(
@@ -195,28 +194,31 @@ if __name__ == "__main__":
 
     PATH_EXPERIMENT = "saved_experiments/c2st_evaluation/"
 
-    # distributions P and Q
-    dim = 5  # data dimension
-    P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))
-    mu = np.sqrt(0.05)  # mean shift between P and Q
-    Q_dist = mvn(mean=np.array([mu] * dim), cov=np.eye(dim))
-
     # metrics / test statistics
-    metrics = ["accuracy", "div", "mse"]
-    metrics_cv = ["accuracy_cv", "div_cv", "mse_cv"]
+    metrics = ["accuracy", "div", "mse", "probas_mean"]
+    metrics_cv = ["accuracy_cv", "div_cv", "mse_cv", "probas_mean_cv"]
+    all_metrics = metrics + metrics_cv
+
     cross_val_folds = 2
 
-    # parse arguments
+    # Parse arguments
     # default values according to [Lee et al. 2018](https://arxiv.org/abs/1812.08927)
     parser = argparse.ArgumentParser()
 
     # data parameters
     parser.add_argument(
-        "--n_samples",  # make as list
+        "--n_samples",
         "-ns",
+        nargs="+",
         type=int,
-        default=100,
-        help="Number of samples for P and Q to train and evaluate the classifier.",
+        default=[100],  # [25, 50, 100, 200, 500, 1000, 1500, 2000]
+        help="Number of samples to draw from P and Q. Can be a list of values.",
+    )
+    parser.add_argument(
+        "--dim",
+        type=int,
+        default=5,
+        help="Dimension of the data (number of features).",
     )
 
     # test parameters
@@ -250,7 +252,7 @@ if __name__ == "__main__":
 
     # classifier parameters
     parser.add_argument(
-        "--clf_name",  # make list
+        "--clf_name",  # make a list?
         "-c",
         type=str,
         default="LDA",
@@ -284,6 +286,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    # Define data distributions P and Q
+    dim = args.dim  # data dimension
+    P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))
+    mu = np.sqrt(0.05)  # mean shift between P and Q
+    Q_dist = mvn(mean=np.array([mu] * dim), cov=np.eye(dim))
+
     # Initialize classifier
     if args.clf_name == "LDA":
         clf_class = LinearDiscriminantAnalysis
@@ -294,8 +302,8 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError
 
-    # important parameters
-    N_SAMPLES = args.n_samples
+    # Important parameters
+    N_SAMPLES_LIST = args.n_samples
     N_RUNS = args.n_runs
     N_TRIALS_NULL = args.n_trials_null
 
@@ -309,63 +317,67 @@ if __name__ == "__main__":
         single_class_eval=args.single_class_eval,
     )
 
-    # test statistics under the null distribution
-    if not args.use_permutation:
-        # not using the permutation method to simulate the null distribution
-        # use data from P to compute the scores/test statistics under the true null distribution
+    # Test statistics under the null distribution
+    scores_null_list = []
+    for n in N_SAMPLES_LIST:
         print()
-        print(
-            "Pre-computing or loading the test statistics under the null distribution."
-            + "\n They will be reused at every test-run. The permutation method is not needed."
-        )
-        print()
-        scores_null = dict(zip([True, False], [None, None]))
-        for cross_val, metric_list in zip([True, False], [metrics_cv, metrics]):
-            filename = f"nt_{N_TRIALS_NULL}_dim_{dim}_{args.clf_name}_single_class_{args.single_class_eval}_in_sample_{args.in_sample}"
-            if cross_val:
-                filename += f"_cross_val_nfolds_{cross_val_folds}.npy"
-            else:
-                filename += ".npy"
-            if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
-                # load null scores if they exist
-                t_stats_null = np.load(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename, allow_pickle=True,
-                ).item()
-            else:
-                # otherwise, compute them
-                # generate data from P
-                list_P_null = [P_dist.rvs(N_SAMPLES) for _ in range(2 * N_TRIALS_NULL)]
-                list_P_eval_null = [
-                    P_dist.rvs(N_SAMPLES) for _ in range(2 * N_TRIALS_NULL)
-                ]
-                _, t_stats_null = t_stats_c2st_custom(
-                    use_permutation=False,
-                    metrics=metric_list,
-                    cross_val=cross_val,
-                    n_folds=cross_val_folds,
-                    list_P_null=list_P_null,
-                    list_P_eval_null=list_P_eval_null,
-                    # unnecessary, but needed inside `t_stats_c2st`
-                    P=list_P_null[0],
-                    Q=list_P_eval_null[0],
-                    P_eval=list_P_null[1],
-                    Q_eval=list_P_eval_null[1],
-                )
-                # save null scores
-                np.save(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename, t_stats_null,
-                )
-            scores_null[cross_val] = t_stats_null
-    else:
-        print()
-        print(
-            f"Not pre-computing the test-statistics under the null."
-            + "\n Using the permutation method to estimate them at each test run."
-        )
-        print()
-        scores_null = None
+        print(f"N = {n}")
+        if not args.use_permutation:
+            # Not using the permutation method to simulate the null distribution
+            # Using data from P to compute the scores/test statistics under the true null distribution
+            print()
+            print(
+                "Pre-computing or loading the test statistics under the null distribution."
+                + "\n They will be reused at every test-run. The permutation method is not needed."
+            )
+            print()
+            scores_null = dict(zip([True, False], [None, None]))
+            for cross_val, metric_list in zip([True, False], [metrics_cv, metrics]):
+                filename = f"nt_{N_TRIALS_NULL}_N_{n}_dim_{dim}_{args.clf_name}_single_class_{args.single_class_eval}_in_sample_{args.in_sample}"
+                if cross_val:
+                    filename += f"_cross_val_nfolds_{cross_val_folds}.npy"
+                else:
+                    filename += ".npy"
+                if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
+                    # load null scores if they exist
+                    t_stats_null = np.load(
+                        PATH_EXPERIMENT + "t_stats_null/" + filename, allow_pickle=True,
+                    ).item()
+                else:
+                    # otherwise, compute them
+                    # generate data from P
+                    list_P_null = [P_dist.rvs(n) for _ in range(2 * N_TRIALS_NULL)]
+                    list_P_eval_null = [P_dist.rvs(n) for _ in range(2 * N_TRIALS_NULL)]
+                    _, t_stats_null = t_stats_c2st_custom(
+                        use_permutation=False,
+                        metrics=metric_list,
+                        cross_val=cross_val,
+                        n_folds=cross_val_folds,
+                        list_P_null=list_P_null,
+                        list_P_eval_null=list_P_eval_null,
+                        # unnecessary, but needed inside `t_stats_c2st`
+                        P=list_P_null[0],
+                        Q=list_P_eval_null[0],
+                        P_eval=list_P_null[1],
+                        Q_eval=list_P_eval_null[1],
+                    )
+                    if args.clf_name != "LDA":
+                        # save null scores
+                        np.save(
+                            PATH_EXPERIMENT + "t_stats_null/" + filename, t_stats_null,
+                        )
+                scores_null[cross_val] = t_stats_null
+        else:
+            print()
+            print(
+                f"Not pre-computing the test-statistics under the null."
+                + "\n Using the permutation method to estimate them at each test run."
+            )
+            print()
+            scores_null = None
+        scores_null_list.append(scores_null)
 
-    # define function to evaluate the test
+    # Define function to evaluate the test
     eval_c2st = partial(
         eval_htest,
         t_stats_estimator=t_stats_c2st_custom,
@@ -373,136 +385,135 @@ if __name__ == "__main__":
         verbose=False,
     )
 
-    if args.roc:
-        # compute p_value at alpha=0.05, for each metric with `eval_c2st_lda`
+    # Avoid unnecessary computations for certain experiments
+    if args.type1_err:
+        compute_TPR = False
+    else:
+        compute_TPR = True
+
+    # For each sample size, compute the test results for each metric:
+    # p-values, TPR and FPR (at given alphas)
+    TPR_list, FPR_list, p_values_H0_list, p_values_H1_list = [], [], [], []
+    for i, n in enumerate(N_SAMPLES_LIST):
+        print()
+        print(f"N = {n}")
+        print()
         TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
             eval_c2st_fn=eval_c2st,
             n_runs=N_RUNS,
-            n_samples=N_SAMPLES,
+            n_samples=n,
             alpha_list=args.alphas,
             P_dist=P_dist,
             Q_dist=Q_dist,
             metrics=metrics,
             metrics_cv=metrics_cv,
             n_folds=cross_val_folds,
-            scores_null=scores_null,
+            scores_null=scores_null_list[i],
             use_permutation=args.use_permutation,
+            compute_TPR=compute_TPR,
         )
+        TPR_list.append(TPR)
+        FPR_list.append(FPR)
+        p_values_H1_list.append(p_values_H1)
+        p_values_H0_list.append(p_values_H0)
 
-        # plot p-values for each metric
+    # ==== EXP 1: plot ROC curves comparing metrics for a given classifier and sample size ====
 
-        for m in metrics + metrics_cv:
-            p_values = np.concatenate(
-                [p_values_H1[m], p_values_H0[m]]
-            )  # concatenate H1 and H0 p-values
-            index = np.concatenate(
-                [np.ones(N_RUNS), np.zeros(N_RUNS)]
-            )  # 1 for H1, 0 for H0
-            sorter = np.argsort(p_values)  # sort p-values
-            sorted_index = index[sorter]  # sort index
-            idx_0 = np.where(sorted_index == 0)[0]  # find index of H0 p-values
-            idx_1 = np.where(sorted_index == 1)[0]  # find index of H1 p-values
+    if args.roc:
+        for i, n in enumerate(N_SAMPLES_LIST):
+            # plot p-values for each metric
+            p_values_H0, p_values_H1 = p_values_H0_list[i], p_values_H1_list[i]
+            for m in all_metrics:
+                p_values = np.concatenate(
+                    [p_values_H1[m], p_values_H0[m]]
+                )  # concatenate H1 and H0 p-values
+                index = np.concatenate(
+                    [np.ones(N_RUNS), np.zeros(N_RUNS)]
+                )  # 1 for H1, 0 for H0
+                sorter = np.argsort(p_values)  # sort p-values
+                sorted_index = index[sorter]  # sort index
+                idx_0 = np.where(sorted_index == 0)[0]  # find index of H0 p-values
+                idx_1 = np.where(sorted_index == 1)[0]  # find index of H1 p-values
 
-            plt.plot(np.sort(p_values), color="blue", label="p-values")
+                plt.plot(np.sort(p_values), color="blue", label="p-values")
 
-            plt.scatter(
-                np.arange(2 * N_RUNS)[idx_1],
-                np.sort(p_values)[idx_1],
-                c="g",
-                label=f"H1 (mu={np.round(mu,2)})",
-                alpha=0.3,
-            )
-            plt.scatter(
-                np.arange(2 * N_RUNS)[idx_0],
-                np.sort(p_values)[idx_0],
-                c="r",
-                label="H0",
-                alpha=0.3,
-            )
+                plt.scatter(
+                    np.arange(2 * N_RUNS)[idx_1],
+                    np.sort(p_values)[idx_1],
+                    c="g",
+                    label=f"H1 (mu={np.round(mu,2)})",
+                    alpha=0.3,
+                )
+                plt.scatter(
+                    np.arange(2 * N_RUNS)[idx_0],
+                    np.sort(p_values)[idx_0],
+                    c="r",
+                    label="H0",
+                    alpha=0.3,
+                )
+                plt.legend()
+                plt.title(f"C2ST-{m}, (N={n}, dim={dim})")
+                plt.savefig(
+                    PATH_EXPERIMENT
+                    + f"p_values_{m}_{args.clf_name}_mu_{np.round(mu,2)}_N_{n}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
+                )
+                plt.show()
+
+            TPR, FPR = TPR_list[i], FPR_list[i]
+            # Plot TPR for each metric
+            for m in all_metrics:
+                plt.plot(args.alphas, TPR[m], label=m)
             plt.legend()
-            plt.title(f"C2ST-{m}, (N={N_SAMPLES}, dim={dim})")
+            plt.title(f"TPR for C2ST, (H1): mu={np.round(mu,2)}, (N={n}, dim={dim})")
             plt.savefig(
                 PATH_EXPERIMENT
-                + f"p_values_{m}_{args.clf_name}_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
+                + f"tpr_{args.clf_name}_mu_{np.round(mu,2)}_N_{n}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
             )
             plt.show()
 
-        # plot TPR for each metric
-        for m in metrics + metrics_cv:
-            plt.plot(args.alphas, TPR[m], label=m)
-        plt.legend()
-        plt.title(
-            f"TPR for C2ST, (H1): mu={np.round(mu,2)}, (N={N_SAMPLES}, dim={dim})"
-        )
-        plt.savefig(
-            PATH_EXPERIMENT
-            + f"tpr_{args.clf_name}_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
-        )
-        plt.show()
+            # Plot FPR for each metric
+            for m in all_metrics:
+                plt.plot(args.alphas, FPR[m], label=m)
+            plt.legend()
+            plt.title(f"FPR for C2ST, (H1): mu={np.round(mu,2)}, (N={n}, dim={dim})")
+            plt.savefig(
+                PATH_EXPERIMENT
+                + f"fpr_{args.clf_name}_mu_{np.round(mu,2)}_N_{n}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
+            )
+            plt.show()
 
-        # plot FPR for each metric
-        for m in metrics + metrics_cv:
-            plt.plot(args.alphas, FPR[m], label=m)
-        plt.legend()
-        plt.title(
-            f"FPR for C2ST, (H1): mu={np.round(mu,2)}, (N={N_SAMPLES}, dim={dim})"
-        )
-        plt.savefig(
-            PATH_EXPERIMENT
-            + f"fpr_{args.clf_name}_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
-        )
-        plt.show()
+            # Plot ROC
+            for m in all_metrics:
+                plt.plot(FPR[m], TPR[m], label=m)
+            plt.legend()
+            plt.title(f"ROC for C2ST, (H1): mu={np.round(mu,2)}, (N={n}, dim={dim})")
+            plt.savefig(
+                PATH_EXPERIMENT
+                + f"roc_{args.clf_name}_mu_{np.round(mu,2)}_N_{n}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
+            )
+            plt.show()
 
-        # roc curve
-        for m in metrics + metrics_cv:
-            plt.plot(FPR[m], TPR[m], label=m)
-        plt.legend()
-        plt.title(
-            f"ROC for C2ST, (H1): mu={np.round(mu,2)}, (N={N_SAMPLES}, dim={dim})"
-        )
-        plt.savefig(
-            PATH_EXPERIMENT
-            + f"roc_{args.clf_name}_mu_{np.round(mu,2)}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
-        )
-        plt.show()
+    # ==== EXP 2: Type I error as a function of n_samples at alpha =====
+    # (as in [Lopez-Paz et al. 2016](https://arxiv.org/abs/1610.06545))
 
     if args.type1_err:
 
-        # type I error as a function of n_samples at alpha
-        # (as in [Lopez-Paz et al. 2016](https://arxiv.org/abs/1610.06545))
-        n_samples_list = [25, 50, 100, 200, 500, 1000, 1500, 2000]
-        FPR_n = dict(zip(metrics + metrics_cv, [[] for _ in metrics + metrics_cv]))
-        for n in n_samples_list:
-            print(f"n={n}:")
-            _, FPR, _, p_values_H0 = c2st_p_values_tfpr(
-                n_samples=n,
-                eval_c2st_fn=eval_c2st,
-                n_runs=N_RUNS,
-                alpha_list=args.alphas,
-                P_dist=P_dist,
-                Q_dist=Q_dist,
-                metrics=metrics,
-                metrics_cv=metrics_cv,
-                n_folds=cross_val_folds,
-                scores_null=scores_null,
-                use_permutation=args.use_permutation,
-                compute_TPR=False,
+        for k, alpha in enumerate(args.alphas):
+            FPR_a = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
+            for m in all_metrics:
+                for i in range(len(N_SAMPLES_LIST)):
+                    FPR_a[m].append(FPR_list[i][m][k])
+
+            for m in all_metrics:
+                plt.plot(N_SAMPLES_LIST, FPR_a[m], label=m)
+            plt.legend()
+            plt.title(
+                f"C2ST Type I error as a function of n_samples (dim={dim})"
+                + f"\n alpha = {np.round(alpha,2)}"
             )
-
-            for m in metrics + metrics_cv:
-                FPR_n[m].append(FPR[m][0])
-                print(f"{m}: {FPR[m]}")
-
-        for m in metrics + metrics_cv:
-            plt.plot(n_samples_list, FPR_n[m], label=m)
-        plt.legend()
-        plt.title(
-            f"C2ST Type I error as a function of n_samples (dim={dim})"
-            + f"\n alpha = {args.alphas} "
-        )
-        plt.savefig(
-            PATH_EXPERIMENT
-            + f"type_I_error_alpha_{args.alphas}_{args.clf_name}_n_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
-        )
-        plt.show()
+            plt.savefig(
+                PATH_EXPERIMENT
+                + f"type_I_error_alpha_{np.round(alpha,2)}_{args.clf_name}_dim_{dim}_nruns_{N_RUNS}_single_class_{args.single_class_eval}_permutation_{args.use_permutation}_insample_{args.in_sample}.pdf"
+            )
+            plt.show()
 

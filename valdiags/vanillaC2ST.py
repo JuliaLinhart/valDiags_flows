@@ -109,7 +109,7 @@ def compute_metric(proba, metrics, single_class_eval=False):
     scores = {}
     for m in metrics:
         # mean of success probas (predicting the right class)
-        if m == "probas_mean":
+        if "probas_mean" in m:
             if single_class_eval:
                 scores[m] = np.mean(proba)
             else:

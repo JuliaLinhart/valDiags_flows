@@ -141,7 +141,7 @@ if __name__ == "__main__":
     import seaborn as sns
 
     N_SAMPLES = 1_000
-    DIM = 1
+    DIM = 2
 
     # shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
     # shifts = np.sort(np.concatenate([-1 * shifts, shifts[1:]]))
@@ -277,34 +277,27 @@ if __name__ == "__main__":
     plt.savefig(f"lqda_scale_shift_dim_{DIM}_n_{N_SAMPLES}.pdf")
     plt.show()
 
-    # Scale-shift experiment plot
-    colors = ["orange", "orange", "blue", "blue"]
-    for name, color in zip(test_stats.keys(), colors):
-        linestyle = "-"
-        if "0" not in name:
-            linestyle = "--"
-        # plt.errorbar(shifts, test_stats_mean, color=color, label=name, linestyle=linestyle)
-        plt.plot(
-            shifts, test_stats_mean[name], color=color, label=name, linestyle=linestyle,
-        )
-        plt.fill_between(
-            x=shifts,
-            y1=test_stats_mean[name] - test_stats_std[name],
-            y2=test_stats_mean[name] + test_stats_std[name],
-            alpha=0.2,
-            color=color,
-        )
-    plt.plot(shifts, [0.5] * len(shifts), color="grey", linestyle="--", label="H_0")
-    plt.plot(
-        [1] * len(np.arange(0.4, 1.1, 0.1)),
-        np.arange(0.4, 1.1, 0.1),
-        color="grey",
-        linestyle="--",
-    )
-    plt.xlabel("df (degrees of freedom)")
-    plt.ylabel(r"$\hat{t}$ (test statistic)")
-    plt.legend(loc="upper right")
-    plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = t(df)")
-    plt.savefig("student_df_shift_dim_{DIM}_n_{N_SAMPLES}.pdf")
-    plt.show()
-
+    # # DF-shift experiment plot
+    # colors = ["orange", "orange", "blue", "blue"]
+    # for name, color in zip(test_stats.keys(), colors):
+    #     linestyle = "-"
+    #     if "0" not in name:
+    #         linestyle = "--"
+    #     # plt.errorbar(shifts, test_stats_mean, color=color, label=name, linestyle=linestyle)
+    #     plt.plot(
+    #         shifts, test_stats_mean[name], color=color, label=name, linestyle=linestyle,
+    #     )
+    #     plt.fill_between(
+    #         x=shifts,
+    #         y1=test_stats_mean[name] - test_stats_std[name],
+    #         y2=test_stats_mean[name] + test_stats_std[name],
+    #         alpha=0.2,
+    #         color=color,
+    #     )
+    # plt.plot(shifts, [0.5] * len(shifts), color="grey", linestyle="--", label="H_0")
+    # plt.xlabel("df (degrees of freedom)")
+    # plt.ylabel(r"$\hat{t}$ (test statistic)")
+    # plt.legend(loc="upper right")
+    # plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = Student-ft(df)")
+    # plt.savefig(f"student_df_shift_n_{N_SAMPLES}.pdf")
+    # plt.show()

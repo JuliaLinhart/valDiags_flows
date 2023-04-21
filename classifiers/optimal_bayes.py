@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from scipy.stats import multivariate_normal as mvn
+from scipy.stats import multivariate_normal as mvn, norm
 from scipy.stats import t
 
 from valdiags.vanillaC2ST import eval_c2st, compute_metric
@@ -70,8 +70,16 @@ class AnalyticGaussianLQDA(OptimalBayesClassifier):
 
     def __init__(self, dim, mu=0, sigma=1) -> None:
         super().__init__()
+        self.mu = mu
+        self.sigma = sigma
         self.dist_c0 = mvn(mean=np.zeros(dim))
         self.dist_c1 = mvn(mean=np.array([mu] * dim), cov=np.eye(dim) * sigma)
+
+    def predict(self, x):
+        if self.mu == 0 and self.sigma == 1:
+            return np.random.binomial(size=x.shape[0], n=1, p=0.5)
+        else:
+            return super().predict(x)
 
 
 class AnalyticStudentClassifier(OptimalBayesClassifier):
@@ -82,19 +90,14 @@ class AnalyticStudentClassifier(OptimalBayesClassifier):
         - c1: t(df=2, loc=mu, scale=sigma) with mu and sigma to be specified.
     """
 
-    def __init__(self, mu=0, sigma=1) -> None:
+    def __init__(self, mu=0, sigma=1, df=2) -> None:
         super().__init__()
-        self.dist_c0 = t(df=2, loc=0, scale=1)
-        self.dist_c1 = t(df=2, loc=mu, scale=sigma)
+        self.dist_c0 = norm(loc=0, scale=1)
+        self.dist_c1 = t(df=df, loc=mu, scale=sigma)
 
 
 def opt_bayes_scores(
-    P,
-    Q,
-    clf,
-    metrics=["accuracy", "probas_mean", "div", "mse"],
-    single_class_eval=True,
-    cross_val=False,
+    P, Q, clf, metrics=["accuracy", "mse"], single_class_eval=True, cross_val=False,
 ):
     """Compute the scores of the optimal Bayes classifier on the data from P and Q.
     These scores can be used as test statistics for the C2ST test.
@@ -137,128 +140,171 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    N_SAMPLES = 10_000
-    DIM = 2
+    N_SAMPLES = 1_000
+    DIM = 1
 
-    shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
-    shifts = np.concatenate([-1 * shifts, shifts[1:]])
-    # # uncomment this to do the scale-shift experiment
-    # shifts = np.linspace(0.01, 10, 20)
+    # shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
+    # shifts = np.sort(np.concatenate([-1 * shifts, shifts[1:]]))
 
-    # # ref norm samples
-    # ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+    # uncomment this to do the scale-shift experiment
+    shifts = np.array([0.01, 0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
-    # shifted_samples = [
-    #     mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES) for s in shifts
-    # ]
+    test_stats_runs = {
+        r"$\hat{t}_{Acc}$": [],
+        r"$\hat{t}_{Acc0}$": [],
+        r"$\hat{t}_{Reg}$": [],
+        r"$\hat{t}_{Reg0}$": [],
+    }
+    for r in range(10):
+        # ref norm samples
+        ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
 
-    # # uncomment this to do the scale-shift experiment
-    # shifted_samples = [
-    #     mvn(mean=np.zeros(DIM), cov=np.eye(DIM) * s).rvs(N_SAMPLES) for s in shifts
-    # ]
+        # shifted_samples = [
+        #     mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+        #     for s in shifts
+        # ]
 
-    # uncomment this to do the student mean-shift experiment
-    # ref student samples
-    ref_samples = t(df=2, loc=0, scale=1).rvs(N_SAMPLES)
-    shifted_samples = [t(df=2, loc=s, scale=1).rvs(N_SAMPLES) for s in shifts]
+        # uncomment this to do the scale-shift experiment
+        shifted_samples = [
+            mvn(mean=np.zeros(DIM), cov=np.eye(DIM) * s).rvs(N_SAMPLES) for s in shifts
+        ]
 
-    accuracies = []
-    probas_mean = []
-    div = []
-    mse = []
-    single_class = []
-    shift_list = []
+        # uncomment this to do the student df-shift experiment
+        # ref student samples
+        # ref_samples = norm(loc=0, scale=1).rvs(N_SAMPLES)
+        # shifts = np.arange(0.01, 21)
+        # shifted_samples = [t(df=s, loc=0, scale=1).rvs(N_SAMPLES) for s in shifts]
 
-    for s, s_samples in zip(shifts, shifted_samples):
-        # # uncomment this to do the mean-shift experiment
-        # clf = AnalyticGaussianLQDA(dim=DIM, mu=s)
-        # # uncomment this to do the scale-shift experiment
-        # clf = AnalyticGaussianLQDA(dim=DIM, sigma=s)
-
-        # uncomment this to do the student mean-shift experiment
-        clf = AnalyticStudentClassifier(mu=s)
-
-        for b in [True, False]:
-            single_class.append(b)
-            shift_list.append(s)
-
-            scores = opt_bayes_scores(
-                P=ref_samples, Q=s_samples, clf=clf, single_class_eval=b
-            )
-
-            accuracies.append(scores["accuracy"])
-            probas_mean.append(scores["probas_mean"])
-            div.append(scores["div"])
-            mse.append(scores["mse"])
-
-    # df = pd.DataFrame(
-    #     {
-    #         "mean_shift": shift_list,
-    #         "accuracy": accuracies,
-    #         # "probas_mean": probas_mean,
-    #         "div": div,
-    #         "mse": mse,
-    #         "single_class_eval": single_class,
-    #     }
-    # )
-
-    # for metric in ["accuracy", "div", "mse"]:
-    #     sns.relplot(
-    #         data=df,
-    #         x="mean_shift",
-    #         y=metric,
-    #         hue="single_class_eval",
-    #         style="single_class_eval",
-    #         kind="line",
-    #     )
-    #     plt.savefig(f"lqda_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
-    #     plt.show()
-
-    # # uncomment this to do the scale-shift experiment
-    # df = pd.DataFrame(
-    #     {
-    #         "scale_shift": shift_list,
-    #         "accuracy": accuracies,
-    #         # "probas_mean": probas_mean,
-    #         "div": div,
-    #         "mse": mse,
-    #         "single_class_eval": single_class,
-    #     }
-    # )
-
-    # for metric in ["accuracy", "div", "mse"]:
-    #     sns.relplot(
-    #         data=df,
-    #         x="scale_shift",
-    #         y=metric,
-    #         hue="single_class_eval",
-    #         style="single_class_eval",
-    #         kind="line",
-    #     )
-    #     plt.savefig(f"lqda_scale_shift_n_{N_SAMPLES}_{metric}.pdf")
-    #     plt.show()
-
-    # uncomment this to do the student mean-shift experiment
-    df = pd.DataFrame(
-        {
-            "mean_shift": shift_list,
-            "accuracy": accuracies,
-            "probas_mean": probas_mean,
-            "div": div,
-            "mse": mse,
-            "single_class_eval": single_class,
+        test_stats = {
+            r"$\hat{t}_{Acc}$": [],
+            r"$\hat{t}_{Acc0}$": [],
+            r"$\hat{t}_{Reg}$": [],
+            r"$\hat{t}_{Reg0}$": [],
         }
-    )
+        # probas_mean = []
+        # div = []
+        # single_class = []
+        # shift_list = []
 
-    for metric in ["accuracy", "probas_mean", "div", "mse"]:
-        sns.relplot(
-            data=df,
-            x="mean_shift",
-            y=metric,
-            hue="single_class_eval",
-            style="single_class_eval",
-            kind="line",
+        for s, s_samples in zip(shifts, shifted_samples):
+            # uncomment this to do the mean-shift experiment
+            # clf = AnalyticGaussianLQDA(dim=DIM, mu=s)
+            # uncomment this to do the scale-shift experiment
+            clf = AnalyticGaussianLQDA(dim=DIM, sigma=s)
+
+            # uncomment this to do the student mean-shift experiment
+            # clf = AnalyticStudentClassifier(df=s)
+
+            for b in [True, False]:
+                # single_class.append(b)
+                # shift_list.append(s)
+
+                scores = opt_bayes_scores(
+                    P=ref_samples, Q=s_samples, clf=clf, single_class_eval=b
+                )
+                if b:
+                    test_stats[r"$\hat{t}_{Acc0}$"].append(scores["accuracy"])
+                    test_stats[r"$\hat{t}_{Reg0}$"].append(scores["mse"] + 0.5)
+                else:
+                    test_stats[r"$\hat{t}_{Acc}$"].append(scores["accuracy"])
+                    test_stats[r"$\hat{t}_{Reg}$"].append(scores["mse"] + 0.5)
+
+        for k in test_stats.keys():
+            test_stats_runs[k].append(test_stats[k])
+
+    test_stats_mean = {k: np.mean(v, axis=0) for k, v in test_stats_runs.items()}
+    test_stats_std = {k: np.std(v, axis=0) for k, v in test_stats_runs.items()}
+    colors = ["orange", "orange", "blue", "blue"]
+
+    # # Mean-shift experiment plot
+    # for name, color in zip(test_stats.keys(), colors):
+    #     linestyle = "-"
+    #     if "0" not in name:
+    #         linestyle = "--"
+    #     # plt.errorbar(shifts, test_stats_mean, color=color, label=name, linestyle=linestyle)
+    #     plt.plot(
+    #         shifts, test_stats_mean[name], color=color, label=name, linestyle=linestyle,
+    #     )
+    #     plt.fill_between(
+    #         x=shifts,
+    #         y1=test_stats_mean[name] - test_stats_std[name],
+    #         y2=test_stats_mean[name] + test_stats_std[name],
+    #         alpha=0.2,
+    #         color=color,
+    #     )
+    # plt.plot(shifts, [0.5] * len(shifts), color="grey", linestyle="--", label="H_0")
+    # plt.plot(
+    #     [0] * len(np.arange(0.4, 1.1, 0.1)),
+    #     np.arange(0.4, 1.1, 0.1),
+    #     color="grey",
+    #     linestyle="--",
+    # )
+    # plt.xlabel("m (mean shift)")
+    # plt.ylabel(r"$\hat{t}$ (test statistic)")
+    # plt.legend(loc="upper right")
+    # plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = N(m, I), dim={DIM}")
+    # plt.savefig(f"lqda_mean_shift_dim_{DIM}_n_{N_SAMPLES}.pdf")
+    # plt.show()
+
+    # Scale-shift experiment plot
+    colors = ["orange", "orange", "blue", "blue"]
+    for name, color in zip(test_stats.keys(), colors):
+        linestyle = "-"
+        if "0" not in name:
+            linestyle = "--"
+        # plt.errorbar(shifts, test_stats_mean, color=color, label=name, linestyle=linestyle)
+        plt.plot(
+            shifts, test_stats_mean[name], color=color, label=name, linestyle=linestyle,
         )
-        plt.savefig(f"student_mean_shift_n_{N_SAMPLES}_{metric}.pdf")
-        plt.show()
+        plt.fill_between(
+            x=shifts,
+            y1=test_stats_mean[name] - test_stats_std[name],
+            y2=test_stats_mean[name] + test_stats_std[name],
+            alpha=0.2,
+            color=color,
+        )
+    plt.plot(shifts, [0.5] * len(shifts), color="grey", linestyle="--", label="H_0")
+    plt.plot(
+        [1] * len(np.arange(0.4, 1.1, 0.1)),
+        np.arange(0.4, 1.1, 0.1),
+        color="grey",
+        linestyle="--",
+    )
+    plt.xlabel("s (scale shift)")
+    plt.ylabel(r"$\hat{t}$ (test statistic)")
+    plt.legend(loc="upper right")
+    plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = N(0, s), dim={DIM}")
+    plt.savefig(f"lqda_scale_shift_dim_{DIM}_n_{N_SAMPLES}.pdf")
+    plt.show()
+
+    # Scale-shift experiment plot
+    colors = ["orange", "orange", "blue", "blue"]
+    for name, color in zip(test_stats.keys(), colors):
+        linestyle = "-"
+        if "0" not in name:
+            linestyle = "--"
+        # plt.errorbar(shifts, test_stats_mean, color=color, label=name, linestyle=linestyle)
+        plt.plot(
+            shifts, test_stats_mean[name], color=color, label=name, linestyle=linestyle,
+        )
+        plt.fill_between(
+            x=shifts,
+            y1=test_stats_mean[name] - test_stats_std[name],
+            y2=test_stats_mean[name] + test_stats_std[name],
+            alpha=0.2,
+            color=color,
+        )
+    plt.plot(shifts, [0.5] * len(shifts), color="grey", linestyle="--", label="H_0")
+    plt.plot(
+        [1] * len(np.arange(0.4, 1.1, 0.1)),
+        np.arange(0.4, 1.1, 0.1),
+        color="grey",
+        linestyle="--",
+    )
+    plt.xlabel("df (degrees of freedom)")
+    plt.ylabel(r"$\hat{t}$ (test statistic)")
+    plt.legend(loc="upper right")
+    plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = t(df)")
+    plt.savefig("student_df_shift_dim_{DIM}_n_{N_SAMPLES}.pdf")
+    plt.show()
 

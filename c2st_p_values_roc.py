@@ -195,8 +195,8 @@ if __name__ == "__main__":
     PATH_EXPERIMENT = "saved_experiments/c2st_evaluation/"
 
     # metrics / test statistics
-    metrics = ["accuracy", "div", "mse", "probas_mean"]
-    metrics_cv = ["accuracy_cv", "div_cv", "mse_cv", "probas_mean_cv"]
+    metrics = ["accuracy", "mse"]  # , "probas_mean"]
+    metrics_cv = ["accuracy_cv"]  # , "probas_mean_cv"]
     all_metrics = metrics + metrics_cv
 
     cross_val_folds = 2
@@ -289,7 +289,8 @@ if __name__ == "__main__":
     # Define data distributions P and Q
     dim = args.dim  # data dimension
     P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))
-    mu = np.sqrt(0.05)  # mean shift between P and Q
+    # mu = np.sqrt(0.05)  # mean shift between P and Q
+    mu = 0.1  # mean shift between P and Q
     Q_dist = mvn(mean=np.array([mu] * dim), cov=np.eye(dim))
 
     # Initialize classifier
@@ -361,11 +362,11 @@ if __name__ == "__main__":
                         P_eval=list_P_null[1],
                         Q_eval=list_P_eval_null[1],
                     )
-                    if args.clf_name != "LDA":
-                        # save null scores
-                        np.save(
-                            PATH_EXPERIMENT + "t_stats_null/" + filename, t_stats_null,
-                        )
+                    # if args.clf_name != "LDA":
+                    # save null scores
+                    np.save(
+                        PATH_EXPERIMENT + "t_stats_null/" + filename, t_stats_null,
+                    )
                 scores_null[cross_val] = t_stats_null
         else:
             print()

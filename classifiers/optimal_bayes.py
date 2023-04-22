@@ -144,7 +144,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     N_SAMPLES = 10_000
-    DIM = 2
+    DIM = 20
 
     # shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
     # shifts = np.sort(np.concatenate([-1 * shifts, shifts[1:]]))
@@ -185,6 +185,7 @@ if __name__ == "__main__":
     for r in range(10):
         # ref norm samples
         ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
+
 
         # shifted_samples = [
         #     mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)

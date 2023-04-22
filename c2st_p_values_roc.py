@@ -99,6 +99,15 @@ def c2st_p_values_tfpr(
         Q_eval = Q_dist.rvs(n_eval)
         Q_H0_eval = P_dist.rvs(n_eval)
 
+        if P.ndim == 1:
+            P = P.reshape(-1, 1)
+            Q = Q.reshape(-1, 1)
+            Q_H0 = Q_H0.reshape(-1, 1)
+
+            P_eval = P_eval.reshape(-1, 1)
+            Q_eval = Q_eval.reshape(-1, 1)
+            Q_H0_eval = Q_H0_eval.reshape(-1, 1)
+
         if compute_TPR:
             # evaluate test under (H1)
             _, p_value = eval_c2st_fn(
@@ -359,7 +368,7 @@ if __name__ == "__main__":
     if args.clf_name == "LDA":
         clf_class = LinearDiscriminantAnalysis
         clf_kwargs = {"solver": "eigen", "priors": [0.5, 0.5]}
-    if args.clf_name == "QDA":
+    elif args.clf_name == "QDA":
         clf_class = QuadraticDiscriminantAnalysis
         clf_kwargs = {"priors": [0.5, 0.5]}
     elif args.clf_name == "MLP":
@@ -413,6 +422,10 @@ if __name__ == "__main__":
                     list_P_eval_null = [
                         P_dist.rvs(n_eval) for _ in range(2 * N_TRIALS_NULL)
                     ]
+                    if dim == 1:
+                        for i in range(2 * N_TRIALS_NULL):
+                            list_P_null[i] = list_P_null[i].reshape(-1, 1)
+                            list_P_eval_null[i] = list_P_eval_null[i].reshape(-1, 1)
                     _, t_stats_null = t_stats_c2st_custom(
                         use_permutation=False,
                         metrics=metric_list,
@@ -509,6 +522,7 @@ if __name__ == "__main__":
         # ==== EXP 1: plot ROC curves comparing test statistics for a given sample size ====
 
         if args.roc:
+            print(f"EXP 1: ROC curves for {H1_label}, dim={dim}, n={n}")
             for i, n in enumerate(N_SAMPLES_LIST):
                 # Plot p-values for each metric
                 p_values_H0, p_values_H1 = p_values_H0_list[i], p_values_H1_list[i]
@@ -598,7 +612,9 @@ if __name__ == "__main__":
         # (as in [Lopez-Paz et al. 2016](https://arxiv.org/abs/1610.06545))
 
         if args.err_ns:
-
+            print(
+                f"EXP 2: FPR and TPR as a function of n_samples for {H1_label}, dim={dim}"
+            )
             for k, alpha in enumerate(args.alphas):
                 FPR_a = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
                 TPR_a = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
@@ -638,7 +654,6 @@ if __name__ == "__main__":
 
     # ==== EXP 3: FPR and TPR as a function of shifts at fixed N and alpha=====
     if args.err_shift:
-        print("Exp 3")
         # define case labels
         if args.q_dist == "mean":
             s = 1
@@ -660,6 +675,10 @@ if __name__ == "__main__":
         n = N_SAMPLES_LIST[0]
         n_eval = N_EVAL_LIST[0]
         scores_null = scores_null_list[0]
+
+        print(
+            f"Exp 3: FPR and TPR as a function of {case} shifts at fixed N={n}, dim={dim}"
+        )
 
         # compute TPR and FPR for each shift
         TPR_list, FPR_list, p_values_H0_list, p_values_H1_list = [], [], [], []

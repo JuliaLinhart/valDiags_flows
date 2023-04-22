@@ -103,7 +103,7 @@ if __name__ == "__main__":
     TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
         eval_c2st_fn=eval_c2st,
         n_runs=N_RUNS,
-        n_samples=N_SAMPLES,
+        n_samples={'train':N_SAMPLES, 'eval':N_SAMPLES},
         alpha_list=ALPHA_LIST,
         P_dist=P_dist,
         Q_dist=Q_dist,

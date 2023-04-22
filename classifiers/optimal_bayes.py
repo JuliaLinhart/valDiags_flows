@@ -97,7 +97,12 @@ class AnalyticStudentClassifier(OptimalBayesClassifier):
 
 
 def opt_bayes_scores(
-    P, Q, clf, metrics=["accuracy", "mse"], single_class_eval=True, cross_val=False,
+    P,
+    Q,
+    clf,
+    metrics=["accuracy", "mse", "div"],
+    single_class_eval=True,
+    cross_val=False,
 ):
     """Compute the scores of the optimal Bayes classifier on the data from P and Q.
     These scores can be used as test statistics for the C2ST test.
@@ -136,24 +141,46 @@ def opt_bayes_scores(
 
 if __name__ == "__main__":
 
-    import pandas as pd
     import matplotlib.pyplot as plt
-    import seaborn as sns
 
-    N_SAMPLES = 1_000
+    N_SAMPLES = 10_000
     DIM = 2
 
     # shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
     # shifts = np.sort(np.concatenate([-1 * shifts, shifts[1:]]))
 
     # uncomment this to do the scale-shift experiment
-    shifts = np.array([0.01, 0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    # shifts = np.array([0.01, 0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    shifts = np.array(
+        [
+            0.01,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9,
+            1,
+            1.1,
+            1.2,
+            1.3,
+            1.4,
+            1.5,
+            2,
+            3,
+        ]
+    )
 
     test_stats_runs = {
         r"$\hat{t}_{Acc}$": [],
         r"$\hat{t}_{Acc0}$": [],
         r"$\hat{t}_{Reg}$": [],
         r"$\hat{t}_{Reg0}$": [],
+        r"$\hat{t}_{Max}$": [],
+        r"$\hat{t}_{Max0}$": [],
     }
     for r in range(10):
         # ref norm samples
@@ -169,8 +196,8 @@ if __name__ == "__main__":
             mvn(mean=np.zeros(DIM), cov=np.eye(DIM) * s).rvs(N_SAMPLES) for s in shifts
         ]
 
-        # uncomment this to do the student df-shift experiment
-        # ref student samples
+        # # uncomment this to do the student df-shift experiment
+        # # ref student samples
         # ref_samples = norm(loc=0, scale=1).rvs(N_SAMPLES)
         # shifts = np.arange(0.01, 21)
         # shifted_samples = [t(df=s, loc=0, scale=1).rvs(N_SAMPLES) for s in shifts]
@@ -180,11 +207,9 @@ if __name__ == "__main__":
             r"$\hat{t}_{Acc0}$": [],
             r"$\hat{t}_{Reg}$": [],
             r"$\hat{t}_{Reg0}$": [],
+            r"$\hat{t}_{Max}$": [],
+            r"$\hat{t}_{Max0}$": [],
         }
-        # probas_mean = []
-        # div = []
-        # single_class = []
-        # shift_list = []
 
         for s, s_samples in zip(shifts, shifted_samples):
             # uncomment this to do the mean-shift experiment
@@ -192,7 +217,7 @@ if __name__ == "__main__":
             # uncomment this to do the scale-shift experiment
             clf = AnalyticGaussianLQDA(dim=DIM, sigma=s)
 
-            # uncomment this to do the student mean-shift experiment
+            # # uncomment this to do the student mean-shift experiment
             # clf = AnalyticStudentClassifier(df=s)
 
             for b in [True, False]:
@@ -205,16 +230,18 @@ if __name__ == "__main__":
                 if b:
                     test_stats[r"$\hat{t}_{Acc0}$"].append(scores["accuracy"])
                     test_stats[r"$\hat{t}_{Reg0}$"].append(scores["mse"] + 0.5)
+                    test_stats[r"$\hat{t}_{Max0}$"].append(scores["div"])
                 else:
                     test_stats[r"$\hat{t}_{Acc}$"].append(scores["accuracy"])
                     test_stats[r"$\hat{t}_{Reg}$"].append(scores["mse"] + 0.5)
+                    test_stats[r"$\hat{t}_{Max}$"].append(scores["div"])
 
         for k in test_stats.keys():
             test_stats_runs[k].append(test_stats[k])
 
     test_stats_mean = {k: np.mean(v, axis=0) for k, v in test_stats_runs.items()}
     test_stats_std = {k: np.std(v, axis=0) for k, v in test_stats_runs.items()}
-    colors = ["orange", "orange", "blue", "blue"]
+    colors = ["red", "red", "blue", "blue", "orange", "orange"]
 
     # # Mean-shift experiment plot
     # for name, color in zip(test_stats.keys(), colors):
@@ -247,7 +274,6 @@ if __name__ == "__main__":
     # plt.show()
 
     # Scale-shift experiment plot
-    colors = ["orange", "orange", "blue", "blue"]
     for name, color in zip(test_stats.keys(), colors):
         linestyle = "-"
         if "0" not in name:
@@ -278,7 +304,6 @@ if __name__ == "__main__":
     plt.show()
 
     # # DF-shift experiment plot
-    # colors = ["orange", "orange", "blue", "blue"]
     # for name, color in zip(test_stats.keys(), colors):
     #     linestyle = "-"
     #     if "0" not in name:
@@ -298,6 +323,6 @@ if __name__ == "__main__":
     # plt.xlabel("df (degrees of freedom)")
     # plt.ylabel(r"$\hat{t}$ (test statistic)")
     # plt.legend(loc="upper right")
-    # plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = Student-ft(df)")
+    # plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = Student-t(df)")
     # plt.savefig(f"student_df_shift_n_{N_SAMPLES}.pdf")
     # plt.show()

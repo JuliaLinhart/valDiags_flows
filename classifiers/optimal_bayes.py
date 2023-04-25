@@ -1,6 +1,6 @@
 # Implementation of the optimal Bayes classifier for
 # - Gaussian L/QDA
-# - Student t distributions with fixed df=2
+# - Normal Gaussian vs. Student t distribution with varying df
 
 import numpy as np
 
@@ -8,9 +8,6 @@ from scipy.stats import multivariate_normal as mvn, norm
 from scipy.stats import t
 
 from valdiags.vanillaC2ST import eval_c2st, compute_metric
-
-from tqdm import tqdm
-from functools import partial
 
 
 class OptimalBayesClassifier:
@@ -68,7 +65,7 @@ class AnalyticGaussianLQDA(OptimalBayesClassifier):
     
     """
 
-    def __init__(self, dim, mu=0, sigma=1) -> None:
+    def __init__(self, dim, mu=0.0, sigma=1.0) -> None:
         super().__init__()
         self.mu = mu
         self.sigma = sigma
@@ -76,18 +73,16 @@ class AnalyticGaussianLQDA(OptimalBayesClassifier):
         self.dist_c1 = mvn(mean=np.array([mu] * dim), cov=np.eye(dim) * sigma)
 
     def predict(self, x):
-        if self.mu == 0 and self.sigma == 1:
+        if self.mu == 0.0 and self.sigma == 1.0:
             return np.random.binomial(size=x.shape[0], n=1, p=0.5)
         else:
             return super().predict(x)
 
 
 class AnalyticStudentClassifier(OptimalBayesClassifier):
-    """`OptimalBayesClassifier` for Student t distributions.
-    The two classes are Student t distributions with fixed df=2:
-    
-        - c0: t(df=2, loc=0, scale=1)
-        - c1: t(df=2, loc=mu, scale=sigma) with mu and sigma to be specified.
+    """`OptimalBayesClassifier` between Normal and Student t distributions:
+        - c0: norm(loc=0, scale=1)
+        - c1: t(df=df, loc=mu, scale=sigma) with df, mu and sigma to be specified.
     """
 
     def __init__(self, mu=0, sigma=1, df=2) -> None:
@@ -102,7 +97,8 @@ def opt_bayes_scores(
     clf,
     metrics=["accuracy", "mse", "div"],
     single_class_eval=True,
-    cross_val=False,
+    P_eval=None,
+    Q_eval=None,
 ):
     """Compute the scores of the optimal Bayes classifier on the data from P and Q.
     These scores can be used as test statistics for the C2ST test.
@@ -144,7 +140,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     N_SAMPLES = 10_000
-    DIM = 20
+    DIM = 5
 
     # shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
     # shifts = np.sort(np.concatenate([-1 * shifts, shifts[1:]]))
@@ -185,7 +181,6 @@ if __name__ == "__main__":
     for r in range(10):
         # ref norm samples
         ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
-
 
         # shifted_samples = [
         #     mvn(mean=np.array([s] * DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)

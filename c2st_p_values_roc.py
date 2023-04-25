@@ -27,7 +27,6 @@ def c2st_p_values_tfpr(
     compute_FPR=True,
     compute_TPR=True,
     scores_null=None,
-    use_permutation=True,
 ):
     """Computes the p-values, TPR and FPR over several runs of the Classifier Two Sample Test (C2ST)
     between two distributions P and Q:
@@ -62,8 +61,6 @@ def c2st_p_values_tfpr(
             values: second output of t_stats_c2st function.
             If None, use_permuation should be True.
             Defaults to None.
-        use_permutation (bool): whether to use permutation to compute the test statistics under the null.
-            Defaults to True.
     
     Returns:
         p_values_H1 (dict): dict of p-values for each metric under (H1)
@@ -119,7 +116,6 @@ def c2st_p_values_tfpr(
                 Q_eval=Q_eval,
                 cross_val=False,
                 t_stats_null=t_stats_null,
-                use_permutation=use_permutation,
             )
             # update the empirical power at alpha for each metric
             for m in metrics:
@@ -135,7 +131,6 @@ def c2st_p_values_tfpr(
                 Q_eval=Q_H0_eval,
                 cross_val=False,
                 t_stats_null=t_stats_null,
-                use_permutation=use_permutation,
             )
             # update the FPR at alpha for each metric
             for m in metrics:
@@ -151,7 +146,6 @@ def c2st_p_values_tfpr(
                     cross_val=True,
                     n_folds=n_folds,
                     t_stats_null=t_stats_null_cv,
-                    use_permutation=use_permutation,
                 )
                 # update the empirical power at alpha for each cv-metric
                 for m in metrics_cv:
@@ -166,7 +160,6 @@ def c2st_p_values_tfpr(
                     cross_val=True,
                     n_folds=n_folds,
                     t_stats_null=t_stats_null_cv,
-                    use_permutation=use_permutation,
                 )
                 # update the FPR at alpha for each cv-metric
                 for m in metrics_cv:
@@ -178,12 +171,14 @@ def c2st_p_values_tfpr(
     for alpha in alpha_list:
         # append TPR/TPF at alpha for each metric
         for m in all_metrics:
-            if alpha == 0:
-                TPR[m].append(0)
-                FPR[m].append(0)
-            else:
+            if compute_TPR and alpha != 0:
                 TPR[m].append(np.mean(np.array(p_values_H1[m]) <= alpha))
+            else:
+                TPR[m].append(0)
+            if compute_FPR and alpha != 0:
                 FPR[m].append(np.mean(np.array(p_values_H0[m]) <= alpha))
+            else:
+                FPR[m].append(0)
 
     return TPR, FPR, p_values_H1, p_values_H0
 
@@ -390,8 +385,8 @@ if __name__ == "__main__":
 
     # Pre-compute test statistics under the null distribution
     scores_null_list = []
-    for i, n in enumerate(N_SAMPLES_LIST):
-        n_eval = N_EVAL_LIST[i]
+    for k, n in enumerate(N_SAMPLES_LIST):
+        n_eval = N_EVAL_LIST[k]
         print()
         print(f"N = {n}")
         if not args.use_permutation:
@@ -435,12 +430,10 @@ if __name__ == "__main__":
                         list_P_eval_null=list_P_eval_null,
                         # unnecessary, but needed inside `t_stats_c2st`
                         P=list_P_null[0],
-                        Q=list_P_eval_null[0],
-                        P_eval=list_P_null[1],
+                        Q=list_P_null[1],
+                        P_eval=list_P_eval_null[0],
                         Q_eval=list_P_eval_null[1],
                     )
-                    # if args.clf_name != "LDA":
-                    # save null scores
                     np.save(
                         PATH_EXPERIMENT + "t_stats_null/" + filename, t_stats_null,
                     )
@@ -512,7 +505,6 @@ if __name__ == "__main__":
                 metrics_cv=metrics_cv,
                 n_folds=cross_val_folds,
                 scores_null=scores_null_list[i],
-                use_permutation=args.use_permutation,
             )
             TPR_list.append(TPR)
             FPR_list.append(FPR)
@@ -697,7 +689,6 @@ if __name__ == "__main__":
                 metrics_cv=metrics_cv,
                 n_folds=cross_val_folds,
                 scores_null=scores_null,
-                use_permutation=args.use_permutation,
             )
             TPR_list.append(TPR)
             FPR_list.append(FPR)

@@ -20,17 +20,17 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def train_lc2st(P, Q, x_P, x_Q, clf=DEFAULT_CLF):
-    """ Trains a classifier to distinguish between data from two joint distributions
-    
+    """Trains a classifier to distinguish between data from two joint distributions
+
         - P,x = P * x|P (where x|P is denoted as x_P)
         - Q,x = Q * x|Q (where x|Q is denoted as x_Q)
-    
+
     This function is built on the original `train_c2st`, adapting it to joint distributions.
-    
+
     Example for SBI:
     ----------------
         - P is the prior and x_P is generated via the simulator from the parameters P.
-        - Q is the approximate posterior amortized in x. x_Q is a shuffled version of x_P, 
+        - Q is the approximate posterior amortized in x. x_Q is a shuffled version of x_P,
         used to generate independant samples from Q | x.
 
     Args:
@@ -43,7 +43,7 @@ def train_lc2st(P, Q, x_P, x_Q, clf=DEFAULT_CLF):
         x_Q (numpy.array): data drawn from p(x), such that [Q ,x_Q] ~ p(Q,x)
             of size (n_samples, n_features).
         clf (sklearn model, optional): the initialized classifier to use.
-            needs to have a method `.fit(X,y)`. 
+            needs to have a method `.fit(X,y)`.
             Defaults to DEFAULT_CLF.
 
     Returns:
@@ -65,14 +65,14 @@ def eval_lc2st(P, x_eval, clf, Q=None, single_class_eval=True):
         - P,x
         - Q,x
 
-    at a fixed observation x=x_eval. 
-    
+    at a fixed observation x=x_eval.
+
     This function is built on the `eval_c2st`, adapting it to evaluate conditional
-    ditributions at a fixed observation x_eval. By default, we only evaluate on P. 
-    
-    Example for SBI: 
+    ditributions at a fixed observation x_eval. By default, we only evaluate on P.
+
+    Example for SBI:
     ----------------
-    We here typically do not know the true posterior and can only evaluate on data 
+    We here typically do not know the true posterior and can only evaluate on data
     generated from the approximate posterior at fixed x=x_eval.
 
     Args:
@@ -84,10 +84,10 @@ def eval_lc2st(P, x_eval, clf, Q=None, single_class_eval=True):
             of size (n_features,).
         clf (sklearn model, optional): needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
             Defaults to DEFAULT_CLF.
-    
+
     Returns:
         (numpy.array): predicted probabilities for class 0 (P|x) (and accuracy if y is not None).
-        
+
     """
     # concatenate P with repeated x_eval to match training data format
     P_x_eval = np.concatenate([P, x_eval.repeat(len(P), 1)], axis=1)
@@ -131,19 +131,19 @@ def lc2st_scores(
     n_ensemble=1,
     in_sample=False,
 ):
-    """Computes the scores of a classifier 
+    """Computes the scores of a classifier
         - trained on data from the joint distributions P,x and Q,x
-        - evaluated on data from the conditional distributions P|x and/or Q|x 
+        - evaluated on data from the conditional distributions P|x and/or Q|x
         at a fixed observation x=x_eval.
-    
+
     They represent the test statistics of the local C2ST test between P|x and Q|x at x=x_eval.
 
-    If at least one of the classes (P or Q) is independent of x, we don't need extra data 
-    P_eval and/or Q_eval during cross-validation. We can directly use the validation split of 
+    If at least one of the classes (P or Q) is independent of x, we don't need extra data
+    P_eval and/or Q_eval during cross-validation. We can directly use the validation split of
     P and/or Q to evaluate the classifier. This is the default behavior.
 
     By default, we only evaluate on P|x: `single_class_eval` is set to `True`.
-    This is typically the case in SBI, where we generally do not have access to data from the 
+    This is typically the case in SBI, where we generally do not have access to data from the
     class representing the true posterior.
 
 
@@ -159,7 +159,7 @@ def lc2st_scores(
         x_eval (numpy.array): a fixed observation
             of size (n_features,).
         P_eval (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x)
-            of size (n_test_samples, dim). 
+            of size (n_test_samples, dim).
             Has to be provided if P is not independent of x.
             Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
@@ -181,8 +181,8 @@ def lc2st_scores(
             Defaults to 1.
         in_sample (bool, optional): whether to evaluate on training data (True) or not (False).
             Can only be used if P is independent of x.
-            Defaults to False. 
-    
+            Defaults to False.
+
     Returns:
         (dict): dictionary of scores (accuracy, proba, etc.) for each metric.
     """
@@ -299,17 +299,17 @@ def t_stats_lc2st(
     **kwargs,
 ):
     """Performs hypothesis test for LC2ST.
-    We compute the test statistic for the observed data and compare it to the test statistic of the null 
-    distribution. 
+    We compute the test statistic for the observed data and compare it to the test statistic of the null
+    distribution.
 
     - For the observed data, we compute the test statistic using `lc2st_scores`.
     - Under the null distribution, we either use the pre-computed scores (if `t_stats_null` is provided)
     or we compute the test statistics for each trial using `lc2st_scores` on each element of the provided
-    lists of null samples. 
-    
-    In sbi, we typically do not have access to data from both classes during evaluation, therefore we cannot 
+    lists of null samples.
+
+    In sbi, we typically do not have access to data from both classes during evaluation, therefore we cannot
     use the permutation method to simulate the null hypothesis as in the classical c2st setting.
-    This is why this method is not implemented here. (we could add it in the future if needed with a 
+    This is why this method is not implemented here. (we could add it in the future if needed with a
     statement "if Q_eval is not None: ... else: ...").
 
     Args:
@@ -334,17 +334,17 @@ def t_stats_lc2st(
             Defaults to 10.
         n_trials_null (int, optional): number of trials to perform for null hypothesis.
             Defaults to 100.
-        t_stats_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each 
-            metric under the null hypothesis. 
+        t_stats_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each
+            metric under the null hypothesis.
             Defaults to None.
-        list_P_null (list): list of samples from P used as "P" and "Q" to test under the null 
-            hypothesis. 
+        list_P_null (list): list of samples from P used as "P" and "Q" to test under the null
+            hypothesis.
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
-        list_x_P_null (list): list of samples like x_P used as x_P and x_Q to test under the null 
+        list_x_P_null (list): list of samples like x_P used as x_P and x_Q to test under the null
             hypothesis. Of size (2*n_trials_null, n_samples, n_features).
             Defaults to None.
-        list_P_eval_null (list): list of samples from P_eval used as "P_eval" and "Q_eval" to test under the 
+        list_P_eval_null (list): list of samples from P_eval used as "P_eval" and "Q_eval" to test under the
             null hypothesis. Of size (2*n_trials_null, n_test_samples, dim).
             Defaults to None.
         single_class_eval (bool, optional): whether to evaluate the classifier only on P or on P and Q.
@@ -352,7 +352,7 @@ def t_stats_lc2st(
         return_probas (bool, optional): whether to return predicted probabilities.
             Defaults to True.
         kwargs: keyword arguments for `lc2st_scores`.
-    
+
     Returns:
         t_stats_ensemble (dict): test statistics for the ensemble model.
         proba_ensemble (numpy.array): predicted probabilities of class 0 for the ensemble model.
@@ -408,3 +408,49 @@ def t_stats_lc2st(
     else:
         return t_stats_ensemble, t_stats_null
 
+
+# ==== L-C2ST functions to use in sbi-benchmarking framework====
+
+import torch
+
+
+def sbi_clf_kwargs(ndim):
+    """same setup as in :
+    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
+    """
+    return {
+        "activation": "relu",
+        "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+        "max_iter": 1000,
+        "solver": "adam",
+        "early_stopping": True,
+        "n_iter_no_change": 50,
+    }
+
+
+def lc2st_sbibm(
+    P,
+    Q,
+    x_P,
+    x_Q,
+    x_eval,
+    metric="accuracy",
+    classifier=None,
+    **kwargs,  # for c2st_scores
+):
+    ndim = P.shape[-1] + x_P.shape[-1]
+    if classifier is None:
+        clf_class = MLPClassifier
+        clf_kwargs = sbi_clf_kwargs(ndim)
+    scores, _ = lc2st_scores(
+        P,
+        Q,
+        x_P,
+        x_Q,
+        x_eval,
+        metrics=[metric],
+        clf_class=clf_class,
+        clf_kwargs=clf_kwargs,
+        **kwargs,  # cross_val, n_folds, n_ensemble, P_eval, Q_eval, single_class_eval, ...
+    )
+    return torch.tensor([np.mean(scores[metric])])

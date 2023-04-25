@@ -23,7 +23,7 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def train_c2st(P, Q, clf=DEFAULT_CLF):
-    """ Trains a classifier to distinguish between data from P and Q.
+    """Trains a classifier to distinguish between data from P and Q.
 
     Args:
         P (numpy.array): data drawn from P
@@ -31,7 +31,7 @@ def train_c2st(P, Q, clf=DEFAULT_CLF):
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
         clf (sklearn model, optional): the initialized classifier to use.
-            needs to have a method `.fit(X,y)`. 
+            needs to have a method `.fit(X,y)`.
             Defaults to DEFAULT_CLF.
 
     Returns:
@@ -56,21 +56,21 @@ def train_c2st(P, Q, clf=DEFAULT_CLF):
 
 def eval_c2st(P, Q, clf, single_class_eval=False):
     """Evaluates a classifier on data from P and Q.
-    
+
     Args:
         P (numpy.array): data drawn from P
             of size (n_samples, dim).
-        Q (numpy.array): data drawn from Q
+        Q (numpy.array, optional): data drawn from Q
             of size (n_samples, dim).
+            If None, only evaluate on P (single_class_eval=True).
         clf (sklearn model): the trained classifier on both classes.
             needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
         single_class_eval (bool, optional): if True, only evaluate on P.
             Defaults to False.
-    
+
     Returns:
         (float, numpy.array): accuracy and proba of class 0.
     """
-
     n_samples = len(P)
     # define features and labels
     if single_class_eval or Q is None:  # if Q is None, only evaluate on P
@@ -166,10 +166,11 @@ def c2st_scores(
     in_sample=False,
     P_eval=None,
     Q_eval=None,
+    n_ensemble=1,
 ):
-    """Computes scores/metrics for a classifier trained on P and Q. 
+    """Computes scores/metrics for a classifier trained on P and Q.
     They represent the test statistics of the C2ST test estimated on P and Q.
-    
+
     Args:
         P (numpy.array): data drawn from P
             of size (n_samples, dim).
@@ -194,7 +195,7 @@ def c2st_scores(
             Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q for out-of-sample evaluation.
             Defaults to None.
-    
+
     Returns:
         (dict): dictionary of computed scores, i.e. estimated test statistics on P and Q.
     """
@@ -202,21 +203,35 @@ def c2st_scores(
     classifier = clf_class(**clf_kwargs)
 
     if not cross_val:
-        # train classifier
-        clf = train_c2st(P, Q, clf=classifier)
+        ens_accuracies = []
+        ens_probas = []
+        for _ in range(n_ensemble):
+            # train classifier
+            clf = train_c2st(P, Q, clf=classifier)
 
-        # eval classifier
-        if in_sample:
-            P_eval, Q_eval = P, Q
+            # eval classifier
+            if in_sample:  # evaluate on training data
+                P_eval, Q_eval = P, Q
 
-        elif P_eval is None:
-            raise ValueError(
-                "If cross_val=False and in-sample=False, at least P_eval must be provided.\
-                In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
+            elif P_eval is None:
+                raise ValueError(
+                    "If cross_val=False and in-sample=False, at least P_eval must be provided.\
+                    In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
+                )
+
+            accuracy, proba = eval_c2st(
+                P=P_eval,
+                Q=Q_eval,
+                clf=clf,
+                single_class_eval=single_class_eval,
             )
-        accuracy, proba = eval_c2st(
-            P=P_eval, Q=Q_eval, clf=clf, single_class_eval=single_class_eval,
-        )
+
+            ens_accuracies.append(accuracy)
+            ens_probas.append(proba)
+
+        # compute accuracy and proba of ensemble model
+        accuracy = np.mean(ens_accuracies, axis=0)
+        probas = np.mean(ens_probas, axis=0)
 
         # compute metrics
         scores = {}
@@ -225,7 +240,7 @@ def c2st_scores(
                 scores[m] = accuracy
             else:
                 scores[m] = compute_metric(
-                    proba, metrics=[m], single_class_eval=single_class_eval
+                    probas, metrics=[m], single_class_eval=single_class_eval
                 )[m]
 
     else:
@@ -276,7 +291,7 @@ def t_stats_c2st(
     verbose=True,
     **kwargs,
 ):
-    """Computes the C2ST test statistics estimated on P and Q, 
+    """Computes the C2ST test statistics estimated on P and Q,
     as well as on several samples of data from P to simulate the null hypothesis (Q=P).
 
     Args:
@@ -285,10 +300,10 @@ def t_stats_c2st(
         Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
         P_eval (numpy.array, optional): data drawn from P to evaluate the classifier.
-            If None, cross-val is performed or P is used. 
+            If None, cross-val is performed or P is used.
             Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q to evaluate the classifier.
-            If None, cross-val is performed or Q is used. 
+            If None, cross-val is performed or Q is used.
             Defaults to None.
         scores_fn (function): function to compute metrics on classifier-predicted class probabilities.
             Defaults to c2st_scores.
@@ -301,18 +316,18 @@ def t_stats_c2st(
             If None, they are computed via permutations. Defaults to None.
         use_permutation (bool, optional): if True, use permutation to simulate the null hypothesis.
             Defaults to True.
-        list_null_samples_P (list of numpy.array, optional): list of samples from P to 
+        list_null_samples_P (list of numpy.array, optional): list of samples from P to
             train the clasifier under the null hypothesis.
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
-        list_P_eval_null (list of numpy.array, optional): list of samples from P to 
+        list_P_eval_null (list of numpy.array, optional): list of samples from P to
             evaluate the classifier under the null hypothesis.
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
-        verbose (bool, optional): if True, display progress bar. 
+        verbose (bool, optional): if True, display progress bar.
             Defaults to True.
         **kwargs: keyword arguments for scores_fn.
-    
+
     Returns:
         (tuple): tuple containing:
             - t_stat_data (dict): dictionary of test statistics estimated on P and Q.
@@ -338,7 +353,9 @@ def t_stats_c2st(
         t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
         # loop over trials under the null hypothesis
         for t in tqdm(
-            range(n_trials_null), desc="Computing T under (H0)", disable=(not verbose),
+            range(n_trials_null),
+            desc="Computing T under (H0)",
+            disable=(not verbose),
         ):
             # approxiamte the null by permuting the data (same as permuting the labels)
             if use_permutation:
@@ -383,3 +400,43 @@ def t_stats_c2st(
 
     return t_stat_data, t_stats_null
 
+
+# ==== C2ST functions to use in sbi-benchmarking framework====
+
+import torch
+
+
+def c2st_kwargs(ndim):
+    """same setup as in :
+    https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
+    """
+    return {
+        "activation": "relu",
+        "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+        "max_iter": 1000,
+        "solver": "adam",
+        "early_stopping": True,
+        "n_iter_no_change": 50,
+    }
+
+
+def c2st_sbibm(
+    P,
+    Q,
+    metric="accuracy",
+    classifier=None,
+    **kwargs,  # kwargs for c2st_scores
+):
+    ndim = P.shape[-1]
+    if classifier is None:
+        clf_class = MLPClassifier
+        clf_kwargs = c2st_kwargs(ndim)
+    scores = c2st_scores(
+        P,
+        Q,
+        metrics=[metric],
+        clf_class=clf_class,
+        clf_kwargs=clf_kwargs,
+        **kwargs,
+    )
+    return torch.tensor([np.mean(scores[metric])])

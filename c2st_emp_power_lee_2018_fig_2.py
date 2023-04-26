@@ -103,7 +103,7 @@ if __name__ == "__main__":
     TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
         eval_c2st_fn=eval_c2st,
         n_runs=N_RUNS,
-        n_samples={'train':N_SAMPLES, 'eval':N_SAMPLES},
+        n_samples={"train": N_SAMPLES, "eval": N_SAMPLES},
         alpha_list=ALPHA_LIST,
         P_dist=P_dist,
         Q_dist=Q_dist,
@@ -111,7 +111,6 @@ if __name__ == "__main__":
         metrics_cv=METRICS_CV,
         n_folds=CV_FOLDS,
         scores_null=None,
-        use_permutation=PERMUATION,
     )
 
     # plot p-values for each metric
@@ -184,4 +183,3 @@ if __name__ == "__main__":
     )
     plt.savefig(PATH_EXPERIMENT + f"roc_mu_{np.round(mu,2)}_dim_{dim}.pdf")
     plt.show()
-

@@ -3,14 +3,18 @@
 # Author: Julia Linhart
 # Institution: Inria Paris-Saclay (MIND team)
 
+import tqdm as tqdm
+
 import numpy as np
 
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 
-from .test_utils import compute_pvalue
-
-from .vanillaC2ST import train_c2st, eval_c2st, compute_metric
+from .vanillaC2ST import (
+    train_c2st,
+    eval_c2st,
+    compute_metric,
+)
 
 # define default classifier
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
@@ -284,19 +288,20 @@ def t_stats_lc2st(
     Q,
     x_P,
     x_Q,
-    P_eval,
     x_eval,
+    P_eval,
     Q_eval=None,
-    test_stats=["probas_mean"],
-    n_ensemble_obs=10,
+    scores_fn=lc2st_scores,
+    metrics=["mse"],
+    null_hypothesis=False,
     n_trials_null=100,
-    t_stats_null=None,
+    use_permutation=True,
     list_P_null=None,
     list_x_P_null=None,
     list_P_eval_null=None,
-    single_class_eval=True,
     return_probas=True,
-    **kwargs,
+    verbose=True,
+    **kwargs,  # kwargs for scores_fn
 ):
     """Performs hypothesis test for LC2ST.
     We compute the test statistic for the observed data and compare it to the test statistic of the null
@@ -321,17 +326,17 @@ def t_stats_lc2st(
             of size (n_samples, n_features).
         x_Q (numpy.array): data drawn from from p(x), such that [Q ,x_Q] ~ p(Q,x)
             of size (n_samples, n_features).
-        P_eval (numpy.array): data drawn from P|x_eval (or just P if independent of x)
-            of size (n_test_samples, dim).
         x_eval (numpy.array): observed data
             of size (n_features,).
+        P_eval (numpy.array): data drawn from P|x_eval (or just P if independent of x)
+            of size (n_test_samples, dim).
         Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
             of size (n_test_samples, dim). If None, Q_eval, we only evaluate on P_eval (single_class_eval=True).
             Defaults to None.
         test_stats (list of str, optional): list of names of test statistics to compute.
             Defaults to ["probas_mean"] (better than accuracyfor single_class_eval).
         n_ensemble_obs (int, optional): number of classifiers to build an ensemble model on observed data.
-            Defaults to 10.
+            Defaults to 1.
         n_trials_null (int, optional): number of trials to perform for null hypothesis.
             Defaults to 100.
         t_stats_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each
@@ -347,66 +352,107 @@ def t_stats_lc2st(
         list_P_eval_null (list): list of samples from P_eval used as "P_eval" and "Q_eval" to test under the
             null hypothesis. Of size (2*n_trials_null, n_test_samples, dim).
             Defaults to None.
-        single_class_eval (bool, optional): whether to evaluate the classifier only on P or on P and Q.
-            Defaults to True.
         return_probas (bool, optional): whether to return predicted probabilities.
             Defaults to True.
         kwargs: keyword arguments for `lc2st_scores`.
 
     Returns:
-        t_stats_ensemble (dict): test statistics for the ensemble model.
-        proba_ensemble (numpy.array): predicted probabilities of class 0 for the ensemble model.
-            only returned if return_probas is True.
-        t_stats_null (list of dict): list of test statistics computed under the null hypothesis.
-        probas_null (list of numpy.array): list of predicted probabilities under the null hypothesis.
-            only returned if return_probas is True.
+        (tuble): tuple containing:
+        - t_stat_data (dict): dictionary of test statistics for the observed data (P and Q).
+            keys are the names of the metrics. values are floats.
+        - probas_data (list): list of predicted probabilities for the observed data.
+        - t_stats_null (dict): dictionary of test statistics for the null hypothesis.
+        - probas_null (list): list of predicted probabilities for the null hypothesis.
     """
+    if not null_hypothesis:
+        # initialize dict
+        t_stat_data = {}
 
-    t_stats_ensemble, proba_ensemble = lc2st_scores(
-        P,
-        Q,
-        x_P,
-        x_Q,
-        x_eval,
-        P_eval,
-        Q_eval,
-        metrics=test_stats,
-        single_class_eval=single_class_eval,
-        n_ensemble=n_ensemble_obs,
-        **kwargs,
-    )
+        # compute test statistics on P and Q
+        scores_data, probas_data = scores_fn(
+            P,
+            Q,
+            x_P,
+            x_Q,
+            x_eval,
+            P_eval,
+            Q_eval,
+            metrics=metrics,
+            **kwargs,
+        )
 
-    probas_null = []
-    if t_stats_null is None:
-        t_stats_null = dict(zip(test_stats, [[] for _ in range(len(test_stats))]))
-        for t in range(n_trials_null):
-            scores_t, proba_t = lc2st_scores(
-                P=list_P_null[t],
-                Q=list_P_null[n_trials_null + t],
-                x_P=list_x_P_null[t],
-                x_Q=list_x_P_null[n_trials_null + t],
+        # compute their mean (useful if cross_val=True)
+        for m in metrics:
+            t_stat_data[m] = np.mean(scores_data[m])
+
+        if return_probas:
+            return t_stat_data, probas_data
+        else:
+            return t_stat_data
+    else:
+        # if null hypothesis, compute test statistics under the null
+        # initialize list and dict
+        probas_null = []
+        t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+
+        # loop over trials under the null hypothesis
+        for t in tqdm(
+            range(n_trials_null),
+            desc="Computing T under (H0)",
+            disable=(not verbose),
+        ):
+            # approximate the null by permuting the data (same as permutating the labels)
+            if use_permutation:
+                joint_P_x = np.concatenate([P, x_P], axis=1)
+                joint_Q_x = np.concatenate([Q, x_Q], axis=1)
+                X = np.concatenate([joint_P_x, joint_Q_x], axis=0)
+                X = np.random.permutation(X)
+                P_t = X[: len(P)][:, : P.shape[-1]]
+                x_P_t = X[: len(P)][:, P.shape[-1] :]
+                Q_t = X[len(P) :][:, : Q.shape[-1]]
+                x_Q_t = X[len(P) :][:, Q.shape[-1] :]
+
+                # if P_eval and Q_eval are not None, permute them as well
+                if P_eval is not None and Q_eval is not None:
+                    X_eval = np.concatenate([P_eval, Q_eval], axis=0)
+                    X_eval = np.random.permutation(X_eval)
+                    P_eval_t = X[: len(P_eval)]
+                    Q_eval_t = X[len(P_eval) :]
+                else:
+                    P_eval_t = None
+                    Q_eval_t = None
+            # directly use the samples from P to test under the null hypothesis
+            else:
+                P_t = list_P_null[t]
+                x_P_t = list_x_P_null[t]
+                Q_t = list_P_null[n_trials_null + t]
+                x_Q_t = list_x_P_null[n_trials_null + t]
+                P_eval_t = list_P_eval_null[t]
+                Q_eval_t = list_P_eval_null[n_trials_null + t]
+
+            scores_t, proba_t = scores_fn(
+                P=P_t,
+                Q=Q_t,
+                x_P=x_P_t,
+                x_Q=x_Q_t,
                 x_eval=x_eval,
-                P_eval=list_P_eval_null[t],  # a new sample for each trial?
-                Q_eval=list_P_eval_null[
-                    n_trials_null + t
-                ],  # a new sample for each trial?
-                metrics=test_stats,
-                single_class_eval=single_class_eval,
-                n_ensemble=1,  # only one classifier
+                P_eval=P_eval_t,
+                Q_eval=Q_eval_t,
+                metrics=metrics,
                 **kwargs,
             )
             probas_null.append(proba_t)
 
             # append test stat to list
-            for m in test_stats:
+            for m in metrics:
                 t_stats_null[m].append(
                     np.mean(scores_t[m])
                 )  # compute their mean (useful if cross_val=True)
 
-    if return_probas:
-        return t_stats_ensemble, proba_ensemble, t_stats_null, probas_null
-    else:
-        return t_stats_ensemble, t_stats_null
+        if return_probas:
+            return t_stats_null, probas_null
+        else:
+            return t_stats_null
 
 
 # ==== L-C2ST functions to use in sbi-benchmarking framework====

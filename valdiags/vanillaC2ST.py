@@ -246,7 +246,7 @@ def c2st_scores(
     else:
         # initialize scores as dict of empty lists
         scores = dict(zip(metrics, [[] for _ in range(len(metrics))]))
-
+        probas = []
         # cross-validation
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
         for train_index, val_index in kf.split(P):
@@ -272,8 +272,9 @@ def c2st_scores(
                             proba, metrics=[m], single_class_eval=single_class_eval
                         )[m]
                     )
+            probas.append(proba)
 
-    return scores
+    return scores, probas
 
 
 def t_stats_c2st(
@@ -283,12 +284,13 @@ def t_stats_c2st(
     Q_eval=None,
     scores_fn=c2st_scores,
     metrics=["accuracy"],
+    null_hypothesis=False,
     n_trials_null=100,
-    t_stats_null=None,
     use_permutation=True,
     list_P_null=None,
     list_P_eval_null=None,
     verbose=True,
+    return_probas=False,
     **kwargs,
 ):
     """Computes the C2ST test statistics estimated on P and Q,
@@ -309,6 +311,9 @@ def t_stats_c2st(
             Defaults to c2st_scores.
         metrics (list of str, optional): list of names of metrics (aka test statistics) to compute.
             Defaults to ["accuracy"].
+        null_hypothesis (bool, optional): if True, compute the test statistics under the null hypothesis.
+            If False, compute the test statistics on P and Q.
+            Defaults to False.
         n_trials_null (int, optional): number of trials to simulate the null hypothesis,
             i.e. number of times to compute the test statistics under the null hypothesis.
             Defaults to 100.
@@ -328,29 +333,36 @@ def t_stats_c2st(
             Defaults to True.
         **kwargs: keyword arguments for scores_fn.
 
-    Returns:
-        (tuple): tuple containing:
-            - t_stat_data (dict): dictionary of test statistics estimated on P and Q.
-                keys are the names of the metrics. values are floats.
-            - t_stats_null (dict): dictionary of test statistics estimated on P and `null_samples_list`.
-                keys are the names of the metrics. values are lists of length `len(null_samples_list)`.
+    Returns: one of the following (depending on null_hypothesis)
+        t_stat_data (dict): dictionary of test statistics estimated for the observed data (P and Q).
+                    keys are the names of the metrics. values are floats.
+        t_stats_null (dict): dictionary of test statistics estimated under the null.
+            keys are the names of the metrics. values are lists of length `n_trials_null`.
     """
+    # if not null hypothesis, compute test statistics on observed data (P and Q)
+    if not null_hypothesis:
+        # initialize dict
+        t_stat_data = {}
 
-    # initialize dict
-    t_stat_data = {}
+        # compute test statistics on P and Q
+        scores_data, probas_data = scores_fn(
+            P=P, Q=Q, metrics=metrics, P_eval=P_eval, Q_eval=Q_eval, **kwargs
+        )
+        # compute their mean (useful if cross_val=True)
+        for m in metrics:
+            t_stat_data[m] = np.mean(scores_data[m])
 
-    # compute test statistics on P and Q
-    scores_data = scores_fn(
-        P=P, Q=Q, metrics=metrics, P_eval=P_eval, Q_eval=Q_eval, **kwargs
-    )
-    # compute their mean (useful if cross_val=True)
-    for m in metrics:
-        t_stat_data[m] = np.mean(scores_data[m])
+        if return_probas:
+            return t_stat_data, probas_data
+        else:
+            return t_stat_data
 
-    # loop over trials under the null hypothesis
-    if t_stats_null is None:
+    else:
+        # if null hypothesis, compute test statistics under the null
         # initialize dict
         t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+        probas_null = []
+
         # loop over trials under the null hypothesis
         for t in tqdm(
             range(n_trials_null),
@@ -375,15 +387,20 @@ def t_stats_c2st(
                     # In this case scores_fn will use P and Q (via in-sample or cross validation)
                     P_eval_t = None
                     Q_eval_t = None
+
             # directly use the samples from P to test under the null hypothesis
             else:
                 P_t = list_P_null[t]
                 Q_t = list_P_null[n_trials_null + t]
-                P_eval_t = list_P_eval_null[t]
-                Q_eval_t = list_P_eval_null[n_trials_null + t]
+                if list_P_eval_null is not None:
+                    P_eval_t = list_P_eval_null[t]
+                    Q_eval_t = list_P_eval_null[n_trials_null + t]
+                else:
+                    P_eval_t = None
+                    Q_eval_t = None
 
             # compute test statistics on permuted data (i.e. under the null hypothesis)
-            scores_t = scores_fn(
+            scores_t, probas_t = scores_fn(
                 P=P_t,
                 Q=Q_t,
                 metrics=metrics,
@@ -392,13 +409,17 @@ def t_stats_c2st(
                 **kwargs,
             )
 
-            # append the score to list
+            # append the score and probas to list
             for m in metrics:
                 t_stats_null[m].append(
                     np.mean(scores_t[m])
                 )  # compute their mean (useful if cross_val=True)
+            probas_null.append(probas_t)
 
-    return t_stat_data, t_stats_null
+        if return_probas:
+            return t_stats_null, probas_null
+        else:
+            return t_stats_null
 
 
 # ==== C2ST functions to use in sbi-benchmarking framework====
@@ -431,7 +452,7 @@ def c2st_sbibm(
     if classifier is None:
         clf_class = MLPClassifier
         clf_kwargs = c2st_kwargs(ndim)
-    scores = c2st_scores(
+    scores, _ = c2st_scores(
         P,
         Q,
         metrics=[metric],

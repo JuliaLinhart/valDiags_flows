@@ -31,7 +31,7 @@ def c2st_p_values_tfpr(
     """Computes the p-values, TPR and FPR over several runs of the Classifier Two Sample Test (C2ST)
     between two distributions P and Q:
 
-                                         (H0): P = Q   (H1): P != Q 
+                                         (H0): P = Q   (H1): P != Q
     for different metrics (test statistics).
 
     The p-value of a test-run is defined as the probability of falsely rejecting the null hypothesis (H0).
@@ -39,7 +39,7 @@ def c2st_p_values_tfpr(
     - TPR is the average number of times we correctly reject the null hypothesis (H0): power of the test.
     - FPR is the average number of times we incorrectly reject the null hypothesis (H0).
     We compute them for a range of significance levels alpha in (0,1), so that we can plot the ROC curve.
-    
+
     Args:
         eval_c2st_fn (function): function that evaluates the C2ST test
         n_runs (int): number of test runs to compute FPR and TPR. Each time with new samples from P and Q.
@@ -50,9 +50,9 @@ def c2st_p_values_tfpr(
             keys: "train" and "eval".
             values: int.
         metrics (list): list of metrics to be used for the test (test statistics)
-        metrics_cv (list): list of metrics to be used for the cross-validation. 
+        metrics_cv (list): list of metrics to be used for the cross-validation.
             Defauts to None.
-        compute_FPR (bool): whether to compute FPR or not. 
+        compute_FPR (bool): whether to compute FPR or not.
             Defaults to True.
         compute_TPR (bool): whether to compute TPR or not.
             Defaults to True.
@@ -61,7 +61,7 @@ def c2st_p_values_tfpr(
             values: second output of t_stats_c2st function.
             If None, use_permuation should be True.
             Defaults to None.
-    
+
     Returns:
         p_values_H1 (dict): dict of p-values for each metric under (H1)
         p_values_H0 (dict): dict of p-values for each metric under (H0)
@@ -253,7 +253,11 @@ if __name__ == "__main__":
 
     # test parameters
     parser.add_argument(
-        "--n_runs", "-nr", type=int, default=300, help="Number of test runs.",
+        "--n_runs",
+        "-nr",
+        type=int,
+        default=300,
+        help="Number of test runs.",
     )
     parser.add_argument(
         "-alphas",
@@ -408,7 +412,8 @@ if __name__ == "__main__":
                 if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
                     # load null scores if they exist
                     t_stats_null = np.load(
-                        PATH_EXPERIMENT + "t_stats_null/" + filename, allow_pickle=True,
+                        PATH_EXPERIMENT + "t_stats_null/" + filename,
+                        allow_pickle=True,
                     ).item()
                 else:
                     # otherwise, compute them
@@ -421,21 +426,23 @@ if __name__ == "__main__":
                         for i in range(2 * N_TRIALS_NULL):
                             list_P_null[i] = list_P_null[i].reshape(-1, 1)
                             list_P_eval_null[i] = list_P_eval_null[i].reshape(-1, 1)
-                    _, t_stats_null = t_stats_c2st_custom(
+                    t_stats_null = t_stats_c2st_custom(
+                        null_hypothesis=True,
                         use_permutation=False,
                         metrics=metric_list,
                         cross_val=cross_val,
                         n_folds=cross_val_folds,
                         list_P_null=list_P_null,
                         list_P_eval_null=list_P_eval_null,
-                        # unnecessary, but needed inside `t_stats_c2st`
+                        # required args inside `t_stats_c2st`
                         P=list_P_null[0],
                         Q=list_P_null[1],
                         P_eval=list_P_eval_null[0],
                         Q_eval=list_P_eval_null[1],
                     )
                     np.save(
-                        PATH_EXPERIMENT + "t_stats_null/" + filename, t_stats_null,
+                        PATH_EXPERIMENT + "t_stats_null/" + filename,
+                        t_stats_null,
                     )
                 scores_null[cross_val] = t_stats_null
         else:
@@ -733,4 +740,3 @@ if __name__ == "__main__":
                 + f"_{test_params}.pdf"
             )
             plt.show()
-

@@ -55,7 +55,10 @@ parser = argparse.ArgumentParser()
 
 # data parameters
 parser.add_argument(
-    "--dim", type=int, default=2, help="Dimension of the data (number of features).",
+    "--dim",
+    type=int,
+    default=2,
+    help="Dimension of the data (number of features).",
 )
 
 parser.add_argument(
@@ -105,13 +108,12 @@ P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # P is a standard Gaussian
 
 # Parameters for different experiments
 if args.q_dist == "mean":
-
     # variable sample size or distribution shift
     if args.err_ns:
         # N_cal (training set size)
-        n_samples_list = [50, 100, 200, 500, 1000, 2000, 3000, 5000]
+        n_samples_list = [50, 75, 100, 150, 200, 300, 500, 1000]
         # mean-shift
-        shifts = [0.1]
+        shifts = [np.sqrt(0.05)]
     elif args.err_shift or args.t_shift:
         # N_cal (training set size)
         n_samples_list = [3000]
@@ -213,7 +215,6 @@ if args.t_shift:
         P_eval = P_dist.rvs(size=N_SAMPLES_EVAL)
         # evaluate test statistics
         for i, (s, Q_dist) in enumerate(zip(shifts, Q_dist_list)):
-
             for b in [True, False]:
                 Q_eval = Q_dist.rvs(size=N_SAMPLES_EVAL)
                 if args.opt_bayes:
@@ -232,7 +233,7 @@ if args.t_shift:
                         Q = Q.reshape(-1, 1)
                         P_eval = P_eval.reshape(-1, 1)
                         Q_eval = Q_eval.reshape(-1, 1)
-                    scores = c2st_scores(
+                    scores = t_stats_c2st(
                         P=P,
                         Q=Q,
                         cross_val=False,
@@ -242,6 +243,7 @@ if args.t_shift:
                         clf_kwargs=clf_kwargs,
                         metrics=list(METRICS.keys()),
                         single_class_eval=b,
+                        null_hypothesis=False,
                     )
 
                 for metric, t_names in zip(METRICS.keys(), METRICS.values()):
@@ -273,7 +275,11 @@ if args.t_shift:
         if "0" not in name:
             linestyle = "--"
         plt.plot(
-            shifts, test_stats_mean[name], label=name, color=color, linestyle=linestyle,
+            shifts,
+            test_stats_mean[name],
+            label=name,
+            color=color,
+            linestyle=linestyle,
         )
         plt.fill_between(
             x=shifts,
@@ -309,6 +315,7 @@ if args.err_shift or args.err_ns:
     # Pre-compute test statistics under the null distribution
     scores_null_list = []
     for n in n_samples_list:
+        print()
         print(f"N_cal = {n}")
         if not USE_PERMUTATION:
             # Not using the permutation method to simulate the null distribution
@@ -325,7 +332,8 @@ if args.err_shift or args.err_ns:
             if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
                 # load null scores if they exist
                 scores_null = np.load(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename, allow_pickle=True,
+                    PATH_EXPERIMENT + "t_stats_null/" + filename,
+                    allow_pickle=True,
                 ).item()
             else:
                 # otherwise, compute them
@@ -339,7 +347,8 @@ if args.err_shift or args.err_ns:
                         list_P_null[i] = list_P_null[i].reshape(-1, 1)
                         list_P_eval_null[i] = list_P_eval_null[i].reshape(-1, 1)
                 for b in [True, False]:
-                    _, t_stats_null = t_stats_c2st_custom(
+                    t_stats_null = t_stats_c2st_custom(
+                        null_hypothesis=True,
                         list_P_null=list_P_null,
                         list_P_eval_null=list_P_eval_null,
                         # args for scores_fn
@@ -352,7 +361,8 @@ if args.err_shift or args.err_ns:
                     )
                     scores_null[b] = t_stats_null
                 np.save(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename, scores_null,
+                    PATH_EXPERIMENT + "t_stats_null/" + filename,
+                    scores_null,
                 )
 
         else:
@@ -419,7 +429,12 @@ if args.err_shift or args.err_ns:
             if "0" not in name:
                 linestyle = "--"
             plt.plot(
-                shifts, TPR_list[name], label=name, color=color, linestyle=linestyle
+                shifts,
+                TPR_list[name],
+                label=name,
+                color=color,
+                linestyle=linestyle,
+                alpha=0.8,
             )
         plt.legend()
         plt.title(
@@ -484,6 +499,7 @@ if args.err_shift or args.err_ns:
                 label=name,
                 color=color,
                 linestyle=linestyle,
+                alpha=0.8,
             )
         plt.legend()
         plt.title(f"{clf_name}-C2ST Type I error (alpha = {ALPHA})" + f"\n dim={dim}")
@@ -503,6 +519,7 @@ if args.err_shift or args.err_ns:
                 label=name,
                 color=color,
                 linestyle=linestyle,
+                alpha=0.8,
             )
         plt.legend()
         plt.title(
@@ -515,4 +532,3 @@ if args.err_shift or args.err_ns:
             + f"power_ns_{clf_name}_alpha_{ALPHA}_{args.q_dist}_shift_s_{shift}_dim_{dim}.pdf"
         )
         plt.show()
-

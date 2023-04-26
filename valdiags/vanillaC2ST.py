@@ -380,13 +380,13 @@ def t_stats_c2st(
                 if P_eval is not None and Q_eval is not None:
                     X_eval = np.concatenate([P_eval, Q_eval], axis=0)
                     X_eval = np.random.permutation(X_eval)
-                    P_eval_t = X[: len(P_eval)]
-                    Q_eval_t = X[len(P_eval) :]
+                    P_eval_t = X_eval[: len(P_eval)]
+                    Q_eval_t = X_eval[len(P_eval) :]
                 else:
                     # otherwise, set them to None.
                     # In this case scores_fn will use P and Q (via in-sample or cross validation)
-                    P_eval_t = None
-                    Q_eval_t = None
+                    P_eval_t = P_eval
+                    Q_eval_t = Q_eval
 
             # directly use the samples from P to test under the null hypothesis
             else:

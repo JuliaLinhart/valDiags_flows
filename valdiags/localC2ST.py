@@ -3,7 +3,7 @@
 # Author: Julia Linhart
 # Institution: Inria Paris-Saclay (MIND team)
 
-import tqdm as tqdm
+from tqdm import tqdm
 
 import numpy as np
 
@@ -134,6 +134,7 @@ def lc2st_scores(
     n_folds=10,
     n_ensemble=1,
     in_sample=False,
+    trained_clfs=None,
 ):
     """Computes the scores of a classifier
         - trained on data from the joint distributions P,x and Q,x
@@ -186,20 +187,23 @@ def lc2st_scores(
         in_sample (bool, optional): whether to evaluate on training data (True) or not (False).
             Can only be used if P is independent of x.
             Defaults to False.
+        trained_clfs (list of sklearn models, optional): list of trained classifiers.
+            Defaults to None.
 
     Returns:
         (dict): dictionary of scores (accuracy, proba, etc.) for each metric.
     """
-
-    # initialize classifier
-    classifier = clf_class(**clf_kwargs)
-
     if not cross_val:
         ens_accuracies = []
         ens_probas = []
-        for _ in range(n_ensemble):
-            # train classifier
-            clf = train_lc2st(P, Q, x_P, x_Q, clf=classifier)
+        for n in range(n_ensemble):
+            if trained_clfs is not None:
+                clf = trained_clfs[n]
+            else:
+                # initialize classifier
+                classifier = clf_class(**clf_kwargs)
+                # train classifier
+                clf = train_lc2st(P, Q, x_P, x_Q, clf=classifier)
 
             # eval classifier
             if in_sample:  # evaluate on training data
@@ -243,7 +247,7 @@ def lc2st_scores(
 
         # cross-validation
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-        for train_index, val_index in kf.split(P):
+        for n, (train_index, val_index) in enumerate(kf.split(P)):
             # split data into train and val sets for n^th cv-fold
             P_train, x_P_train = P[train_index], x_P[train_index]
             P_val = P[val_index]  # ok if P is independent of x
@@ -256,10 +260,15 @@ def lc2st_scores(
             else:
                 Q_val = None
 
-            # train n^th classifier
-            clf_n = train_lc2st(
-                P=P_train, Q=Q_train, x_P=x_P_train, x_Q=x_Q_train, clf=classifier
-            )
+            if trained_clfs is not None:
+                clf_n = trained_clfs[n]
+            else:
+                # initialize classifier
+                classifier = clf_class(**clf_kwargs)
+                # train n^th classifier
+                clf_n = train_lc2st(
+                    P=P_train, Q=Q_train, x_P=x_P_train, x_Q=x_Q_train, clf=classifier
+                )
             # eval n^th classifier
             accuracy, proba = eval_lc2st(
                 P=P_val,
@@ -419,6 +428,7 @@ def t_stats_lc2st(
                     P_eval_t = X_eval[: len(P_eval)]
                     Q_eval_t = X_eval[len(P_eval) :]
                 else:
+                    # does this make sense? using the same data for each trial?
                     P_eval_t = P_eval
                     Q_eval_t = Q_eval
             # directly use the samples from P to test under the null hypothesis
@@ -460,7 +470,7 @@ def t_stats_lc2st(
 import torch
 
 
-def sbi_clf_kwargs(ndim):
+def sbibm_clf_kwargs(ndim):
     """same setup as in :
     https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
     """
@@ -487,7 +497,7 @@ def lc2st_sbibm(
     ndim = P.shape[-1] + x_P.shape[-1]
     if classifier is None:
         clf_class = MLPClassifier
-        clf_kwargs = sbi_clf_kwargs(ndim)
+        clf_kwargs = sbibm_clf_kwargs(ndim)
     scores, _ = lc2st_scores(
         P,
         Q,

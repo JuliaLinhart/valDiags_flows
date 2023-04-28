@@ -107,7 +107,7 @@ def c2st_p_values_tfpr(
 
         if compute_TPR:
             # evaluate test under (H1)
-            _, p_value = eval_c2st_fn(
+            _, p_value, _, _ = eval_c2st_fn(
                 metrics=metrics,
                 # args for t_stats_c2st
                 P=P,
@@ -123,7 +123,7 @@ def c2st_p_values_tfpr(
 
         if compute_FPR:
             # evaluate test under (H0)
-            _, p_value = eval_c2st_fn(
+            _, p_value, _, _ = eval_c2st_fn(
                 metrics=metrics,
                 P=P,
                 Q=Q_H0,
@@ -139,7 +139,7 @@ def c2st_p_values_tfpr(
         if len(metrics_cv) > 0:
             if compute_TPR:
                 # evaluate test under (H1) over several cross-val folds
-                _, p_value_cv = eval_c2st_fn(
+                _, p_value_cv, _, _ = eval_c2st_fn(
                     metrics=metrics_cv,
                     P=P,
                     Q=Q,
@@ -153,7 +153,7 @@ def c2st_p_values_tfpr(
 
             if compute_FPR:
                 # evaluate test under (H0) over several cross-val folds
-                _, p_value_cv = eval_c2st_fn(
+                _, p_value_cv, _, _ = eval_c2st_fn(
                     metrics=metrics_cv,
                     P=P,
                     Q=Q_H0,
@@ -165,7 +165,7 @@ def c2st_p_values_tfpr(
                 for m in metrics_cv:
                     p_values_H0[m].append(p_value_cv[m])
 
-    # compute TPR and TPF at every alpha
+    # compute TPR and FPR at every alpha
     TPR = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
     FPR = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
     for alpha in alpha_list:
@@ -208,7 +208,8 @@ if __name__ == "__main__":
 
     # metrics / test statistics
     metrics = ["accuracy", "mse", "div"]
-    metrics_cv = ["accuracy_cv"]
+    # metrics_cv = ["accuracy_cv"]
+    metrics_cv = []
     all_metrics = metrics + metrics_cv
 
     cross_val_folds = 2
@@ -322,6 +323,12 @@ if __name__ == "__main__":
         "--err_shift",
         action="store_true",
         help="Compute and Plot Type 1 error/Power for the test over multiple shifts.",
+    )
+
+    parser.add_argument(
+        "--perm_exp",
+        action="store_true",
+        help="Compute and Plot Type 1 error/Power for the test with or without permutation method.",
     )
 
     args = parser.parse_args()
@@ -459,7 +466,7 @@ if __name__ == "__main__":
     eval_c2st = partial(
         eval_htest,
         t_stats_estimator=t_stats_c2st_custom,
-        use_permutation=args.use_permutation,
+        # use_permutation=args.use_permutation,
         verbose=False,
         metrics=metrics,
     )
@@ -497,6 +504,12 @@ if __name__ == "__main__":
         # For each sample size, compute the test results for each metric:
         # p-values, TPR and FPR (at given alphas)
         TPR_list, FPR_list, p_values_H0_list, p_values_H1_list = [], [], [], []
+        TPR_list_perm, FPR_list_perm, p_values_H0_list_perm, p_values_H1_list_perm = (
+            [],
+            [],
+            [],
+            [],
+        )
         for i, n in enumerate(N_SAMPLES_LIST):
             print()
             print(f"N = {n}")
@@ -517,6 +530,32 @@ if __name__ == "__main__":
             FPR_list.append(FPR)
             p_values_H1_list.append(p_values_H1)
             p_values_H0_list.append(p_values_H0)
+
+            if args.perm_exp:
+                print("Running permutation test")
+                (
+                    TPR_perm,
+                    FPR_perm,
+                    p_values_H1_perm,
+                    p_values_H0_perm,
+                ) = c2st_p_values_tfpr(
+                    eval_c2st_fn=partial(
+                        eval_c2st, use_permutation=True, n_trials_null=100
+                    ),
+                    n_runs=N_RUNS,
+                    n_samples={"train": n, "eval": N_EVAL_LIST[i]},
+                    alpha_list=args.alphas,
+                    P_dist=P_dist,
+                    Q_dist=Q_dist,
+                    metrics=metrics,
+                    metrics_cv=metrics_cv,
+                    n_folds=cross_val_folds,
+                    scores_null=None,
+                )
+                TPR_list_perm.append(TPR_perm)
+                FPR_list_perm.append(FPR_perm)
+                p_values_H1_list_perm.append(p_values_H1_perm)
+                p_values_H0_list_perm.append(p_values_H0_perm)
 
         # ==== EXP 1: plot ROC curves comparing test statistics for a given sample size ====
 
@@ -621,35 +660,87 @@ if __name__ == "__main__":
                     for i in range(len(N_SAMPLES_LIST)):
                         FPR_a[m].append(FPR_list[i][m][k])
                         TPR_a[m].append(TPR_list[i][m][k])
+                if args.perm_exp:
+                    FPR_a_perm = dict(
+                        zip(all_metrics, [[] for _ in range(len(all_metrics))])
+                    )
+                    TPR_a_perm = dict(
+                        zip(all_metrics, [[] for _ in range(len(all_metrics))])
+                    )
+                    for m in all_metrics:
+                        for i in range(len(N_SAMPLES_LIST)):
+                            FPR_a_perm[m].append(FPR_list_perm[i][m][k])
+                            TPR_a_perm[m].append(TPR_list_perm[i][m][k])
+                    for m in all_metrics:
+                        plt.plot(N_SAMPLES_LIST, FPR_a[m], label=m)
+                        plt.plot(
+                            N_SAMPLES_LIST,
+                            FPR_a_perm[m],
+                            label=m + " (perm)",
+                            linestyle="--",
+                        )
+                    plt.legend()
+                    plt.title(
+                        f"C2ST Type I error / FPR (alpha = {np.round(alpha,2)})"
+                        + f"\n dim={dim}"
+                    )
+                    plt.savefig(
+                        PATH_EXPERIMENT
+                        + f"perm_type_I_error_ns_alpha_{np.round(alpha,2)}_{args.clf_name}_dim_{dim}"
+                        + f"_{test_params}.pdf"
+                    )
+                    plt.show()
 
-                for m in all_metrics:
-                    plt.plot(N_SAMPLES_LIST, FPR_a[m], label=m)
-                plt.legend()
-                plt.title(
-                    f"C2ST Type I error / FPR (alpha = {np.round(alpha,2)})"
-                    + f"\n dim={dim}"
-                )
-                plt.savefig(
-                    PATH_EXPERIMENT
-                    + f"type_I_error_ns_alpha_{np.round(alpha,2)}_{args.clf_name}_dim_{dim}"
-                    + f"_{test_params}.pdf"
-                )
-                plt.show()
+                    for m in all_metrics:
+                        plt.plot(N_SAMPLES_LIST, TPR_a[m], label=m)
+                        plt.plot(
+                            N_SAMPLES_LIST,
+                            TPR_a_perm[m],
+                            label=m + " (perm)",
+                            linestyle="--",
+                        )
+                    plt.legend()
+                    plt.title(
+                        f"C2ST Power / TPR (alpha = {np.round(alpha,2)})"
+                        + f"\n {H1_label}, dim={dim}"
+                    )
+                    plt.savefig(
+                        PATH_EXPERIMENT
+                        + f"perm_power_ns_alpha_{np.round(alpha,2)}_{args.clf_name}"
+                        + f"_{q_params}"
+                        + f"_{test_params}.pdf"
+                    )
+                    plt.show()
 
-                for m in all_metrics:
-                    plt.plot(N_SAMPLES_LIST, TPR_a[m], label=m)
-                plt.legend()
-                plt.title(
-                    f"C2ST Power / TPR (alpha = {np.round(alpha,2)})"
-                    + f"\n {H1_label}, dim={dim}"
-                )
-                plt.savefig(
-                    PATH_EXPERIMENT
-                    + f"power_ns_alpha_{np.round(alpha,2)}_{args.clf_name}"
-                    + f"_{q_params}"
-                    + f"_{test_params}.pdf"
-                )
-                plt.show()
+                else:
+                    for m in all_metrics:
+                        plt.plot(N_SAMPLES_LIST, FPR_a[m], label=m)
+                    plt.legend()
+                    plt.title(
+                        f"C2ST Type I error / FPR (alpha = {np.round(alpha,2)})"
+                        + f"\n dim={dim}"
+                    )
+                    plt.savefig(
+                        PATH_EXPERIMENT
+                        + f"type_I_error_ns_alpha_{np.round(alpha,2)}_{args.clf_name}_dim_{dim}"
+                        + f"_{test_params}.pdf"
+                    )
+                    plt.show()
+
+                    for m in all_metrics:
+                        plt.plot(N_SAMPLES_LIST, TPR_a[m], label=m)
+                    plt.legend()
+                    plt.title(
+                        f"C2ST Power / TPR (alpha = {np.round(alpha,2)})"
+                        + f"\n {H1_label}, dim={dim}"
+                    )
+                    plt.savefig(
+                        PATH_EXPERIMENT
+                        + f"power_ns_alpha_{np.round(alpha,2)}_{args.clf_name}"
+                        + f"_{q_params}"
+                        + f"_{test_params}.pdf"
+                    )
+                    plt.show()
 
     # ==== EXP 3: FPR and TPR as a function of shifts at fixed N and alpha=====
     if args.err_shift:
@@ -681,6 +772,12 @@ if __name__ == "__main__":
 
         # compute TPR and FPR for each shift
         TPR_list, FPR_list, p_values_H0_list, p_values_H1_list = [], [], [], []
+        TPR_list_perm, FPR_list_perm, p_values_H0_list_perm, p_values_H1_list_perm = (
+            [],
+            [],
+            [],
+            [],
+        )
         for i, Q_dist in enumerate(Q_dist_list):
             print()
             print(f"{case}: {H1_label}, shift = {SHIFT_LIST[i]}")
@@ -702,6 +799,32 @@ if __name__ == "__main__":
             p_values_H1_list.append(p_values_H1)
             p_values_H0_list.append(p_values_H0)
 
+            if args.perm_exp:
+                print("Running permutation test")
+                (
+                    TPR_perm,
+                    FPR_perm,
+                    p_values_H1_perm,
+                    p_values_H0_perm,
+                ) = c2st_p_values_tfpr(
+                    eval_c2st_fn=partial(
+                        eval_c2st, use_permutation=True, n_trials_null=100
+                    ),
+                    n_runs=N_RUNS,
+                    n_samples={"train": n, "eval": n_eval},
+                    alpha_list=args.alphas,
+                    P_dist=P_dist,
+                    Q_dist=Q_dist,
+                    metrics=metrics,
+                    metrics_cv=metrics_cv,
+                    n_folds=cross_val_folds,
+                    scores_null=None,
+                )
+                TPR_list_perm.append(TPR_perm)
+                FPR_list_perm.append(FPR_perm)
+                p_values_H1_list_perm.append(p_values_H1_perm)
+                p_values_H0_list_perm.append(p_values_H0_perm)
+
         # For each alpha, plot TPR and FPR for each metric as a function of shift
         for k, alpha in enumerate(args.alphas):
             FPR_a = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
@@ -711,32 +834,76 @@ if __name__ == "__main__":
                     FPR_a[m].append(FPR_list[i][m][k])
                     TPR_a[m].append(TPR_list[i][m][k])
 
-            # FPR
-            for m in all_metrics:
-                plt.plot(SHIFT_LIST, FPR_a[m], label=m)
-            plt.legend()
-            plt.title(
-                f"C2ST Type I error / FPR (alpha = {np.round(alpha,2)})"
-                + f"\n dim={dim}"
-            )
-            plt.savefig(
-                PATH_EXPERIMENT
-                + f"type_I_error_{case}_shift_dim_{dim}_N_{n}_alpha_{np.round(alpha,2)}_{args.clf_name}"
-                + f"_{test_params}.pdf"
-            )
-            plt.show()
+            if args.perm_exp:
+                FPR_a_perm = dict(
+                    zip(all_metrics, [[] for _ in range(len(all_metrics))])
+                )
+                TPR_a_perm = dict(
+                    zip(all_metrics, [[] for _ in range(len(all_metrics))])
+                )
+                for m in all_metrics:
+                    for i in range(len(SHIFT_LIST)):
+                        FPR_a_perm[m].append(FPR_list_perm[i][m][k])
+                        TPR_a_perm[m].append(TPR_list_perm[i][m][k])
 
-            # TPR
-            for m in all_metrics:
-                plt.plot(SHIFT_LIST, TPR_a[m], label=m)
-            plt.legend()
-            plt.title(
-                f"C2ST Power / TPR (alpha = {np.round(alpha,2)})"
-                + f"\n {H1_label}, dim={dim}"
-            )
-            plt.savefig(
-                PATH_EXPERIMENT
-                + f"power_{case}_shift_dim_{dim}_N_{n}_alpha_{np.round(alpha,2)}_{args.clf_name}"
-                + f"_{test_params}.pdf"
-            )
-            plt.show()
+                for m in all_metrics:
+                    plt.plot(SHIFT_LIST, FPR_a[m], label=m)
+                    plt.plot(
+                        SHIFT_LIST, FPR_a_perm[m], label=m + " (perm)", linestyle="--"
+                    )
+                plt.legend()
+                plt.title(
+                    f"C2ST Type I error / FPR (alpha = {np.round(alpha,2)})"
+                    + f"\n dim={dim}"
+                )
+                plt.savefig(
+                    PATH_EXPERIMENT
+                    + f"perm_type_I_error_{case}_shift_dim_{dim}_N_{n}_alpha_{np.round(alpha,2)}_{args.clf_name}"
+                    + f"_{test_params}.pdf"
+                )
+                plt.show()
+
+                for m in all_metrics:
+                    plt.plot(SHIFT_LIST, TPR_a[m], label=m)
+                    plt.plot(
+                        SHIFT_LIST, TPR_a_perm[m], label=m + " (perm)", linestyle="--"
+                    )
+                plt.legend()
+                plt.title(f"C2ST Power / TPR (alpha = {np.round(alpha,2)})")
+                plt.savefig(
+                    PATH_EXPERIMENT
+                    + f"perm_power_{case}_shift_dim_{dim}_N_{n}_alpha_{np.round(alpha,2)}_{args.clf_name}"
+                    + f"_{test_params}.pdf"
+                )
+                plt.show()
+
+            else:
+                # FPR
+                for m in all_metrics:
+                    plt.plot(SHIFT_LIST, FPR_a[m], label=m)
+                plt.legend()
+                plt.title(
+                    f"C2ST Type I error / FPR (alpha = {np.round(alpha,2)})"
+                    + f"\n dim={dim}"
+                )
+                plt.savefig(
+                    PATH_EXPERIMENT
+                    + f"type_I_error_{case}_shift_dim_{dim}_N_{n}_alpha_{np.round(alpha,2)}_{args.clf_name}"
+                    + f"_{test_params}.pdf"
+                )
+                plt.show()
+
+                # TPR
+                for m in all_metrics:
+                    plt.plot(SHIFT_LIST, TPR_a[m], label=m)
+                plt.legend()
+                plt.title(
+                    f"C2ST Power / TPR (alpha = {np.round(alpha,2)})"
+                    + f"\n {H1_label}, dim={dim}"
+                )
+                plt.savefig(
+                    PATH_EXPERIMENT
+                    + f"power_{case}_shift_dim_{dim}_N_{n}_alpha_{np.round(alpha,2)}_{args.clf_name}"
+                    + f"_{test_params}.pdf"
+                )
+                plt.show()

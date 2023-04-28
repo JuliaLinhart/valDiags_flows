@@ -3,6 +3,7 @@
 # - evaluate hypothesis test
 
 import numpy as np
+import torch
 
 
 def compute_pvalue(t_stat_est, t_stats_null):
@@ -43,7 +44,11 @@ def eval_htest(
         kwargs: additional inputs to `t_stats_estimator`: True rejected, False otherwise.
 
     Returns:
-        dict: contains the result of the hypothesis test for each metric
+        reject (dict): dictionary of booleans indicating whether the null hypothesis is rejected
+            for each metric.
+        p_value (dict): dictionary of p-values for each metric.
+        t_stat_data (dict): dictionary of test statistics estimated on observed data for each metric.
+        t_stats_null (dict): dictionary of test statistics drawn under the null hypothesis for each metric.
     """
     reject = {}
     p_value = {}
@@ -56,4 +61,18 @@ def eval_htest(
         p_value[m] = compute_pvalue(t_stat_data[m], t_stats_null[m])
         reject[m] = p_value[m] < conf_alpha  # True = reject
 
-    return reject, p_value
+    return reject, p_value, t_stat_data, t_stats_null
+
+
+def permute_data(P, Q):
+    """Permute the concatenated data [P,Q] to create null-hyp samples.
+
+    Args:
+        P (torch.Tensor): data of shape (n_samples, dim)
+        Q (torch.Tensor): data of shape (n_samples, dim)
+    """
+    assert P.shape[0] == Q.shape[0]
+    n_samples = P.shape[0]
+    X = torch.cat([P, Q], dim=0)
+    X_perm = X[torch.randperm(n_samples * 2)]
+    return X_perm[:n_samples], X_perm[n_samples:]

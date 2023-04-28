@@ -14,7 +14,7 @@ from sklearn.discriminant_analysis import (
     QuadraticDiscriminantAnalysis,
 )
 from sklearn.neural_network import MLPClassifier
-from valdiags.vanillaC2ST import c2st_scores
+from valdiags.vanillaC2ST import c2st_scores, t_stats_c2st
 
 from classifiers.optimal_bayes import (
     opt_bayes_scores,
@@ -24,7 +24,6 @@ from classifiers.optimal_bayes import (
 
 from c2st_p_values_roc import c2st_p_values_tfpr
 from valdiags.test_utils import eval_htest
-from valdiags.vanillaC2ST import t_stats_c2st
 
 # GLOBAL PARAMETERS
 PATH_EXPERIMENT = "saved_experiments/neurips_2023/exp_1/"
@@ -111,7 +110,7 @@ if args.q_dist == "mean":
     # variable sample size or distribution shift
     if args.err_ns:
         # N_cal (training set size)
-        n_samples_list = [50, 75, 100, 150, 200, 300, 500, 1000]
+        n_samples_list = [50, 75, 100, 150, 200]
         # mean-shift
         shifts = [np.sqrt(0.05)]
     elif args.err_shift or args.t_shift:
@@ -306,8 +305,6 @@ if args.err_shift or args.err_ns:
         metrics=list(METRICS.keys()),
         clf_class=clf_class,
         clf_kwargs=clf_kwargs,
-        n_trials_null=N_TRIALS_NULL,
-        use_permutation=USE_PERMUTATION,
         # args for scores_fn
         cross_val=False,
     )
@@ -349,8 +346,10 @@ if args.err_shift or args.err_ns:
                 for b in [True, False]:
                     t_stats_null = t_stats_c2st_custom(
                         null_hypothesis=True,
+                        n_trials_null=N_TRIALS_NULL,
                         list_P_null=list_P_null,
                         list_P_eval_null=list_P_eval_null,
+                        use_permutation=False,
                         # args for scores_fn
                         single_class_eval=b,
                         # unnecessary, but needed inside `t_stats_c2st`
@@ -389,9 +388,7 @@ if args.err_shift or args.err_ns:
         scores_null = scores_null_list[0]
 
         # compute TPR and FPR for each shift
-        TPR_list, FPR_list, p_values_H0_list, p_values_H1_list = (
-            dict(zip(test_stat_names, [[] for _ in test_stat_names])),
-            dict(zip(test_stat_names, [[] for _ in test_stat_names])),
+        TPR_list, p_values_H1_list = (
             dict(zip(test_stat_names, [[] for _ in test_stat_names])),
             dict(zip(test_stat_names, [[] for _ in test_stat_names])),
         )
@@ -401,7 +398,9 @@ if args.err_shift or args.err_ns:
             print()
             for b in [True, False]:
                 TPR, _, p_values_H1, _ = c2st_p_values_tfpr(
-                    eval_c2st_fn=partial(eval_c2st, single_class_eval=b),
+                    eval_c2st_fn=partial(
+                        eval_c2st, single_class_eval=b, n_trials_null=N_TRIALS_NULL
+                    ),
                     n_runs=N_RUNS,
                     n_samples={"train": n, "eval": N_SAMPLES_EVAL},
                     alpha_list=[ALPHA],
@@ -436,9 +435,11 @@ if args.err_shift or args.err_ns:
                 linestyle=linestyle,
                 alpha=0.8,
             )
+        plt.xlabel(f"{args.q_dist} shift")
+        plt.ylabel(r"Power (TPR)")
         plt.legend()
         plt.title(
-            f"{clf_name}-C2ST Power (alpha = {ALPHA})" + f"\n {h0_label}, dim={dim}"
+            f"{clf_name}-C2ST Power for {h0_label}, dim={dim}" + "\n alpha = {ALPHA}"
         )
         plt.savefig(
             PATH_EXPERIMENT
@@ -464,7 +465,9 @@ if args.err_shift or args.err_ns:
             print()
             for b in [True, False]:
                 TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
-                    eval_c2st_fn=partial(eval_c2st, single_class_eval=b),
+                    eval_c2st_fn=partial(
+                        eval_c2st, single_class_eval=b, n_trials_null=N_TRIALS_NULL
+                    ),
                     n_runs=N_RUNS,
                     n_samples={"train": n, "eval": N_SAMPLES_EVAL},
                     alpha_list=[ALPHA],
@@ -477,6 +480,7 @@ if args.err_shift or args.err_ns:
                         True: None,
                     },  # no cross val metrics
                 )
+
                 for metric, t_names in zip(METRICS.keys(), METRICS.values()):
                     if b:
                         name = t_names[0]
@@ -501,8 +505,10 @@ if args.err_shift or args.err_ns:
                 linestyle=linestyle,
                 alpha=0.8,
             )
+        plt.ylabel(r"Type I error (FPR)")
+        plt.xlabel(r"$N_{cal}$")
         plt.legend()
-        plt.title(f"{clf_name}-C2ST Type I error (alpha = {ALPHA})" + f"\n dim={dim}")
+        plt.title(f"{clf_name}-C2ST Type I error, dim={dim}" + f"\n alpha = {ALPHA}")
         plt.savefig(
             PATH_EXPERIMENT + f"type_I_error_ns_{clf_name}_alpha_{ALPHA}_dim_{dim}.pdf"
         )
@@ -521,11 +527,13 @@ if args.err_shift or args.err_ns:
                 linestyle=linestyle,
                 alpha=0.8,
             )
+
+        plt.ylabel(r"Power (TPR)")
+        plt.xlabel(r"$N_{cal}$")
         plt.legend()
         plt.title(
-            f"{clf_name}-C2ST Power (alpha = {ALPHA})"
-            + f"\n {h0_label}"
-            + f"\n s = {shift}, dim={dim}"
+            f"{clf_name}-C2ST Power for {h0_label}, s = {shift}, dim={dim}"
+            + "\n alpha = {ALPHA}"
         )
         plt.savefig(
             PATH_EXPERIMENT

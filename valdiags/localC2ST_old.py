@@ -26,18 +26,18 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def train_lc2st(P, Q, x, clf=DEFAULT_CLF):
-    """ Trains a classifier to distinguish between data from P,x and Q,x.
+    """Trains a classifier to distinguish between data from P,x and Q,x.
 
     Args:
-        P (numpy.array): data drawn from P 
+        P (numpy.array): data drawn from P
             of size (n_samples, dim).
-        Q (numpy.array): data drawn from Q  
+        Q (numpy.array): data drawn from Q
             of size (n_samples, dim).
         x (numpy.array): data drawn from x
             of size (n_samples, n_features).
         clf (sklearn model, optional): needs to have a method `.fit(X,y)`.
             Defaults to DEFAULT_CLF.
-    
+
     Returns:
         (sklearn model): trained classifier (cloned from clf).
     """
@@ -74,10 +74,10 @@ def eval_lc2st(P, x, y=None, clf=DEFAULT_CLF):
             of size (n_samples,). Defaults to None.
         clf (sklearn model, optional): needs to have a methods `.score(X,y)` and `.predict_proba(X)`.
             Defaults to DEFAULT_CLF.
-    
+
     Returns:
         (numpy.array): predicted probabilities for class 0 (P|x) (and accuracy if y is not None).
-        
+
     """
     # concatenate P with repeated x to get samples from P|x
     features_eval = np.concatenate([P, x.repeat(len(P), 1)], axis=1)
@@ -165,7 +165,7 @@ def lc2st_scores(
     P_eval=None,
     Q_eval=None,
 ):
-    """Computes scores for a classifier trained on P,x_cal and Q,x_cal 
+    """Computes scores for a classifier trained on P,x_cal and Q,x_cal
     and evaluated at a fixed observation x_eval.
 
     Args:
@@ -181,19 +181,19 @@ def lc2st_scores(
             Defaults to ["probas_mean"].
         n_folds (int, optional): number of folds for cross-validation.
             Defaults to 10.
-        clf_class (sklearn model, optional): needs to have a method `.fit(X,y)`, 
-            `.score(X,y)` and `.predict_proba(X)`. 
+        clf_class (sklearn model, optional): needs to have a method `.fit(X,y)`,
+            `.score(X,y)` and `.predict_proba(X)`.
             Defaults to MLPClassifier.
         clf_kwargs (dict, optional): keyword arguments for clf_class.
             Defaults to {"alpha": 0, "max_iter": 25000}.
-        P_eval (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x_eval)   
+        P_eval (numpy.array, optional): data drawn from P|x_eval (or just P if independent of x_eval)
             of size (n_samples, dim). Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x_eval)
             of size (n_samples, dim). Defaults to None.
-    
+
     Returns:
         (dict): dictionary with scores for each metric.
-        
+
     """
 
     classifier = clf_class(**clf_kwargs)
@@ -206,19 +206,24 @@ def lc2st_scores(
         scores[m] = []
     for train_index, val_index in kf.split(P):
         P_train = P[train_index]
-        if P_eval is None:
-            P_val = P[val_index]
-        else:
-            P_val = P_eval[val_index]
         Q_train = Q[train_index]
         x_train = x_cal[train_index]
+
+        if P_eval is None:
+            P_val = P[val_index]
+            Q_val = Q[val_index]
+        elif P_eval is not None and Q_eval is not None:
+            P_val = P_eval[val_index]
+            Q_val = Q_eval[val_index]
+        else:
+            P_val = P_eval[val_index]
+            Q_val = None
 
         # train n^th classifier
         clf_n = train_lc2st(P_train, Q_train, x_train, clf=classifier)
 
         # eval n^th classifier
-        if Q_eval is not None:
-            Q_val = Q_eval[val_index]
+        if P_eval is None or Q_eval is not None:
             features_val = np.concatenate([P_val, Q_val], axis=0)
             labels_val = np.array([0] * len(P_val) + [1] * len(Q_val)).reshape(-1, 1)
         else:
@@ -331,7 +336,6 @@ def expected_lc2st_scores(
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     only_one_class_for_eval=False,
 ):
-
     classifier = clf_class(**clf_kwargs)
 
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
@@ -458,7 +462,11 @@ def flow_vs_reference_distribution(
     else:
         colors = ["blue", "orange"]
     plot_distributions(
-        [samples_ref, samples_flow], colors=colors, labels=labels, dim=dim, hist=hist,
+        [samples_ref, samples_flow],
+        colors=colors,
+        labels=labels,
+        dim=dim,
+        hist=hist,
     )
     plt.title(title)
 
@@ -721,7 +729,6 @@ def eval_null_lc2st(
     n=1000,
     n_folds=10,
 ):
-
     scores = {}
     for m in test_stats:
         scores[m] = []
@@ -827,7 +834,8 @@ def lc2st_sbibm(
 ):
     ndim = P.shape[-1] + x_cal.shape[-1]
     if classifier is None:
-        classifier = MLPClassifier(**c2st_kwargs(ndim))
+        clf_class = MLPClassifier
+        clf_kwargs = c2st_kwargs(ndim)
     scores, _ = lc2st_scores(
         P,
         Q,
@@ -837,13 +845,21 @@ def lc2st_sbibm(
         n_folds=n_folds,
         P_eval=P_eval,
         Q_eval=Q_eval,
+        clf_class=clf_class,
+        clf_kwargs=clf_kwargs,
     )
     return torch.tensor([np.mean(scores[metric])])
 
 
 ## expected c2st score
 def expected_lc2st_sbibm(
-    P, Q, x_cal, metric="accuracy", n_folds=10, clf_class=None, clf_kwargs=None,
+    P,
+    Q,
+    x_cal,
+    metric="accuracy",
+    n_folds=10,
+    clf_class=None,
+    clf_kwargs=None,
 ):
     if clf_class is None or clf_kwargs is None:
         ndim = P.shape[-1] + x_cal.shape[-1]
@@ -851,7 +867,12 @@ def expected_lc2st_sbibm(
         clf_kwargs = c2st_kwargs(ndim)
 
     scores = expected_lc2st_scores(
-        P, Q, x_cal, clf_class=clf_class, clf_kwargs=clf_kwargs, n_folds=n_folds,
+        P,
+        Q,
+        x_cal,
+        clf_class=clf_class,
+        clf_kwargs=clf_kwargs,
+        n_folds=n_folds,
     )
     score = np.mean(scores[metric])
 

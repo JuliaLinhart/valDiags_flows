@@ -167,6 +167,7 @@ def c2st_scores(
     P_eval=None,
     Q_eval=None,
     n_ensemble=1,
+    trained_clfs=None,
 ):
     """Computes scores/metrics for a classifier trained on P and Q.
     They represent the test statistics of the C2ST test estimated on P and Q.
@@ -195,19 +196,26 @@ def c2st_scores(
             Defaults to None.
         Q_eval (numpy.array, optional): data drawn from Q for out-of-sample evaluation.
             Defaults to None.
+        n_ensemble (int, optional): number of classifiers to build an ensemble model.
+            Defaults to 1.
+        trained_clfs (list of sklearn models, optional): list of pre-trained classifiers.
+            Defaults to None.
 
     Returns:
         (dict): dictionary of computed scores, i.e. estimated test statistics on P and Q.
     """
-    # initialize classifier
-    classifier = clf_class(**clf_kwargs)
 
     if not cross_val:
         ens_accuracies = []
         ens_probas = []
-        for _ in range(n_ensemble):
-            # train classifier
-            clf = train_c2st(P, Q, clf=classifier)
+        for n in range(n_ensemble):
+            if trained_clfs is not None:
+                clf = trained_clfs[n]
+            else:
+                # initialize classifier
+                classifier = clf_class(**clf_kwargs)
+                # train classifier
+                clf = train_c2st(P, Q, clf=classifier)
 
             # eval classifier
             if in_sample:  # evaluate on training data
@@ -256,9 +264,15 @@ def c2st_scores(
             Q_train = Q[train_index]
             Q_val = Q[val_index]
 
-            # train n^th classifier
-            clf_n = train_c2st(P_train, Q_train, clf=classifier)
-            # eval n^th classifier
+            if trained_clfs is not None:
+                clf_n = trained_clfs[n]
+            else:
+                # initialize classifier
+                classifier = clf_class(**clf_kwargs)
+                # train n^th classifier
+                clf_n = train_c2st(P_train, Q_train, clf=classifier)
+                # eval n^th classifier
+
             accuracy, proba = eval_c2st(
                 P_val, Q_val, clf=clf_n, single_class_eval=single_class_eval
             )
@@ -385,8 +399,8 @@ def t_stats_c2st(
                 else:
                     # otherwise, set them to None.
                     # In this case scores_fn will use P and Q (via in-sample or cross validation)
-                    P_eval_t = P_eval
-                    Q_eval_t = Q_eval
+                    P_eval_t = None
+                    Q_eval_t = None
 
             # directly use the samples from P to test under the null hypothesis
             else:
@@ -427,7 +441,7 @@ def t_stats_c2st(
 import torch
 
 
-def c2st_kwargs(ndim):
+def sbibm_clf_kwargs(ndim):
     """same setup as in :
     https://github.com/mackelab/sbi/blob/3e3522f177d4f56f3a617b2f15a5b2e25360a90f/sbi/utils/metrics.py
     """
@@ -451,7 +465,7 @@ def c2st_sbibm(
     ndim = P.shape[-1]
     if classifier is None:
         clf_class = MLPClassifier
-        clf_kwargs = c2st_kwargs(ndim)
+        clf_kwargs = sbibm_clf_kwargs(ndim)
     scores, _ = c2st_scores(
         P,
         Q,

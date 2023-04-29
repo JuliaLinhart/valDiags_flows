@@ -20,8 +20,6 @@
 import argparse
 from pathlib import Path
 import os
-from functools import partial
-from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,14 +28,13 @@ import sbibm
 from lc2st_sbibm_experiments import (
     compute_emp_power_l_c2st,
     l_c2st_results_n_train,
+    precompute_t_stats_null,
 )
 
-from valdiags.vanillaC2ST import t_stats_c2st, sbibm_clf_kwargs
-from valdiags.localC2ST import t_stats_lc2st, train_lc2st
-
-from valdiags.test_utils import eval_htest
+from valdiags.vanillaC2ST import sbibm_clf_kwargs
 
 from scipy.stats import multivariate_normal as mvn
+from sklearn.neural_network import MLPClassifier
 
 # # set seed
 # seed = 42
@@ -45,26 +42,11 @@ from scipy.stats import multivariate_normal as mvn
 # GLOBAL PARAMETERS
 PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_2")
 
-# number of training samples for the estimator (NF)
-N_TRAIN_LIST = [
-    100,
-    # 215,
-    # 464,
-    1000,
-    # 2151,
-    # 4641,
-    10000,
-    # 21544,
-    # 46415,
-    100000,
-]  # np.logspace(2,5,10, dtpye=int)
-
 # numbers of the observations x_0 from sbibm to evaluate the tests at
 NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # test parameters
 ALPHA = 0.05
-N_RUNS = 100
 N_TRIALS_PRECOMPUTE = 1000
 
 # metrics / test statistics
@@ -82,14 +64,26 @@ parser.add_argument(
     "--task",
     type=str,
     default="two_moons",
-    choices=["two_moons", "gaussian_mixture", "gaussian_linear_uniform"],
+    choices=["two_moons", "gaussian_mixture", "gaussian_linear_uniform", "slcp"],
     help="Task from sbibm to perform the experiment on.",
 )
 
 parser.add_argument(
-    "--t_stat_nt",
+    "--t_res_ntrain",
     action="store_true",
-    help="Exp 1: Plot the test statistic as a function of N_train.",
+    help="Exp 1: Plot the test results as a function of N_train (at fixed N_cal).",
+)
+
+parser.add_argument(
+    "--power_ntrain",
+    action="store_true",
+    help="Exp 2: Plot the empirical power / type 1 error as a function N_train (at fixed N_cal).",
+)
+
+parser.add_argument(
+    "--power_ncal",
+    action="store_true",
+    help="Exp 2: Plot the the empirical power / type 1 error as a function N_cal (at fixed N_train).",
 )
 
 # data parameters
@@ -119,7 +113,10 @@ parser.add_argument(
     help="Number of trials to estimate the distribution of the test statistic under the null.",
 )
 
-print("==== VALIDATION METHOD COMPARISON for sbibm-tasks ====")
+print()
+print("=================================================")
+print("  VALIDATION METHOD COMPARISON for sbibm-tasks")
+print("=================================================")
 print()
 
 # Parse arguments
@@ -158,134 +155,85 @@ c2st_clf_kwargs = sbibm_clf_kwargs(ndim=dim_theta)
 lc2st_clf_kwargs = sbibm_clf_kwargs(ndim=dim_theta + dim_x)
 
 # set-up path-params to save results for given test params
-test_params = f"alpha_{ALPHA}_n_runs_{N_RUNS}_n_trials_null_{args.n_trials_null}"
+test_params = f"alpha_{ALPHA}_n_trials_null_{args.n_trials_null}"
 eval_params = f"n_eval_{N_eval}_n_ensemble_{N_ENSEMBLE}_cross_val_{CROSS_VAL}"
+
+# kwargs for c2st_scores function
+kwargs_c2st = {
+    "cross_val": CROSS_VAL,
+    "n_ensemble": N_ENSEMBLE,
+    "clf_kwargs": c2st_clf_kwargs,
+}
+# kwargs for lc2st_scores function
+kwargs_lc2st = {
+    "cross_val": CROSS_VAL,
+    "n_ensemble": N_ENSEMBLE,
+    "single_class_eval": True,
+    "clf_kwargs": lc2st_clf_kwargs,
+}
 
 # pre-compute / load test statistics for the null hypothesis
 # they are independant of the estimator and the observation space (x)
+t_stats_null = {}
 for N_cal in N_cal_list:
-    if not os.path.exists(task_path / "t_stats_null" / eval_params):
-        os.makedirs(task_path / "t_stats_null" / eval_params)
-    try:
-        lc2st_stats_null = torch.load(
-            task_path
-            / "t_stats_null"
-            / eval_params
-            / f"lc2st_stats_null_nt_{N_TRIALS_PRECOMPUTE}_n_cal_{N_cal}.pkl"
-        )
-        c2st_stats_null = torch.load(
-            task_path
-            / "t_stats_null"
-            / eval_params
-            / f"c2st_stats_null_nt_{N_TRIALS_PRECOMPUTE}_n_cal_{N_cal}.pkl"
-        )
-    except FileNotFoundError:
-        print(
-            f"Pre-compute test statistics for (NF)-H_0 (N_cal={N_cal}, n_trials={N_TRIALS_PRECOMPUTE})"
-        )
-        P_dist_null = mvn(mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta))
-        list_P_null = [P_dist_null.rvs(N_cal) for _ in range(2 * N_TRIALS_PRECOMPUTE)]
-        list_P_eval_null = [
-            P_dist_null.rvs(N_cal) for _ in range(2 * N_TRIALS_PRECOMPUTE)
-        ]
-
-        lc2st_stats_null = t_stats_c2st(
-            null_hypothesis=True,
-            metrics=ALL_METRICS,  # proposed test statistics
-            use_permutation=False,
-            n_trials_null=N_TRIALS_PRECOMPUTE,  # we can use a lot because we pre-compute
-            return_probas=False,
-            # required kwargs for t_stats_c2st
-            P=list_P_null[0],
-            Q=list_P_null[1],
-            # kwargs for c2st_scores
-            cross_val=CROSS_VAL,
-            n_ensemble=N_ENSEMBLE,
-            single_class_eval=True,
-            clf_kwargs=c2st_clf_kwargs,
-            list_P_null=list_P_null,
-            list_P_eval_null=list_P_eval_null,
-        )
-        c2st_stats_null = t_stats_c2st(
-            null_hypothesis=True,
-            metrics=ALL_METRICS,  # proposed test statistics
-            use_permutation=False,
-            n_trials_null=N_TRIALS_PRECOMPUTE,  # we can use a lot because we pre-compute
-            return_probas=False,
-            # required kwargs for t_stats_c2st
-            P=list_P_null[0],
-            Q=list_P_null[1],
-            # kwargs for c2st_scores
-            cross_val=CROSS_VAL,
-            n_ensemble=N_ENSEMBLE,
-            single_class_eval=False,
-            clf_kwargs=c2st_clf_kwargs,
-            list_P_null=list_P_null,
-            list_P_eval_null=list_P_eval_null,
-        )
-        torch.save(
-            lc2st_stats_null,
-            task_path
-            / "t_stats_null"
-            / eval_params
-            / f"lc2st_stats_null_nt_{N_TRIALS_PRECOMPUTE}_n_cal_{N_cal}.pkl",
-        )
-        torch.save(
-            c2st_stats_null,
-            task_path
-            / "t_stats_null"
-            / eval_params
-            / f"c2st_stats_null_nt_{N_TRIALS_PRECOMPUTE}_n_cal_{N_cal}.pkl",
-        )
-
-# initialize the C2ST and L-C2ST test statistics function
-t_stats_c2st_custom = partial(
-    t_stats_c2st,
-    n_trials_null=args.n_trials_null,
-    # kwargs for c2st_scores
-    cross_val=CROSS_VAL,
-    n_ensemble=N_ENSEMBLE,
-    clf_kwargs=c2st_clf_kwargs,
-)
-
-t_stats_lc2st_custom = partial(
-    t_stats_lc2st,
-    n_trials_null=args.n_trials_null,
-    return_probas=False,
-    # kwargs for lc2st_scores
-    cross_val=CROSS_VAL,
-    n_ensemble=N_ENSEMBLE,
-    single_class_eval=True,
-    clf_kwargs=lc2st_clf_kwargs,
-)
-
+    P_dist_null = mvn(mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta))
+    list_P_null = [P_dist_null.rvs(N_cal) for _ in range(2 * N_TRIALS_PRECOMPUTE)]
+    list_P_eval_null = [P_dist_null.rvs(N_cal) for _ in range(2 * N_TRIALS_PRECOMPUTE)]
+    t_stats_null[N_cal] = precompute_t_stats_null(
+        metrics=ALL_METRICS,
+        list_P_null=list_P_null,
+        list_P_eval_null=list_P_eval_null,
+        t_stats_null_path=task_path / "t_stats_null" / eval_params,
+        methods=["c2st_nf", "lc2st_nf"],
+        save_results=True,
+        **kwargs_c2st,
+    )
 
 # perform the experiment
 # ==== EXP 1: test stats as a function of N_train (N_cal = max)==== #
-if args.t_stat_nt:
+if args.t_res_ntrain:
+    print()
     print(f"Experiment 1: test statistics as a function of N_train...")
     print(f"... for N_cal = {N_cal}")
     print()
 
+    # number of training samples for the estimator (NF)
+    N_TRAIN_LIST = [
+        100,
+        # 215,
+        # 464,
+        1000,
+        # 2151,
+        # 4641,
+        10000,
+        # 21544,
+        # 46415,
+        100000,
+    ]  # np.logspace(2,5,10, dtpye=int)
+
+    METHODS = ["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm"]
+
     for N_cal in N_cal_list:
-        avg_results = l_c2st_results_n_train(
+        avg_results, train_runtime = l_c2st_results_n_train(
             task,
             n_cal=N_cal,
             n_eval=N_eval,
             observation_dict=observation_dict,
             n_train_list=N_TRAIN_LIST,
             alpha=ALPHA,
-            c2st_stats_fn=t_stats_c2st_custom,
-            lc2st_stats_fn=t_stats_lc2st_custom,
-            c2st_stats_null_nf=c2st_stats_null,
-            lc2st_stats_null_nf=lc2st_stats_null,
+            n_trials_null=args.n_trials_null,
+            t_stats_null_c2st_nf=t_stats_null[N_cal]["c2st_nf"],
+            t_stats_null_lc2st_nf=t_stats_null[N_cal]["lc2st_nf"],
+            kwargs_c2st=kwargs_c2st,
+            kwargs_lc2st=kwargs_lc2st,
             task_path=task_path,
             results_n_train_path=Path("results") / test_params / eval_params,
-            methods=["c2st", "lc2st", "c2st_nf", "lc2st_nf"],
+            methods=METHODS,
+            test_stat_names=ALL_METRICS,
         )
 
         # path to save figures
-        fig_path = task_path / "figures"
+        fig_path = task_path / "figures" / eval_params / test_params
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
 
@@ -296,16 +244,22 @@ if args.t_stat_nt:
             "Reg-L-C2ST (NF)": {
                 k: v["mse"] for k, v in avg_results["lc2st_nf"].items()
             },
+            "Reg-L-C2ST (NF-Perm)": {
+                k: v["mse"] for k, v in avg_results["lc2st_nf_perm"].items()
+            },
             "Max-L-C2ST": {k: v["div"] for k, v in avg_results["lc2st"].items()},
             "Max-L-C2ST (NF)": {
                 k: v["div"] for k, v in avg_results["lc2st_nf"].items()
             },
+            "Max-L-C2ST (NF-Perm)": {
+                k: v["div"] for k, v in avg_results["lc2st_nf_perm"].items()
+            },
         }
 
-        colors = ["grey", "blue", "orange", "orange", "red", "red"]
-        linestyles = ["-", "-", "-", "--", "-", "--"]
+        colors = ["grey", "blue", "orange", "orange", "gold", "red", "red", "coral"]
+        linestyles = ["-", "-", "-", "--", "-.", "-", "--", "-."]
 
-        markers = ["o", "o", "o", "*", "o", "*"]
+        markers = ["o", "o", "o", "*", "*", "o", "*", "*"]
 
         for k in avg_results["c2st"].keys():
             for method, color, linestyle, marker in zip(
@@ -319,14 +273,14 @@ if args.t_stat_nt:
                     linestyle=linestyle,
                     marker=marker,
                 )
-                if "std" in k:
-                    k_mean = k[:-4] + "_mean"
+                if "mean" in k:
+                    k_std = k[:-5] + "_std"
                     plt.fill_between(
                         np.arange(len(N_TRAIN_LIST)),
-                        np.array(test_results_dict[method][k_mean])
-                        - np.array(test_results_dict[method][k]),
-                        np.array(test_results_dict[method][k_mean])
-                        + np.array(test_results_dict[method][k]),
+                        np.array(test_results_dict[method][k])
+                        - np.array(test_results_dict[method][k_std]),
+                        np.array(test_results_dict[method][k])
+                        + np.array(test_results_dict[method][k_std]),
                         alpha=0.2,
                         color=color,
                     )
@@ -346,13 +300,112 @@ if args.t_stat_nt:
                     color="black",
                     label=r"$\mathcal{H}_0$",
                 )
+            if "run_time" in k:
+                plt.plot(
+                    np.arange(len(N_TRAIN_LIST)),
+                    train_runtime["lc2st"],
+                    label="L-C2ST (pre-train)",
+                    color="black",
+                    linestyle="--",
+                    marker="o",
+                )
+                plt.plot(
+                    np.arange(len(N_TRAIN_LIST)),
+                    train_runtime["lc2st_nf"],
+                    label="L-C2ST-NF (pre-train)",
+                    color="black",
+                    linestyle="--",
+                    marker="*",
+                )
+                k = k + " (1 trial)"
+
             if "std" not in k:
                 plt.legend()
                 plt.xticks(np.arange(len(N_TRAIN_LIST)), N_TRAIN_LIST)
                 plt.xlabel("N_train")
                 plt.ylabel(k)
-                plt.savefig(
-                    fig_path
-                    / f"{k}_ntrain_n_cal_{N_cal}_{test_params}_{eval_params}.pdf"
-                )
+                plt.savefig(fig_path / f"{k}_ntrain_n_cal_{N_cal}.pdf")
                 plt.show()
+            else:
+                plt.close()
+
+if args.power_ncal:
+    print()
+    print(f"Experiment 2: Empirical Power as a function of N_cal...")
+
+    N_TRAIN = 100000
+    print(f"... for N_train = {N_TRAIN} ...")
+    print()
+
+    METHODS = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm"]  # "c2st_nf",
+    N_RUNS = 100
+
+    result_path = task_path / f"npe_{N_TRAIN}" / "results" / test_params / eval_params
+    if not os.path.exists(result_path):
+        os.makedirs(result_path)
+
+    emp_power_dict, type_I_error_dict = {}, {}
+    p_values_dict, p_values_h0_dict = {}, {}
+
+    COMPUTE_FPR = True
+    COMPUTE_TPR = True
+
+    for N_cal in N_cal_list:
+        try:
+            if COMPUTE_TPR:
+                emp_power_dict[N_cal] = torch.load(
+                    result_path / f"emp_power_n_runs_{N_RUNS}_n_cal_{N_cal}.pkl",
+                )
+                p_values_dict[N_cal] = torch.load(
+                    result_path / f"p_values_avg_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
+                )
+            if COMPUTE_FPR:
+                type_I_error_dict[N_cal] = torch.load(
+                    result_path / f"type_I_error_n_runs_{N_RUNS}_n_cal_{N_cal}.pkl",
+                )
+                p_values_h0_dict[N_cal] = torch.load(
+                    result_path / f"p_values_h0_avg_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
+                )
+            print(f"Loaded Empirical Results for N_cal = {N_cal} ...")
+        except FileNotFoundError:
+            emp_power, type_I_error, p_values, p_values_h0 = compute_emp_power_l_c2st(
+                n_runs=N_RUNS,
+                alpha=ALPHA,
+                task=task,
+                n_train=N_TRAIN,
+                observation_dict=observation_dict,
+                n_cal=N_cal,
+                n_eval=N_eval,
+                n_trials_null=args.n_trials_null,
+                kwargs_c2st=kwargs_c2st,
+                kwargs_lc2st=kwargs_lc2st,
+                t_stats_null_c2st_nf=t_stats_null[N_cal]["c2st_nf"],
+                t_stats_null_lc2st_nf=t_stats_null[N_cal]["lc2st_nf"],
+                methods=METHODS,
+                test_stat_names=ALL_METRICS,
+                compute_emp_power=COMPUTE_TPR,
+                compute_type_I_error=COMPUTE_FPR,
+                task_path=task_path,
+            )
+            emp_power_dict[N_cal] = emp_power
+            type_I_error_dict[N_cal] = type_I_error
+            p_values_dict[N_cal] = p_values
+            p_values_h0_dict[N_cal] = p_values_h0
+
+            torch.save(
+                emp_power,
+                result_path / f"emp_power_n_runs_{N_RUNS}_n_cal_{N_cal}.pkl",
+            )
+            torch.save(
+                p_values,
+                result_path / f"p_values_avg_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
+            )
+            if COMPUTE_FPR:
+                torch.save(
+                    type_I_error,
+                    result_path / f"type_I_error_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
+                )
+                torch.save(
+                    p_values_h0,
+                    result_path / f"p_values_h0_avg_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
+                )

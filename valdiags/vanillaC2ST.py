@@ -380,7 +380,7 @@ def t_stats_c2st(
         # loop over trials under the null hypothesis
         for t in tqdm(
             range(n_trials_null),
-            desc="Computing T under (H0)",
+            desc=f"Computing T under (H0) - permutation = {use_permutation}",
             disable=(not verbose),
         ):
             # approxiamte the null by permuting the data (same as permuting the labels)

@@ -16,6 +16,8 @@ from .vanillaC2ST import (
     compute_metric,
 )
 
+from .test_utils import permute_data
+
 # define default classifier
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
@@ -133,8 +135,9 @@ def lc2st_scores(
     cross_val=True,
     n_folds=10,
     n_ensemble=1,
-    in_sample=False,
     trained_clfs=None,
+    return_clfs=False,
+    eval=True,
 ):
     """Computes the scores of a classifier
         - trained on data from the joint distributions P,x and Q,x
@@ -184,32 +187,38 @@ def lc2st_scores(
             Defaults to 10.
         n_ensemble (int, optional): number of classifiers to train and average over to build an ensemble model.
             Defaults to 1.
-        in_sample (bool, optional): whether to evaluate on training data (True) or not (False).
-            Can only be used if P is independent of x.
-            Defaults to False.
         trained_clfs (list of sklearn models, optional): list of trained classifiers.
             Defaults to None.
+        return_clfs (bool, optional): whether to return the trained classifiers or not.
+            Defaults to False.
+        eval (bool, optional): whether to evaluate the classifier or not.
 
     Returns:
-        (dict): dictionary of scores (accuracy, proba, etc.) for each metric.
+        tuple: (scores, probas, clf_list) if return_clfs=True, (scores, probas) otherwise.
+            - scores (dict): dictionary of scores (accuracy, proba, etc.) for each metric.
+            - probas (np.array): predicted probabilities.
+            - clf_list (list of sklearn models): list of trained classifiers.
     """
+    clf_list = []
     if not cross_val:
         ens_accuracies = []
         ens_probas = []
+        # train ensemble of classifiers
         for n in range(n_ensemble):
             if trained_clfs is not None:
-                clf = trained_clfs[n]
+                clf_n = trained_clfs[n]
             else:
                 # initialize classifier
                 classifier = clf_class(**clf_kwargs)
                 # train classifier
-                clf = train_lc2st(P, Q, x_P, x_Q, clf=classifier)
+                clf_n = train_lc2st(P, Q, x_P, x_Q, clf=classifier)
+            clf_list.append(clf_n)
+        if not eval:
+            return None, None, clf_list
 
-            # eval classifier
-            if in_sample:  # evaluate on training data
-                P_eval, Q_eval = P, None  # ok if P is independent of x
-
-            elif P_eval is None:
+        # eval classifier
+        for clf_n in clf_list:
+            if P_eval is None:
                 raise ValueError(
                     "If cross_val=False and in-sample=False, at least P_eval must be provided.\
                     In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
@@ -219,7 +228,7 @@ def lc2st_scores(
                 P=P_eval,
                 Q=Q_eval,
                 x_eval=x_eval,
-                clf=clf,
+                clf=clf_n,
                 single_class_eval=single_class_eval,
             )
 
@@ -247,34 +256,43 @@ def lc2st_scores(
 
         # cross-validation
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-        for n, (train_index, val_index) in enumerate(kf.split(P)):
-            # split data into train and val sets for n^th cv-fold
-            P_train, x_P_train = P[train_index], x_P[train_index]
-            P_val = P[val_index]  # ok if P is independent of x
-            if P_eval is not None:
-                P_val = P_eval[val_index]
-
-            Q_train, x_Q_train = Q[train_index], x_Q[train_index]
-            if Q_eval is not None:
-                Q_val = Q_eval[val_index]
-            else:
-                Q_val = None
-
+        cv_splits = kf.split(P)
+        # train classifiers over cv-folds
+        for n, (train_index, val_index) in enumerate(cv_splits):
             if trained_clfs is not None:
                 clf_n = trained_clfs[n]
             else:
+                # get train split
+                P_train, x_P_train = P[train_index], x_P[train_index]
+                Q_train, x_Q_train = Q[train_index], x_Q[train_index]
                 # initialize classifier
                 classifier = clf_class(**clf_kwargs)
                 # train n^th classifier
                 clf_n = train_lc2st(
                     P=P_train, Q=Q_train, x_P=x_P_train, x_Q=x_Q_train, clf=classifier
                 )
+            clf_list.append(clf_n)
+
+        if not eval:
+            return None, None, clf_list
+
+        # evaluate classifiers over cv-folds
+        for n, (train_index, val_index) in enumerate(cv_splits):
+            # get val split
+            P_val = P[val_index]  # ok if P is independent of x
+            if P_eval is not None:
+                P_val = P_eval[val_index]
+            if Q_eval is not None:
+                Q_val = Q_eval[val_index]
+            else:
+                Q_val = None
+
             # eval n^th classifier
             accuracy, proba = eval_lc2st(
                 P=P_val,
                 Q=Q_val,
                 x_eval=x_eval,
-                clf=clf_n,
+                clf=clf_list[n],
                 single_class_eval=single_class_eval,
             )
             # compute metrics
@@ -289,7 +307,10 @@ def lc2st_scores(
                     )
             probas.append(proba)
 
-    return scores, probas
+    if return_clfs:
+        return scores, probas, clf_list
+    else:
+        return scores, probas
 
 
 def t_stats_lc2st(
@@ -302,13 +323,16 @@ def t_stats_lc2st(
     Q_eval=None,
     scores_fn=lc2st_scores,
     metrics=["mse"],
+    trained_clfs=None,
     null_hypothesis=False,
     n_trials_null=100,
     use_permutation=True,
     list_P_null=None,
     list_x_P_null=None,
     list_P_eval_null=None,
+    trained_clfs_null=None,
     return_probas=True,
+    return_clfs_null=False,
     verbose=True,
     **kwargs,  # kwargs for scores_fn
 ):
@@ -342,27 +366,35 @@ def t_stats_lc2st(
         Q_eval (numpy.array, optional): data drawn from Q|x_eval (or just Q if independent of x)
             of size (n_test_samples, dim). If None, Q_eval, we only evaluate on P_eval (single_class_eval=True).
             Defaults to None.
-        test_stats (list of str, optional): list of names of test statistics to compute.
-            Defaults to ["probas_mean"] (better than accuracyfor single_class_eval).
-        n_ensemble_obs (int, optional): number of classifiers to build an ensemble model on observed data.
-            Defaults to 1.
+        scores_fn (function, optional): function to compute scores.
+            Defaults to lc2st_scores.
+        metrics (list, optional): list of metrics to compute.
+            Defaults to ["mse"].
+        trained_clfs (list, optional): list of trained classifiers.
+            Defaults to None.
+        null_hypothesis (bool, optional): whether to test under the null hypothesis.
+            Defaults to False.
         n_trials_null (int, optional): number of trials to perform for null hypothesis.
             Defaults to 100.
-        t_stats_null (dict, optional): dictionary of precumputed scores (accuracy, proba, etc.) for each
-            metric under the null hypothesis.
-            Defaults to None.
-        list_P_null (list): list of samples from P used as "P" and "Q" to test under the null
+        use_permutation (bool, optional): whether to use the permutation method to simulate the null
+            hypothesis.
+            Defaults to True.
+        list_P_null (list, optional): list of samples from P used as "P" and "Q" to test under the null
             hypothesis.
             Of size (2*n_trials_null, n_samples, dim).
             Defaults to None.
-        list_x_P_null (list): list of samples like x_P used as x_P and x_Q to test under the null
+        list_x_P_null (list, optional): list of samples like x_P used as x_P and x_Q to test under the null
             hypothesis. Of size (2*n_trials_null, n_samples, n_features).
             Defaults to None.
-        list_P_eval_null (list): list of samples from P_eval used as "P_eval" and "Q_eval" to test under the
-            null hypothesis. Of size (2*n_trials_null, n_test_samples, dim).
+        list_P_eval_null (list, optional): list of samples from P_eval used as "P_eval" and "Q_eval" to test
+            under the null hypothesis. Of size (2*n_trials_null, n_test_samples, dim).
+            Defaults to None.
+        trained_clfs_null (list, optional): list of trained classifiers for the null hypothesis.
             Defaults to None.
         return_probas (bool, optional): whether to return predicted probabilities.
             Defaults to True.
+        return_clfs_null (bool, optional): whether to return trained classifiers under the null.
+            Defaults to False.
         kwargs: keyword arguments for `lc2st_scores`.
 
     Returns:
@@ -387,6 +419,7 @@ def t_stats_lc2st(
             P_eval,
             Q_eval,
             metrics=metrics,
+            trained_clfs=trained_clfs,
             **kwargs,
         )
 
@@ -402,45 +435,61 @@ def t_stats_lc2st(
         # if null hypothesis, compute test statistics under the null
         # initialize list and dict
         probas_null = []
+        clfs_null = []
         t_stats_null = dict(zip(metrics, [[] for _ in range(len(metrics))]))
+
+        if trained_clfs_null is None:
+            trained_clfs_null = [None for _ in range(n_trials_null)]
 
         # loop over trials under the null hypothesis
         for t in tqdm(
             range(n_trials_null),
-            desc="Computing T under (H0)",
+            desc="Training / Computing T under (H0)",
             disable=(not verbose),
         ):
             # approximate the null by permuting the data (same as permutating the labels)
             if use_permutation:
-                joint_P_x = np.concatenate([P, x_P], axis=1)
-                joint_Q_x = np.concatenate([Q, x_Q], axis=1)
-                X = np.concatenate([joint_P_x, joint_Q_x], axis=0)
-                X = np.random.permutation(X)
-                P_t = X[: len(P)][:, : P.shape[-1]]
-                x_P_t = X[: len(P)][:, P.shape[-1] :]
-                Q_t = X[len(P) :][:, : Q.shape[-1]]
-                x_Q_t = X[len(P) :][:, Q.shape[-1] :]
+                # permute data
+                joint_P_x = torch.cat([P, x_P], dim=1)
+                joint_Q_x = torch.cat([Q, x_Q], dim=1)
+                joint_P_x_perm, joint_Q_x_perm = permute_data(
+                    joint_P_x,
+                    joint_Q_x,
+                )
+                P_t = joint_P_x_perm[:, : P.shape[-1]]
+                x_P_t = joint_P_x_perm[:, P.shape[-1] :]
+                Q_t = joint_Q_x_perm[:, : Q.shape[-1]]
+                x_Q_t = joint_Q_x_perm[:, Q.shape[-1] :]
 
                 # if P_eval and Q_eval are not None, permute them as well
                 if P_eval is not None and Q_eval is not None:
-                    X_eval = np.concatenate([P_eval, Q_eval], axis=0)
-                    X_eval = np.random.permutation(X_eval)
-                    P_eval_t = X_eval[: len(P_eval)]
-                    Q_eval_t = X_eval[len(P_eval) :]
+                    P_eval_t, Q_eval_t = permute_data(P_eval, Q_eval)
                 else:
                     # does this make sense? using the same data for each trial?
-                    P_eval_t = P_eval
-                    Q_eval_t = Q_eval
+                    P_eval_t, Q_eval_t = P_eval, Q_eval
+
             # directly use the samples from P to test under the null hypothesis
             else:
-                P_t = list_P_null[t]
-                x_P_t = list_x_P_null[t]
-                Q_t = list_P_null[n_trials_null + t]
-                x_Q_t = list_x_P_null[n_trials_null + t]
-                P_eval_t = list_P_eval_null[t]
-                Q_eval_t = list_P_eval_null[n_trials_null + t]
+                if (list_P_null is None or list_x_P_null is None) and (
+                    trained_clfs_null[t] is None
+                ):
+                    raise ValueError(
+                        "list_P_null and list_x_P_null must be provided if use_permutation=False and no trained classifier is provided."
+                    )
+                if list_P_eval_null is None:
+                    raise ValueError(
+                        "list_P_eval_null must be provided if use_permutation=False"
+                    )
+                else:
+                    print("Using new data [P,x] to test under the null hypothesis.")
+                    P_t = list_P_null[t]
+                    x_P_t = list_x_P_null[t]
+                    Q_t = list_P_null[n_trials_null + t]
+                    x_Q_t = list_x_P_null[n_trials_null + t]
+                    P_eval_t = list_P_eval_null[t]
+                    Q_eval_t = list_P_eval_null[n_trials_null + t]
 
-            scores_t, proba_t = scores_fn(
+            scores_t, proba_t, clf_t = scores_fn(
                 P=P_t,
                 Q=Q_t,
                 x_P=x_P_t,
@@ -449,17 +498,25 @@ def t_stats_lc2st(
                 P_eval=P_eval_t,
                 Q_eval=Q_eval_t,
                 metrics=metrics,
+                trained_clfs=trained_clfs_null[t],
+                return_clfs=True,
                 **kwargs,
             )
             probas_null.append(proba_t)
+            clfs_null.append(clf_t)
 
             # append test stat to list
             for m in metrics:
-                t_stats_null[m].append(
-                    np.mean(scores_t[m])
-                )  # compute their mean (useful if cross_val=True)
+                if scores_t is not None:
+                    t_stats_null[m].append(
+                        np.mean(scores_t[m])
+                    )  # compute their mean (useful if cross_val=True)
+                else:
+                    t_stats_null[m].append(None)
 
-        if return_probas:
+        if return_probas and return_clfs_null:
+            return t_stats_null, probas_null, clfs_null
+        elif return_probas:
             return t_stats_null, probas_null
         else:
             return t_stats_null

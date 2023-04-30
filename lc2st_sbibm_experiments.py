@@ -145,6 +145,7 @@ def compute_emp_power_l_c2st(
     test_stat_names=["accuracy", "mse", "div"],
     compute_emp_power=True,
     compute_type_I_error=False,
+    base_dist_samples_null=None,
 ):
     """Compute the empirical power of the (L)C2ST methods for a given task and npe-flow
     (corresponding to n_train). We also compute the type I error if specified.
@@ -208,6 +209,7 @@ def compute_emp_power_l_c2st(
         )
 
     for n in range(n_runs):
+        print()
         print("====> RUN: ", n + 1, "/", n_runs, " <====")
         # GENERATE DATA
         data_samples = generate_data_one_run(
@@ -225,7 +227,9 @@ def compute_emp_power_l_c2st(
         # count rejection of H0 under H1 (p_value <= alpha) for every run
         # and for every observation: [reject(obs1), reject(obs2), ...]
         if compute_emp_power:
+            print()
             print("Computing empirical power...")
+            print()
             H1_results_dict, _ = compute_test_results_npe_one_run(
                 alpha=alpha,
                 data_samples=data_samples,
@@ -256,8 +260,8 @@ def compute_emp_power_l_c2st(
                         p_values[m][t_stat_name] += H1_results_dict[m]["p_value"][
                             t_stat_name
                         ]
-            else:
-                emp_power, p_values = None, None
+        else:
+            emp_power, p_values = None, None
 
         # Type I error = False Positive Rate (FPR)
         # count rejection of H0 under H0 (p_value <= alpha) for every run
@@ -277,6 +281,7 @@ def compute_emp_power_l_c2st(
                 test_stat_names=test_stat_names,
                 methods=methods,
                 compute_under_null=True,
+                base_dist_samples_null=base_dist_samples_null,
                 task_path=task_path,
                 results_n_train_path="",
                 save_results=False,
@@ -367,6 +372,7 @@ def generate_data_one_run(
             )
 
     # eval set for fixed task data
+    print()
     print(f"Evaluation set for fixed task data (n_eval={n_eval})")
     try:
         if not load_data:
@@ -396,6 +402,7 @@ def generate_data_one_run(
             )
 
     # cal and eval set for every estimator
+    print()
     print(
         f"Calibration and evaluation sets for every estimator (n_cal={n_cal}, n_eval={n_eval})"
     )
@@ -794,8 +801,9 @@ def compute_test_results_npe_one_run(
                 **kwargs_lc2st,
             )
             runtime = time.time() - t0
-            torch.save(runtime, result_path / f"runtime_lc2st_n_cal_{n_cal}.pkl")
             train_runtime["lc2st"] = runtime
+            if save_results:
+                torch.save(runtime, result_path / f"runtime_lc2st_n_cal_{n_cal}.pkl")
 
             # train classifier on the joint under null
             _, _, trained_clfs_null_lc2st = t_stats_lc2st(
@@ -896,10 +904,11 @@ def compute_test_results_npe_one_run(
                             **kwargs_lc2st,
                         )
                         runtime = time.time() - t0
-                        torch.save(
-                            runtime, result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
-                        )
                         train_runtime[m] = runtime
+                        if save_results:
+                            torch.save(
+                                runtime, result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
+                            )
             else:
                 t0 = time.time()
                 _, _, trained_clfs_lc2st_nf = lc2st_scores(
@@ -912,12 +921,17 @@ def compute_test_results_npe_one_run(
                     **kwargs_lc2st,
                 )
                 runtime = time.time() - t0
-                torch.save(runtime, result_path / f"runtime_lc2st_nf_n_cal_{n_cal}.pkl")
-                torch.save(
-                    runtime, result_path / f"runtime_lc2st_nf_perm_n_cal_{n_cal}.pkl"
-                )
                 train_runtime["lc2st_nf"] = runtime
                 train_runtime["lc2st_nf_perm"] = runtime
+
+                if save_results:
+                    torch.save(
+                        runtime, result_path / f"runtime_lc2st_nf_n_cal_{n_cal}.pkl"
+                    )
+                    torch.save(
+                        runtime,
+                        result_path / f"runtime_lc2st_nf_perm_n_cal_{n_cal}.pkl",
+                    )
 
             _, _, trained_clfs_null_perm = t_stats_lc2st(
                 null_hypothesis=True,
@@ -985,7 +999,7 @@ def compute_test_results_npe_one_run(
                         metrics=test_stat_names,
                         # args for t_stats_estimator
                         x_eval=observation,
-                        P_eval=base_dist_samples["cal"],
+                        P_eval=base_dist_samples["eval"],
                         Q_eval=None,
                         use_permutation=True,
                         n_trials_null=n_trials_null,

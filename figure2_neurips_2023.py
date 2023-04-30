@@ -347,7 +347,7 @@ if args.power_ncal:
     emp_power_dict, type_I_error_dict = {}, {}
     p_values_dict, p_values_h0_dict = {}, {}
 
-    COMPUTE_FPR = True
+    COMPUTE_FPR = False
     COMPUTE_TPR = True
 
     for N_cal in N_cal_list:
@@ -391,15 +391,15 @@ if args.power_ncal:
             type_I_error_dict[N_cal] = type_I_error
             p_values_dict[N_cal] = p_values
             p_values_h0_dict[N_cal] = p_values_h0
-
-            torch.save(
-                emp_power,
-                result_path / f"emp_power_n_runs_{N_RUNS}_n_cal_{N_cal}.pkl",
-            )
-            torch.save(
-                p_values,
-                result_path / f"p_values_avg_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
-            )
+            if COMPUTE_TPR:
+                torch.save(
+                    emp_power,
+                    result_path / f"emp_power_n_runs_{N_RUNS}_n_cal_{N_cal}.pkl",
+                )
+                torch.save(
+                    p_values,
+                    result_path / f"p_values_avg_n_runs_{N_RUNS}_n_cal{N_cal}.pkl",
+                )
             if COMPUTE_FPR:
                 torch.save(
                     type_I_error,

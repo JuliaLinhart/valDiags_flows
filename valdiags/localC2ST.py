@@ -444,7 +444,7 @@ def t_stats_lc2st(
         # loop over trials under the null hypothesis
         for t in tqdm(
             range(n_trials_null),
-            desc="Training / Computing T under (H0)",
+            desc=f"Training / Computing T under (H0) - permutation = {use_permutation}",
             disable=(not verbose),
         ):
             # approximate the null by permuting the data (same as permutating the labels)

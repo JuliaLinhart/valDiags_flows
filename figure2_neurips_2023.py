@@ -31,6 +31,8 @@ from lc2st_sbibm_experiments import (
     precompute_t_stats_null,
 )
 
+from tasks.sbibm.data_generators import generate_task_data
+
 from valdiags.vanillaC2ST import sbibm_clf_kwargs
 
 from scipy.stats import multivariate_normal as mvn
@@ -125,7 +127,7 @@ print()
 args = parser.parse_args()
 # define task and path
 task = sbibm.get_task(args.task)
-task_path = PATH_EXPERIMENT / args.task
+task_path = PATH_EXPERIMENT / args.task / "seed_lc2st_null_joint"
 
 # ==== sbi set-up for given task ==== #
 # prior, simulator, inference algorithm
@@ -174,26 +176,28 @@ kwargs_lc2st = {
     "clf_kwargs": lc2st_clf_kwargs,
 }
 
-# pre-compute / load test statistics for the null hypothesis
+# pre-compute / load test statistics for the C2ST-NF null hypothesis
 # they are independant of the estimator and the observation space (x)
-t_stats_null = {}
+# N.B> L-C2ST is still dependent on the observation space (x)
+# as its trained on the joint samples (theta, x)
+t_stats_null_c2st_nf = {}
 for N_cal in N_cal_list:
-    P_dist_null = mvn(mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta))
-    list_P_null = [
-        P_dist_null.rvs(N_cal, random_state=t) for t in range(2 * N_TRIALS_PRECOMPUTE)
-    ]
-    list_P_eval_null = [
-        P_dist_null.rvs(N_cal, random_state=t) for t in range(2 * N_TRIALS_PRECOMPUTE)
-    ]
-    t_stats_null[N_cal] = precompute_t_stats_null(
+    t_stats_null_c2st_nf[N_cal] = precompute_t_stats_null(
         metrics=ALL_METRICS,
-        list_P_null=list_P_null,
-        list_P_eval_null=list_P_eval_null,
+        n_cal=N_cal,
+        n_eval=N_eval,
+        dim_theta=dim_theta,
+        n_trials_null=N_TRIALS_PRECOMPUTE,
         t_stats_null_path=task_path / "t_stats_null" / eval_params,
-        methods=["c2st_nf", "lc2st_nf"],
+        methods=["c2st_nf"],
+        kwargs_c2st=kwargs_c2st,
         save_results=True,
-        **kwargs_c2st,
-    )
+        load_results=True,
+        # args for lc2st only
+        kwargs_lc2st=None,
+        x_cal=None,
+        observation_dict=None,
+    )["c2st_nf"]
 
 # perform the experiment
 # ==== EXP 1: test stats as a function of N_train (N_cal = max)==== #
@@ -228,11 +232,12 @@ if args.t_res_ntrain:
             n_train_list=N_TRAIN_LIST,
             alpha=ALPHA,
             n_trials_null=args.n_trials_null,
-            t_stats_null_c2st_nf=t_stats_null[N_cal]["c2st_nf"],
-            t_stats_null_lc2st_nf=t_stats_null[N_cal]["lc2st_nf"],
+            t_stats_null_c2st_nf=t_stats_null_c2st_nf[N_cal],
+            n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
             kwargs_c2st=kwargs_c2st,
             kwargs_lc2st=kwargs_lc2st,
             task_path=task_path,
+            t_stats_null_path=task_path / "t_stats_null" / eval_params,
             results_n_train_path=Path("results") / test_params / eval_params,
             methods=METHODS,
             test_stat_names=ALL_METRICS,
@@ -386,8 +391,8 @@ if args.power_ncal:
                 n_trials_null=args.n_trials_null,
                 kwargs_c2st=kwargs_c2st,
                 kwargs_lc2st=kwargs_lc2st,
-                t_stats_null_c2st_nf=t_stats_null[N_cal]["c2st_nf"],
-                t_stats_null_lc2st_nf=t_stats_null[N_cal]["lc2st_nf"],
+                t_stats_null_c2st_nf=t_stats_null_c2st_nf[N_cal],
+                n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
                 methods=METHODS,
                 test_stat_names=ALL_METRICS,
                 compute_emp_power=COMPUTE_TPR,

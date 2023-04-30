@@ -26,10 +26,11 @@ def l_c2st_results_n_train(
     alpha,
     n_trials_null,
     t_stats_null_c2st_nf,
-    t_stats_null_lc2st_nf,
+    n_trials_null_precompute,
     kwargs_c2st,
     kwargs_lc2st,
     task_path,
+    t_stats_null_path,
     results_n_train_path="",
     methods=["c2st", "lc2st", "lc2st_nf"],
     test_stat_names=["accuracy", "mse", "div"],
@@ -46,6 +47,30 @@ def l_c2st_results_n_train(
         save_data=True,
         seed=seed,  # fixed seed for reproducibility
     )
+
+    # precompute test statistics under null hypothesis for lc2st_nf
+    # same for every estimator (no need to recompute for every n_train)
+    if "lc2st_nf" in methods:
+        x_cal = data_samples["joint_cal"]["x"]
+        dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+        t_stats_null_lc2st_nf = precompute_t_stats_null(
+            n_cal=n_cal,
+            n_eval=n_eval,
+            dim_theta=dim_theta,
+            n_trials_null=n_trials_null_precompute,
+            kwargs_lc2st=kwargs_lc2st,
+            x_cal=x_cal,
+            observation_dict=observation_dict,
+            methods=["lc2st_nf"],
+            metrics=test_stat_names,
+            t_stats_null_path=t_stats_null_path,
+            save_results=True,
+            load_results=True,
+            # args only for c2st
+            kwargs_c2st=None,
+        )["lc2st_nf"]
+    else:
+        t_stats_null_lc2st_nf = None
 
     avg_result_keys = {
         "TPR": "reject",
@@ -139,7 +164,7 @@ def compute_emp_power_l_c2st(
     kwargs_c2st,
     kwargs_lc2st,
     n_trials_null,
-    t_stats_null_lc2st_nf,
+    n_trials_null_precompute,
     t_stats_null_c2st_nf,
     task_path,
     methods=["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm"],
@@ -224,6 +249,30 @@ def compute_emp_power_l_c2st(
             load_data=False,
             seed=n,  # different seed for every run (fixed for reproducibility)
         )
+
+        # precompute test statistics under null hypothesis for lc2st_nf
+        # we need to do this for every run because we use different data
+        if "lc2st_nf" in methods and (compute_emp_power + compute_type_I_error != 0):
+            x_cal = data_samples["joint_cal"]["x"]
+            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+            t_stats_null_lc2st_nf = precompute_t_stats_null(
+                n_cal=n_cal,
+                n_eval=n_eval,
+                dim_theta=dim_theta,
+                n_trials_null=n_trials_null_precompute,
+                kwargs_lc2st=kwargs_lc2st,
+                x_cal=x_cal,
+                observation_dict=observation_dict,
+                methods=["lc2st_nf"],
+                metrics=test_stat_names,
+                t_stats_null_path="",
+                save_results=False,
+                load_results=False,
+                # args only for c2st
+                kwargs_c2st=None,
+            )["lc2st_nf"]
+        else:
+            t_stats_null_lc2st_nf = None
 
         # Empirical Power = True Positive Rate (TPR)
         # count rejection of H0 under H1 (p_value <= alpha) for every run
@@ -597,6 +646,7 @@ def compute_test_results_npe_one_run(
     results_dict = dict(zip(methods, [{} for _ in methods]))
     print()
     print("     1. C2ST: for every x_0 in x_test")
+    print()
     try:
         if "c2st" in methods:
             results_dict["c2st"] = torch.load(
@@ -1059,27 +1109,39 @@ def compute_test_results_npe_one_run(
 
 def precompute_t_stats_null(
     metrics,
-    list_P_null,
-    list_P_eval_null,
-    x_samples,
+    n_cal,
+    n_eval,
+    dim_theta,
+    n_trials_null,
     observation_dict,
     t_stats_null_path,
     kwargs_c2st,
     kwargs_lc2st,
+    x_cal,
     methods=["c2st_nf", "lc2st_nf"],
     save_results=True,
+    load_results=True,
 ):
-    # pre-compute / load test statistics for the null hypothesis
+    # fixed distribution for null hypothesis (base distribution)
+    from scipy.stats import multivariate_normal as mvn
+
     if save_results and not os.path.exists(t_stats_null_path):
         os.makedirs(t_stats_null_path)
 
-    n_trials_null = len(list_P_null) // 2
-    n_cal = list_P_null[0].shape[0]
+    P_dist_null = mvn(mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta))
+    list_P_null = [
+        P_dist_null.rvs(n_cal, random_state=t) for t in range(2 * n_trials_null)
+    ]
+    list_P_eval_null = [
+        P_dist_null.rvs(n_eval, random_state=t) for t in range(2 * n_trials_null)
+    ]
 
     t_stats_null_dict = dict(zip(methods, [{} for _ in methods]))
 
     for m in methods:
         try:
+            if not load_results:
+                raise FileNotFoundError
             t_stats_null = torch.load(
                 t_stats_null_path
                 / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl"
@@ -1115,15 +1177,16 @@ def precompute_t_stats_null(
                     null_hypothesis=True,
                     metrics=metrics,
                     list_P_null=list_P_null,
-                    list_x_P_null=[x_samples] * len(list_P_null),
+                    list_x_P_null=[x_cal] * len(list_P_null),
                     use_permutation=False,
                     n_trials_null=n_trials_null,
                     return_clfs_null=True,
                     # required kwargs for t_stats_lc2st
                     P=None,
-                    Q=list_P_null[1],
+                    Q=None,
                     x_P=None,
                     x_Q=None,
+                    P_eval=None,
                     list_P_eval_null=list_P_eval_null,
                     x_eval=None,
                     # kwargs for lc2st_scores
@@ -1140,25 +1203,28 @@ def precompute_t_stats_null(
                         list_P_null=list_P_null,
                         list_P_eval_null=list_P_eval_null,
                         # ==== added for LC2ST ====
-                        list_x_P_null=[x_samples] * len(list_P_null),
+                        list_x_P_null=[x_cal] * len(list_P_null),
                         x_eval=observation,
                         return_probas=False,
                         # =========================
                         use_permutation=False,
                         n_trials_null=n_trials_null,
+                        trained_clfs_null=trained_clfs_null,
                         # required kwargs for t_stats_lc2st
-                        P=list_P_null[0],
-                        Q=list_P_null[1],
-                        x_P=x_samples,
-                        x_Q=x_samples,
+                        P=None,
+                        Q=None,
+                        x_P=None,
+                        x_Q=None,
+                        P_eval=None,
                         # kwargs for lc2st_scores
                         **kwargs_lc2st,
                     )
-            torch.save(
-                t_stats_null,
-                t_stats_null_path
-                / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl",
-            )
-            t_stats_null_dict[m] = t_stats_null
+            if save_results:
+                torch.save(
+                    t_stats_null,
+                    t_stats_null_path
+                    / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl",
+                )
+        t_stats_null_dict[m] = t_stats_null
 
     return t_stats_null_dict

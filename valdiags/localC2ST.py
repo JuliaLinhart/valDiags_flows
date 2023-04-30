@@ -482,7 +482,6 @@ def t_stats_lc2st(
                         "list_P_eval_null must be provided if use_permutation=False"
                     )
                 else:
-                    print("Using new data [P,x] to test under the null hypothesis.")
                     P_t = list_P_null[t]
                     x_P_t = list_x_P_null[t]
                     Q_t = list_P_null[n_trials_null + t]

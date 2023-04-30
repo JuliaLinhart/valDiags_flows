@@ -6,10 +6,8 @@ import numpy as np
 from tqdm import tqdm
 import time
 
-from sklearn.neural_network import MLPClassifier
-
 from valdiags.test_utils import eval_htest, permute_data
-from valdiags.vanillaC2ST import t_stats_c2st, c2st_scores
+from valdiags.vanillaC2ST import t_stats_c2st
 from valdiags.localC2ST import t_stats_lc2st, lc2st_scores
 
 from tasks.sbibm.data_generators import (
@@ -35,6 +33,7 @@ def l_c2st_results_n_train(
     results_n_train_path="",
     methods=["c2st", "lc2st", "lc2st_nf"],
     test_stat_names=["accuracy", "mse", "div"],
+    seed=42,
 ):
     # GENERATE DATA
     data_samples = generate_data_one_run(
@@ -45,6 +44,7 @@ def l_c2st_results_n_train(
         n_train_list=n_train_list,
         task_path=task_path,
         save_data=True,
+        seed=seed,  # fixed seed for reproducibility
     )
 
     avg_result_keys = {
@@ -86,6 +86,7 @@ def l_c2st_results_n_train(
             test_stat_names=test_stat_names,
             compute_under_null=False,
             save_results=True,
+            seed=seed,
         )
 
         for method in methods:
@@ -221,6 +222,7 @@ def compute_emp_power_l_c2st(
             task_path=task_path,
             save_data=False,
             load_data=False,
+            seed=n,  # different seed for every run (fixed for reproducibility)
         )
 
         # Empirical Power = True Positive Rate (TPR)
@@ -246,6 +248,7 @@ def compute_emp_power_l_c2st(
                 task_path=task_path,
                 results_n_train_path="",
                 save_results=False,
+                seed=n,  # different seed for every run (fixed for reproducibility)
             )
             for m in methods:
                 for t_stat_name in test_stat_names:
@@ -285,6 +288,7 @@ def compute_emp_power_l_c2st(
                 task_path=task_path,
                 results_n_train_path="",
                 save_results=False,
+                seed=n,  # different seed for every run (fixed for reproducibility)
             )
             for m in methods:
                 for t_stat_name in test_stat_names:
@@ -315,7 +319,12 @@ def generate_data_one_run(
     n_train_list,
     save_data=True,
     load_data=True,
+    seed=42,  # fixed seed for reproducibility
 ):
+    # set seed
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
     # load posterior estimator (NF)
     # trained using the code from https://github.com/sbi-benchmark/results/tree/main/benchmarking_sbi
     # >>> python run.py --multirun task={task} task.num_simulations={n_train_list} algorithm=npe
@@ -554,6 +563,7 @@ def compute_test_results_npe_one_run(
     compute_under_null=False,
     base_dist_samples_null=None,
     save_results=True,
+    seed=42,  # fix seed for reproducibility
 ):
     # extract data samples independent from estimator
     base_dist_samples = data_samples["base_dist"]
@@ -576,7 +586,6 @@ def compute_test_results_npe_one_run(
     print(" ==========================================")
     print()
     print(f"N_train = {n_train}")
-    print()
 
     result_path = task_path / f"npe_{n_train}" / results_n_train_path
     if compute_under_null:
@@ -586,7 +595,7 @@ def compute_test_results_npe_one_run(
 
     train_runtime = dict(zip(methods, [0 for _ in methods]))
     results_dict = dict(zip(methods, [{} for _ in methods]))
-
+    print()
     print("     1. C2ST: for every x_0 in x_test")
     try:
         if "c2st" in methods:
@@ -635,8 +644,8 @@ def compute_test_results_npe_one_run(
                     reference_posterior_samples["eval"][n_obs],
                 )
                 if compute_under_null:
-                    P, Q = permute_data(P, Q)
-                    P_eval, Q_eval = permute_data(P_eval, Q_eval)
+                    P, Q = permute_data(P, Q, seed=seed)
+                    P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
 
                 t0 = time.time()
                 c2st_results_obs = eval_htest(
@@ -684,8 +693,8 @@ def compute_test_results_npe_one_run(
                 Q_eval = reference_inv_transform_samples["eval"][n_obs]
 
                 if compute_under_null:
-                    P, Q = permute_data(P, Q)
-                    P_eval, Q_eval = permute_data(P_eval, Q_eval)
+                    P, Q = permute_data(P, Q, seed=seed)
+                    P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
 
                 t0 = time.time()
                 c2st_nf_results_obs = eval_htest(
@@ -717,7 +726,7 @@ def compute_test_results_npe_one_run(
                     results_dict["c2st_nf"],
                     result_path / f"c2st_nf_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
                 )
-
+    print()
     print("     2. L-C2ST: amortized")
     try:
         if "lc2st" in methods:
@@ -777,6 +786,7 @@ def compute_test_results_npe_one_run(
         # L-C2ST:
         if "lc2st" in methods:
             # train classifier on the joint
+            print()
             print("L-C2ST: TRAINING CLASSIFIER on the joint ...")
 
             P = npe_samples_x_cal
@@ -786,7 +796,7 @@ def compute_test_results_npe_one_run(
             if compute_under_null:
                 joint_P_x = torch.cat([P, x_P], dim=1)
                 joint_Q_x = torch.cat([Q, x_Q], dim=1)
-                joint_P_x, joint_Q_x = permute_data(joint_P_x, joint_Q_x)
+                joint_P_x, joint_Q_x = permute_data(joint_P_x, joint_Q_x, seed=seed)
                 P, x_P = joint_P_x[:, : P.shape[-1]], joint_P_x[:, P.shape[-1] :]
                 Q, x_Q = joint_Q_x[:, : Q.shape[-1]], joint_Q_x[:, Q.shape[-1] :]
 
@@ -870,6 +880,7 @@ def compute_test_results_npe_one_run(
         # L-C2ST-NF:
         if "lc2st_nf" or "lc2st_nf_perm" in methods:
             # train classifier on the joint
+            print()
             print("L-C2ST-NF: TRAINING CLASSIFIER on the joint ...")
 
             P = base_dist_samples["cal"]
@@ -882,7 +893,9 @@ def compute_test_results_npe_one_run(
                         if "perm" in m:
                             joint_P_x = torch.cat([P, x_P], dim=1)
                             joint_Q_x = torch.cat([Q, x_Q], dim=1)
-                            joint_P_x, joint_Q_x = permute_data(joint_P_x, joint_Q_x)
+                            joint_P_x, joint_Q_x = permute_data(
+                                joint_P_x, joint_Q_x, seed=seed
+                            )
                             P, x_P = (
                                 joint_P_x[:, : P.shape[-1]],
                                 joint_P_x[:, P.shape[-1] :],

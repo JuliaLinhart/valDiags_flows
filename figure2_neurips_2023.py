@@ -36,8 +36,10 @@ from valdiags.vanillaC2ST import sbibm_clf_kwargs
 from scipy.stats import multivariate_normal as mvn
 from sklearn.neural_network import MLPClassifier
 
-# # set seed
-# seed = 42
+# set seed for reproducibility
+RANDOM_SEED = 42
+np.random.seed(RANDOM_SEED)
+torch.manual_seed(RANDOM_SEED)
 
 # GLOBAL PARAMETERS
 PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_2")
@@ -177,8 +179,12 @@ kwargs_lc2st = {
 t_stats_null = {}
 for N_cal in N_cal_list:
     P_dist_null = mvn(mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta))
-    list_P_null = [P_dist_null.rvs(N_cal) for _ in range(2 * N_TRIALS_PRECOMPUTE)]
-    list_P_eval_null = [P_dist_null.rvs(N_cal) for _ in range(2 * N_TRIALS_PRECOMPUTE)]
+    list_P_null = [
+        P_dist_null.rvs(N_cal, random_state=t) for t in range(2 * N_TRIALS_PRECOMPUTE)
+    ]
+    list_P_eval_null = [
+        P_dist_null.rvs(N_cal, random_state=t) for t in range(2 * N_TRIALS_PRECOMPUTE)
+    ]
     t_stats_null[N_cal] = precompute_t_stats_null(
         metrics=ALL_METRICS,
         list_P_null=list_P_null,
@@ -230,6 +236,7 @@ if args.t_res_ntrain:
             results_n_train_path=Path("results") / test_params / eval_params,
             methods=METHODS,
             test_stat_names=ALL_METRICS,
+            seed=RANDOM_SEED,
         )
 
         # path to save figures

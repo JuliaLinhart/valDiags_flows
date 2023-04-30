@@ -65,14 +65,19 @@ def eval_htest(
     return reject, p_value, t_stat_data, t_stats_null
 
 
-def permute_data(P, Q):
+def permute_data(P, Q, seed=42):
     """Permute the concatenated data [P,Q] to create null-hyp samples.
 
     Args:
         P (torch.Tensor): data of shape (n_samples, dim)
         Q (torch.Tensor): data of shape (n_samples, dim)
+        seed (int, optional): random seed. Defaults to 42.
     """
+    # set seed
+    torch.manual_seed(seed)
+    # check inputs
     assert P.shape[0] == Q.shape[0]
+
     n_samples = P.shape[0]
     X = torch.cat([P, Q], dim=0)
     X_perm = X[torch.randperm(n_samples * 2)]

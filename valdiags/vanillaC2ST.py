@@ -15,6 +15,8 @@ from .graphical_valdiags import PP_vals
 
 from tqdm import tqdm
 
+from .test_utils import permute_data
+
 # define default classifier
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
@@ -213,7 +215,7 @@ def c2st_scores(
                 clf = trained_clfs[n]
             else:
                 # initialize classifier
-                classifier = clf_class(**clf_kwargs)
+                classifier = clf_class(random_state=n, **clf_kwargs)
                 # train classifier
                 clf = train_c2st(P, Q, clf=classifier)
 
@@ -268,7 +270,7 @@ def c2st_scores(
                 clf_n = trained_clfs[n]
             else:
                 # initialize classifier
-                classifier = clf_class(**clf_kwargs)
+                classifier = clf_class(random_state=n, **clf_kwargs)
                 # train n^th classifier
                 clf_n = train_c2st(P_train, Q_train, clf=classifier)
                 # eval n^th classifier
@@ -385,17 +387,11 @@ def t_stats_c2st(
         ):
             # approxiamte the null by permuting the data (same as permuting the labels)
             if use_permutation:
-                X = np.concatenate([P, Q], axis=0)
-                X = np.random.permutation(X)
-                P_t = X[: len(P)]
-                Q_t = X[len(P) :]
+                P_t, Q_t = permute_data(P, Q, seed=t)
 
                 # if P_eval and Q_eval are not None, permute them as well
                 if P_eval is not None and Q_eval is not None:
-                    X_eval = np.concatenate([P_eval, Q_eval], axis=0)
-                    X_eval = np.random.permutation(X_eval)
-                    P_eval_t = X_eval[: len(P_eval)]
-                    Q_eval_t = X_eval[len(P_eval) :]
+                    P_eval_t, Q_eval_t = permute_data(P_eval, Q_eval, seed=t)
                 else:
                     # otherwise, set them to None.
                     # In this case scores_fn will use P and Q (via in-sample or cross validation)

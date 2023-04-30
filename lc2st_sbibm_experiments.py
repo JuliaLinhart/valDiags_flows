@@ -976,7 +976,9 @@ def compute_test_results_npe_one_run(
                         conf_alpha=alpha,
                         t_stats_estimator=t_stats_lc2st,
                         metrics=test_stat_names,
-                        t_stats_null=t_stats_null_lc2st_nf,  # use precomputed test statistics under null
+                        t_stats_null=t_stats_null_lc2st_nf[
+                            num_observation
+                        ],  # use precomputed test statistics under null
                         # kwargs for t_stats_estimator
                         x_eval=observation,
                         P_eval=base_dist_samples["eval"],
@@ -1059,10 +1061,13 @@ def precompute_t_stats_null(
     metrics,
     list_P_null,
     list_P_eval_null,
+    x_samples,
+    observation_dict,
     t_stats_null_path,
+    kwargs_c2st,
+    kwargs_lc2st,
     methods=["c2st_nf", "lc2st_nf"],
     save_results=True,
-    **kwargs_c2st,
 ):
     # pre-compute / load test statistics for the null hypothesis
     if save_results and not os.path.exists(t_stats_null_path):
@@ -1070,7 +1075,6 @@ def precompute_t_stats_null(
 
     n_trials_null = len(list_P_null) // 2
     n_cal = list_P_null[0].shape[0]
-    n_eval = list_P_eval_null[0].shape[0]
 
     t_stats_null_dict = dict(zip(methods, [{} for _ in methods]))
 
@@ -1087,30 +1091,74 @@ def precompute_t_stats_null(
             print(
                 f"Pre-compute test statistics for (NF)-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
-            if m == "lc2st_nf":
-                single_class_eval = True
-            else:
-                single_class_eval = False
-
-            t_stats_null = t_stats_c2st(
-                null_hypothesis=True,
-                metrics=metrics,
-                list_P_null=list_P_null,
-                list_P_eval_null=list_P_eval_null,
-                use_permutation=False,
-                n_trials_null=n_trials_null,
-                # required kwargs for t_stats_c2st
-                P=list_P_null[0],
-                Q=list_P_null[1],
-                # kwargs for c2st_scores
-                single_class_eval=single_class_eval,
-                **kwargs_c2st,
-            )
+            if m == "c2st_nf":
+                print()
+                print("C2ST: TRAIN / EVAL CLASSIFIERS ...")
+                t_stats_null = t_stats_c2st(
+                    null_hypothesis=True,
+                    metrics=metrics,
+                    list_P_null=list_P_null,
+                    list_P_eval_null=list_P_eval_null,
+                    use_permutation=False,
+                    n_trials_null=n_trials_null,
+                    # required kwargs for t_stats_c2st
+                    P=None,
+                    Q=None,
+                    # kwargs for c2st_scores
+                    **kwargs_c2st,
+                )
+            elif m == "lc2st_nf":
+                # train clfs on joint samples
+                print()
+                print("L-C2ST: TRAINING CLASSIFIERS on the joint ...")
+                _, _, trained_clfs_null = t_stats_lc2st(
+                    null_hypothesis=True,
+                    metrics=metrics,
+                    list_P_null=list_P_null,
+                    list_x_P_null=[x_samples] * len(list_P_null),
+                    use_permutation=False,
+                    n_trials_null=n_trials_null,
+                    return_clfs_null=True,
+                    # required kwargs for t_stats_lc2st
+                    P=None,
+                    Q=list_P_null[1],
+                    x_P=None,
+                    x_Q=None,
+                    list_P_eval_null=list_P_eval_null,
+                    x_eval=None,
+                    # kwargs for lc2st_scores
+                    eval=False,
+                    **kwargs_lc2st,
+                )
+                print()
+                print("L-C2ST: Evaluate for every observation ...")
+                t_stats_null = {}
+                for num_obs, observation in observation_dict.items():
+                    t_stats_null[num_obs] = t_stats_lc2st(
+                        null_hypothesis=True,
+                        metrics=metrics,
+                        list_P_null=list_P_null,
+                        list_P_eval_null=list_P_eval_null,
+                        # ==== added for LC2ST ====
+                        list_x_P_null=[x_samples] * len(list_P_null),
+                        x_eval=observation,
+                        return_probas=False,
+                        # =========================
+                        use_permutation=False,
+                        n_trials_null=n_trials_null,
+                        # required kwargs for t_stats_lc2st
+                        P=list_P_null[0],
+                        Q=list_P_null[1],
+                        x_P=x_samples,
+                        x_Q=x_samples,
+                        # kwargs for lc2st_scores
+                        **kwargs_lc2st,
+                    )
             torch.save(
                 t_stats_null,
                 t_stats_null_path
                 / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl",
             )
-        t_stats_null_dict[m] = t_stats_null
+            t_stats_null_dict[m] = t_stats_null
 
     return t_stats_null_dict

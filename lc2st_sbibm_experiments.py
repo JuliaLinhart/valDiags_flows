@@ -171,7 +171,6 @@ def compute_emp_power_l_c2st(
     test_stat_names=["accuracy", "mse", "div"],
     compute_emp_power=True,
     compute_type_I_error=False,
-    base_dist_samples_null=None,
 ):
     """Compute the empirical power of the (L)C2ST methods for a given task and npe-flow
     (corresponding to n_train). We also compute the type I error if specified.
@@ -236,7 +235,7 @@ def compute_emp_power_l_c2st(
 
     for n in range(n_runs):
         print()
-        print("====> RUN: ", n + 1, "/", n_runs, " <====")
+        print("====> RUN: ", n + 1, "/", n_runs, f", N_cal = {n_cal} <====")
         # GENERATE DATA
         data_samples = generate_data_one_run(
             n_cal=n_cal,
@@ -320,6 +319,20 @@ def compute_emp_power_l_c2st(
         # and for every observation: [reject(obs1), reject(obs2), ...]
         if compute_type_I_error:
             print("Computing Type I error...")
+
+            # fixed distribution for null hypothesis (base distribution)
+            from scipy.stats import multivariate_normal as mvn
+
+            # generate data for L-C2ST-NF (Q_h0 = P_h0 = N(0,1))
+            base_dist_samples_null = mvn(
+                mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta)
+            ).rvs(
+                n_cal, random_state=n + 1
+            )  # not same random state as for other data generation (we dont want same data for P and Q)
+
+            # compatible with torch data
+            base_dist_samples_null = torch.FloatTensor(base_dist_samples_null)
+
             H0_results_dict, _ = compute_test_results_npe_one_run(
                 alpha=alpha,
                 data_samples=data_samples,
@@ -1147,15 +1160,16 @@ def precompute_t_stats_null(
                 / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl"
             )
             print(
-                f"Loaded pre-computed test statistics for (NF)-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
+                f"Loaded pre-computed test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
         except FileNotFoundError:
             print(
-                f"Pre-compute test statistics for (NF)-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
+                f"Pre-compute test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
             if m == "c2st_nf":
                 print()
                 print("C2ST: TRAIN / EVAL CLASSIFIERS ...")
+                print()
                 t_stats_null = t_stats_c2st(
                     null_hypothesis=True,
                     metrics=metrics,
@@ -1173,6 +1187,7 @@ def precompute_t_stats_null(
                 # train clfs on joint samples
                 print()
                 print("L-C2ST: TRAINING CLASSIFIERS on the joint ...")
+                print()
                 _, _, trained_clfs_null = t_stats_lc2st(
                     null_hypothesis=True,
                     metrics=metrics,

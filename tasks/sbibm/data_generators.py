@@ -2,23 +2,7 @@ import torch
 
 from tqdm import tqdm
 
-from sbi.utils import match_theta_and_x_batch_shapes
-
-
-def fwd_flow_transform_obs(batch_z, observation, flow):
-    observation_emb = flow._embedding_net(observation)
-    z_repeated, x_repeated = match_theta_and_x_batch_shapes(batch_z, observation_emb)
-    z_transformed = flow._transform.inverse(z_repeated, x_repeated)[0].detach()
-    return z_transformed
-
-
-def inv_flow_transform_obs(batch_theta, observation, flow):
-    observation_emb = flow._embedding_net(observation)
-    theta_repeated, x_repeated = match_theta_and_x_batch_shapes(
-        batch_theta, observation_emb
-    )
-    theta_transformed = flow._transform(theta_repeated, x_repeated)[0].detach()
-    return theta_transformed
+from .npe_utils import inv_flow_transform_obs, sample_from_npe_obs
 
 
 def generate_task_data(
@@ -103,8 +87,8 @@ def generate_npe_data_for_c2st(
         # Set default x_0 for npe
         npe.set_default_x(observation)
         # Sample from npe at x_0
-        npe_samples_obs[i + 1] = fwd_flow_transform_obs(
-            base_dist_samples, observation, npe.posterior_estimator
+        npe_samples_obs[i + 1] = sample_from_npe_obs(
+            npe=npe, observation=observation, base_dist_samples=base_dist_samples
         )
         # Compute inverse flow transformation of npe on reference posterior samples at x_0
         if nf_case and reference_posterior_samples is not None:
@@ -150,12 +134,15 @@ def generate_npe_data_for_lc2st(
     ):
         x, theta, z = x[None, :], theta[None, :], z[None, :]
 
-        # Set default x for npe
-        npe.set_default_x(x)
         # Sample from flow
-        npe_samples_joint.append(fwd_flow_transform_obs(z, x, npe.posterior_estimator))
+        npe_samples_joint.append(
+            sample_from_npe_obs(npe=npe, observation=x, base_dist_samples=z)
+        )
         # Compute inverse flow transformation of flow on joint samples
         if nf_case:
+            # Set default x for npe
+            npe.set_default_x(x)
+            # compute inverse flow transformation of flowon (theta, x)
             inv_transform_samples_joint.append(
                 inv_flow_transform_obs(
                     theta,

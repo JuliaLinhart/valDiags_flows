@@ -9,6 +9,7 @@ import time
 from valdiags.test_utils import eval_htest, permute_data
 from valdiags.vanillaC2ST import t_stats_c2st
 from valdiags.localC2ST import t_stats_lc2st, lc2st_scores
+from valdiags.localHPD import t_stats_lhpd
 
 from tasks.sbibm.data_generators import (
     generate_task_data,
@@ -118,8 +119,15 @@ def l_c2st_results_n_train(
             train_runtime[method].append(train_runtime_n[method])
 
         for method, results in results_dict.items():
+            print(results["p_value"])
             if method in methods:
                 for k, v in avg_result_keys.items():
+                    if v == "p_value":
+                        print(results[v])
+                        print(np.mean(results[v]["mse"]))
+                        print(np.std(results[v]["mse"]))
+                        print(np.mean(results[v]["div"]))
+                        print(np.std(results[v]["div"]))
                     for t_stat_name in test_stat_names:
                         if "std" in k:
                             if "run_time" in k:
@@ -1131,7 +1139,9 @@ def precompute_t_stats_null(
     kwargs_c2st,
     kwargs_lc2st,
     x_cal,
-    methods=["c2st_nf", "lc2st_nf"],
+    kwargs_lhpd={},
+    alphas=np.linspace(0.1, 0.9, 20),
+    methods=["c2st_nf", "lc2st_nf", "lhpd"],
     save_results=True,
     load_results=True,
 ):
@@ -1159,10 +1169,12 @@ def precompute_t_stats_null(
                 t_stats_null_path
                 / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl"
             )
+            print()
             print(
                 f"Loaded pre-computed test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
         except FileNotFoundError:
+            print()
             print(
                 f"Pre-compute test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
@@ -1234,6 +1246,47 @@ def precompute_t_stats_null(
                         # kwargs for lc2st_scores
                         **kwargs_lc2st,
                     )
+            elif m == "lhpd":
+                # train clfs on joint samples
+                print()
+                print("L-HPD: TRAINING CLASSIFIERS on the joint ...")
+                print()
+                _, _, trained_clfs_null = t_stats_lhpd(
+                    Y=list_P_null[0],  # for dim inside lhpd_scores
+                    X=x_cal,
+                    alphas=alphas,
+                    null_hypothesis=True,
+                    n_trials_null=n_trials_null,
+                    return_clfs_null=True,
+                    # required kwargs for t_stats_lhpd
+                    x_eval=None,
+                    # kwargs for lhpd_scores
+                    eval=False,
+                    est_log_prob_fn=None,
+                    est_sample_fn=None,
+                    **kwargs_lhpd,
+                )
+                print()
+                print("L-HPD: Evaluate for every observation ...")
+                t_stats_null = {}
+                for num_obs, observation in observation_dict.items():
+                    t_stats_null[num_obs] = t_stats_lhpd(
+                        Y=list_P_null[0],  # for dim inside lhpd_scores
+                        X=x_cal,
+                        alphas=alphas,
+                        null_hypothesis=True,
+                        n_trials_null=n_trials_null,
+                        trained_clfs_null=trained_clfs_null,
+                        return_clfs_null=False,
+                        return_r_alphas=False,
+                        # required kwargs for t_stats_lhpd
+                        x_eval=observation,
+                        # kwargs for lhpd_scores
+                        est_log_prob_fn=None,
+                        est_sample_fn=None,
+                        **kwargs_lhpd,
+                    )
+
             if save_results:
                 torch.save(
                     t_stats_null,
@@ -1243,3 +1296,83 @@ def precompute_t_stats_null(
         t_stats_null_dict[m] = t_stats_null
 
     return t_stats_null_dict
+
+
+if __name__ == "__main__":
+    import torch
+    import sbibm
+    from valdiags.localHPD import hpd_ranks, t_stats_lhpd
+    from tasks.sbibm.npe_utils import sample_from_npe_obs
+
+    import matplotlib.pyplot as plt
+
+    task = sbibm.get_task("two_moons")
+    npe = torch.load(
+        "saved_experiments/neurips_2023/exp_2/two_moons/npe_1000/posterior_estimator.pkl"
+    ).flow
+    joint_samples = torch.load(
+        "saved_experiments/neurips_2023/exp_2/two_moons/joint_samples_n_cal_10000.pkl"
+    )
+    x, theta = joint_samples["x"], joint_samples["theta"]
+    observation = task.get_observation(1)
+
+    def sample_fn(n_samples, x):
+        return sample_from_npe_obs(npe, x, n_samples)
+
+    alphas = np.linspace(0.1, 0.9, 20)
+    t_stat, r_alphas = t_stats_lhpd(
+        Y=theta[:100],
+        X=x[:100],
+        alphas=alphas,
+        x_eval=observation,
+        est_log_prob_fn=npe.log_prob,
+        est_sample_fn=sample_fn,
+        return_r_alphas=True,
+    )
+    # t_stats_null, r_alphas_null = t_stats_lhpd(
+    #     null_hypothesis=True,
+    #     Y=theta[:100],
+    #     X=x[:100],
+    #     x_eval=observation,
+    #     alphas=alphas,
+    #     est_log_prob_fn=npe.log_prob,
+    #     est_sample_fn=sample_fn,
+    #     return_r_alphas=True,
+    # )
+
+    t_stats_null = precompute_t_stats_null(
+        methods=["lhpd"],
+        x_cal=x[:100],
+        metrics=None,
+        n_cal=100,
+        n_eval=None,
+        dim_theta=theta.shape[-1],
+        n_trials_null=10,
+        observation_dict={1: observation},
+        t_stats_null_path="",
+        save_results=False,
+        load_results=False,
+        kwargs_c2st={},
+        kwargs_lc2st={},
+        kwargs_lhpd={},
+        alphas=alphas,
+    )["lhpd"][1]
+
+    from valdiags.test_utils import compute_pvalue
+
+    pvalue = compute_pvalue(t_stat, t_stats_null)
+    print(t_stat)
+    print(pvalue)
+
+    alphas = np.concatenate([np.array([0]), alphas, np.array([1])])
+    r_alphas = {**{0.0: 0.0}, **r_alphas, **{1.0: 1.0}}
+    plt.plot(alphas, r_alphas.values())
+
+    # import pandas as pd
+
+    # r_alphas_null = {**{0.0: [0.0] * 100}, **r_alphas_null, **{1.0: [1.0] * 100}}
+    # lower_band = pd.DataFrame(r_alphas_null).quantile(q=0.05 / 2, axis=0)
+    # upper_band = pd.DataFrame(r_alphas_null).quantile(q=1 - 0.05 / 2, axis=0)
+
+    # plt.fill_between(alphas, lower_band, upper_band, color="grey", alpha=0.2)
+    plt.show()

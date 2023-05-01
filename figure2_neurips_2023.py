@@ -31,8 +31,6 @@ from lc2st_sbibm_experiments import (
     precompute_t_stats_null,
 )
 
-from tasks.sbibm.data_generators import generate_task_data
-
 from valdiags.vanillaC2ST import sbibm_clf_kwargs
 
 from scipy.stats import multivariate_normal as mvn
@@ -359,8 +357,8 @@ if args.power_ncal:
     emp_power_dict, type_I_error_dict = {}, {}
     p_values_dict, p_values_h0_dict = {}, {}
 
-    COMPUTE_FPR = False
-    COMPUTE_TPR = True
+    COMPUTE_FPR = True
+    COMPUTE_TPR = False
 
     for N_cal in N_cal_list:
         try:

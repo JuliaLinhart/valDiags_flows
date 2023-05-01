@@ -398,7 +398,7 @@ def t_stats_lc2st(
         kwargs: keyword arguments for `lc2st_scores`.
 
     Returns:
-        (tuble): tuple containing:
+        (tuple): tuple containing:
         - t_stat_data (dict): dictionary of test statistics for the observed data (P and Q).
             keys are the names of the metrics. values are floats.
         - probas_data (list): list of predicted probabilities for the observed data.
@@ -514,7 +514,7 @@ def t_stats_lc2st(
                 else:
                     t_stats_null[m].append(None)
 
-        if return_probas and return_clfs_null:
+        if return_clfs_null:
             return t_stats_null, probas_null, clfs_null
         elif return_probas:
             return t_stats_null, probas_null

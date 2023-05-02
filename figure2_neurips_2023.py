@@ -50,6 +50,7 @@ NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 # test parameters
 ALPHA = 0.05
 N_TRIALS_PRECOMPUTE = 1000
+HPD_LEVELS = np.linspace(0.1, 0.9, 11)
 
 # metrics / test statistics
 ALL_METRICS = ["accuracy", "mse", "div"]
@@ -174,6 +175,13 @@ kwargs_lc2st = {
     "clf_kwargs": lc2st_clf_kwargs,
 }
 
+# kwargs for lhpd_scores function
+kwargs_lhpd = {
+    "alphas": HPD_LEVELS,
+    "n_ensemble": N_ENSEMBLE,
+    "clf_kwargs": lc2st_clf_kwargs,
+}
+
 # pre-compute / load test statistics for the C2ST-NF null hypothesis
 # they are independant of the estimator and the observation space (x)
 # N.B> L-C2ST is still dependent on the observation space (x)
@@ -219,7 +227,7 @@ if args.t_res_ntrain:
         100000,
     ]  # np.logspace(2,5,10, dtpye=int)
 
-    METHODS = ["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm"]
+    METHODS = ["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm", "lhpd"]
 
     for N_cal in N_cal_list:
         avg_results, train_runtime = l_c2st_results_n_train(
@@ -234,6 +242,7 @@ if args.t_res_ntrain:
             n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
             kwargs_c2st=kwargs_c2st,
             kwargs_lc2st=kwargs_lc2st,
+            kwargs_lhpd=kwargs_lhpd,
             task_path=task_path,
             t_stats_null_path=task_path / "t_stats_null" / eval_params,
             results_n_train_path=Path("results") / test_params / eval_params,
@@ -264,12 +273,23 @@ if args.t_res_ntrain:
             "Max-L-C2ST (NF-Perm)": {
                 k: v["div"] for k, v in avg_results["lc2st_nf_perm"].items()
             },
+            "L-HPD": {k: v["mse"] for k, v in avg_results["lhpd"].items()},
         }
 
-        colors = ["grey", "blue", "orange", "orange", "gold", "red", "red", "coral"]
-        linestyles = ["-", "-", "-", "--", "-.", "-", "--", "-."]
+        colors = [
+            "grey",
+            "blue",
+            "orange",
+            "orange",
+            "gold",
+            "red",
+            "red",
+            "coral",
+            "green",
+        ]
+        linestyles = ["-", "-", "-", "--", "-.", "-", "--", "-.", "-"]
 
-        markers = ["o", "o", "o", "*", "*", "o", "*", "*"]
+        markers = ["o", "o", "o", "*", "*", "o", "*", "*", "o"]
 
         for k in avg_results["c2st"].keys():
             for method, color, linestyle, marker in zip(
@@ -327,7 +347,14 @@ if args.t_res_ntrain:
                     linestyle="--",
                     marker="*",
                 )
-                k = k + " (1 trial)"
+                plt.plot(
+                    np.arange(len(N_TRAIN_LIST)),
+                    train_runtime["lhpd"],
+                    label="L-HPD (pre-train)",
+                    color="darkgrey",
+                    linestyle="-",
+                    marker="o",
+                )
 
             if "std" not in k:
                 plt.legend()
@@ -347,7 +374,7 @@ if args.power_ncal:
     print(f"... for N_train = {N_TRAIN} ...")
     print()
 
-    METHODS = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm"]  # "c2st_nf",
+    METHODS = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm", "lhpd"]  # "c2st_nf",
     N_RUNS = 100
 
     result_path = task_path / f"npe_{N_TRAIN}" / "results" / test_params / eval_params
@@ -357,8 +384,8 @@ if args.power_ncal:
     emp_power_dict, type_I_error_dict = {}, {}
     p_values_dict, p_values_h0_dict = {}, {}
 
-    COMPUTE_FPR = True
-    COMPUTE_TPR = False
+    COMPUTE_FPR = False
+    COMPUTE_TPR = True
 
     for N_cal in N_cal_list:
         try:
@@ -389,6 +416,7 @@ if args.power_ncal:
                 n_trials_null=args.n_trials_null,
                 kwargs_c2st=kwargs_c2st,
                 kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf[N_cal],
                 n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
                 methods=METHODS,

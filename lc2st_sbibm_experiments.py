@@ -9,13 +9,14 @@ import time
 from valdiags.test_utils import eval_htest, permute_data
 from valdiags.vanillaC2ST import t_stats_c2st
 from valdiags.localC2ST import t_stats_lc2st, lc2st_scores
-from valdiags.localHPD import t_stats_lhpd
+from valdiags.localHPD import t_stats_lhpd, lhpd_scores
 
 from tasks.sbibm.data_generators import (
     generate_task_data,
     generate_npe_data_for_c2st,
     generate_npe_data_for_lc2st,
 )
+from tasks.sbibm.npe_utils import sample_from_npe_obs
 
 
 def l_c2st_results_n_train(
@@ -30,6 +31,7 @@ def l_c2st_results_n_train(
     n_trials_null_precompute,
     kwargs_c2st,
     kwargs_lc2st,
+    kwargs_lhpd,
     task_path,
     t_stats_null_path,
     results_n_train_path="",
@@ -73,6 +75,27 @@ def l_c2st_results_n_train(
     else:
         t_stats_null_lc2st_nf = None
 
+    if "lhpd" in methods:
+        t_stats_null_lhpd = precompute_t_stats_null(
+            n_cal=n_cal,
+            n_eval=n_eval,
+            dim_theta=dim_theta,
+            n_trials_null=n_trials_null_precompute,
+            kwargs_lhpd=kwargs_lhpd,
+            x_cal=x_cal,
+            observation_dict=observation_dict,
+            methods=["lhpd"],
+            metrics=["mse"],
+            t_stats_null_path=t_stats_null_path,
+            save_results=True,
+            load_results=True,
+            # args only for c2st and lc2st
+            kwargs_c2st=None,
+            kwargs_lc2st=None,
+        )["lhpd"]
+    else:
+        t_stats_null_lhpd = None
+
     avg_result_keys = {
         "TPR": "reject",
         "p_value_mean": "p_value",
@@ -103,9 +126,11 @@ def l_c2st_results_n_train(
             observation_dict=observation_dict,
             kwargs_c2st=kwargs_c2st,
             kwargs_lc2st=kwargs_lc2st,
+            kwargs_lhpd=kwargs_lhpd,
             n_trials_null=n_trials_null,
             t_stats_null_c2st_nf=t_stats_null_c2st_nf,
             t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
+            t_stats_null_lhpd=t_stats_null_lhpd,
             task_path=task_path,
             results_n_train_path=results_n_train_path,
             methods=methods,
@@ -119,44 +144,36 @@ def l_c2st_results_n_train(
             train_runtime[method].append(train_runtime_n[method])
 
         for method, results in results_dict.items():
-            print(results["p_value"])
             if method in methods:
                 for k, v in avg_result_keys.items():
-                    if v == "p_value":
-                        print(results[v])
-                        print(np.mean(results[v]["mse"]))
-                        print(np.std(results[v]["mse"]))
-                        print(np.mean(results[v]["div"]))
-                        print(np.std(results[v]["div"]))
                     for t_stat_name in test_stat_names:
+                        if method == "lhpd" and t_stat_name != "mse":
+                            results_t = [0] * len(observation_dict)  # only "mse exists"
+                        else:
+                            results_t = results[v][t_stat_name]
+
                         if "std" in k:
                             if "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.std(
-                                        np.array(results[v][t_stat_name])
-                                        / n_trials_null
-                                    )
+                                    np.std(np.array(results_t) / n_trials_null)
                                 )
                             else:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.std(results[v][t_stat_name])
+                                    np.std(results_t)
                                 )
                         else:
                             if "t_stat" in k and t_stat_name == "mse":
                                 avg_results[method][k][t_stat_name].append(
-                                    np.mean(results[v][t_stat_name])
+                                    np.mean(results_t)
                                     + 0.5  # for comparison with other t_stats
                                 )
                             elif "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.mean(
-                                        np.array(results[v][t_stat_name])
-                                        / n_trials_null
-                                    )
+                                    np.mean(np.array(results_t) / n_trials_null)
                                 )
                             else:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.mean(results[v][t_stat_name])
+                                    np.mean(results_t)
                                 )
     return avg_results, train_runtime
 
@@ -171,6 +188,7 @@ def compute_emp_power_l_c2st(
     n_eval,
     kwargs_c2st,
     kwargs_lc2st,
+    kwargs_lhpd,
     n_trials_null,
     n_trials_null_precompute,
     t_stats_null_c2st_nf,
@@ -281,6 +299,27 @@ def compute_emp_power_l_c2st(
         else:
             t_stats_null_lc2st_nf = None
 
+        if "lhpd" in methods:
+            t_stats_null_lhpd = precompute_t_stats_null(
+                n_cal=n_cal,
+                n_eval=n_eval,
+                dim_theta=dim_theta,
+                n_trials_null=n_trials_null_precompute,
+                kwargs_lhpd=kwargs_lhpd,
+                x_cal=x_cal,
+                observation_dict=observation_dict,
+                methods=["lhpd"],
+                metrics=["mse"],
+                t_stats_null_path="",
+                save_results=False,
+                load_results=False,
+                # args only for c2st and lc2st
+                kwargs_c2st=None,
+                kwargs_lc2st=None,
+            )["lhpd"]
+        else:
+            t_stats_null_lhpd = None
+
         # Empirical Power = True Positive Rate (TPR)
         # count rejection of H0 under H1 (p_value <= alpha) for every run
         # and for every observation: [reject(obs1), reject(obs2), ...]
@@ -295,9 +334,11 @@ def compute_emp_power_l_c2st(
                 observation_dict=observation_dict,
                 kwargs_c2st=kwargs_c2st,
                 kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
                 n_trials_null=n_trials_null,
                 t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf,
+                t_stats_null_lhpd=t_stats_null_lhpd,
                 test_stat_names=test_stat_names,
                 methods=methods,
                 compute_under_null=False,
@@ -308,17 +349,19 @@ def compute_emp_power_l_c2st(
             )
             for m in methods:
                 for t_stat_name in test_stat_names:
+                    if m == "lhpd" and t_stat_name != "mse":
+                        p_value_t = [0] * len(observation_dict)
+                    else:
+                        p_value_t = H1_results_dict[m]["p_value"][t_stat_name]
                     # increment list of average rejections of H0 under H1
                     emp_power[m][t_stat_name] += (
-                        (np.array(H1_results_dict[m]["p_value"][t_stat_name]) <= alpha)
-                        * 1
-                        / n_runs
+                        (np.array(p_value_t) <= alpha) * 1 / n_runs
                     )
-                    # increment list of average p_values for every observation
+                    # increment p_values for every observation
                     for num_obs in observation_dict.keys():
-                        p_values[m][t_stat_name] += H1_results_dict[m]["p_value"][
-                            t_stat_name
-                        ]
+                        p_values[m][t_stat_name][num_obs - 1] += (
+                            p_value_t[num_obs - 1] / n_runs
+                        )
         else:
             emp_power, p_values = None, None
 
@@ -348,9 +391,11 @@ def compute_emp_power_l_c2st(
                 observation_dict=observation_dict,
                 kwargs_c2st=kwargs_c2st,
                 kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
                 n_trials_null=n_trials_null,
                 t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf,
+                t_stats_null_lhpd=t_stats_null_lhpd,
                 test_stat_names=test_stat_names,
                 methods=methods,
                 compute_under_null=True,
@@ -362,17 +407,20 @@ def compute_emp_power_l_c2st(
             )
             for m in methods:
                 for t_stat_name in test_stat_names:
+                    if m == "lhpd" and t_stat_name != "mse":
+                        p_value_t = [0] * len(observation_dict)
+                    else:
+                        p_value_t = H0_results_dict[m]["p_value"][t_stat_name]
                     # increment list of average rejections of H0 under H0
                     type_I_error[m][t_stat_name] += (
-                        (np.array(H0_results_dict[m]["p_value"][t_stat_name]) <= alpha)
-                        * 1
-                        / n_runs
+                        (np.array(p_value_t) <= alpha) * 1 / n_runs
                     )
-                    # append p_value of this run for every observation
+                    # increment p_value for every observation
                     for num_obs in observation_dict.keys():
-                        p_values_h0[m][t_stat_name] += H0_results_dict[m]["p_value"][
-                            t_stat_name
-                        ][num_obs - 1]
+                        p_values_h0[m][t_stat_name][num_obs - 1] += (
+                            p_value_t[num_obs - 1] / n_runs
+                        )
+
         else:
             type_I_error = None
             p_values_h0 = None
@@ -622,13 +670,15 @@ def compute_test_results_npe_one_run(
     observation_dict,
     kwargs_c2st,
     kwargs_lc2st,
+    kwargs_lhpd,
     n_trials_null,
     t_stats_null_c2st_nf,
     t_stats_null_lc2st_nf,
+    t_stats_null_lhpd,
     task_path,
     results_n_train_path,
     test_stat_names=["accuracy", "mse", "div"],
-    methods=["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm"],
+    methods=["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm", "lhpd"],
     alpha=0.05,
     compute_under_null=False,
     base_dist_samples_null=None,
@@ -665,21 +715,10 @@ def compute_test_results_npe_one_run(
 
     train_runtime = dict(zip(methods, [0 for _ in methods]))
     results_dict = dict(zip(methods, [{} for _ in methods]))
-    print()
-    print("     1. C2ST: for every x_0 in x_test")
-    print()
-    try:
-        if "c2st" in methods:
-            results_dict["c2st"] = torch.load(
-                result_path / f"c2st_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
-            )
-        if "c2st_nf" in methods:
-            results_dict["c2st_nf"] = torch.load(
-                result_path / f"c2st_nf_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
-            )
-    except FileNotFoundError:
-        result_keys = ["reject", "p_value", "t_stat", "t_stats_null", "run_time"]
-        results_dict["c2st"] = dict(
+
+    result_keys = ["reject", "p_value", "t_stat", "t_stats_null", "run_time"]
+    for m in methods:
+        results_dict[m] = dict(
             zip(
                 result_keys,
                 [
@@ -688,442 +727,286 @@ def compute_test_results_npe_one_run(
                 ],
             )
         )
-        results_dict["c2st_nf"] = dict(
-            zip(
-                result_keys,
-                [
-                    dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-                    for _ in result_keys
-                ],
+        try:
+            results_dict[m] = torch.load(
+                result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
             )
-        )
+            train_runtime[m] = torch.load(
+                result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
+            )
+        except FileNotFoundError:
+            if m == "c2st" or m == "c2st_nf":
+                print()
+                print("     C2ST: train for every observation x_0")
+                print()
+                # loop over observations x_0
+                for n_obs in tqdm(
+                    observation_dict.keys(),
+                    desc=f"{m}: Computing T for every observation x_0",
+                ):
+                    if m == "c2st":
+                        # class 0: T ~ p_est(theta | x_0) vs. p_ref(theta | x_0)
+                        P, Q = (
+                            npe_samples_obs["cal"][n_obs],
+                            reference_posterior_samples["cal"][n_obs],
+                        )
+                        P_eval, Q_eval = (
+                            npe_samples_obs["eval"][n_obs],
+                            reference_posterior_samples["eval"][n_obs],
+                        )
+                        # permutation method
+                        if compute_under_null:
+                            P, Q = permute_data(P, Q, seed=seed)
+                            P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
+                        t_stats_null = None
 
-        # C2ST:
-        # class 0: T ~ p_est(theta | x_0) vs. p_ref(theta | x_0)
-        if "c2st" in methods:
-            # loop over observations x_0
-            for n_obs in tqdm(
-                observation_dict.keys(),
-                desc=f"C2ST: Computing T for every observation x_0",
-            ):
-                P, Q = (
-                    npe_samples_obs["cal"][n_obs],
-                    reference_posterior_samples["cal"][n_obs],
-                )
-                P_eval, Q_eval = (
-                    npe_samples_obs["eval"][n_obs],
-                    reference_posterior_samples["eval"][n_obs],
-                )
-                if compute_under_null:
-                    P, Q = permute_data(P, Q, seed=seed)
-                    P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
+                    elif m == "c2st_nf":
+                        # class 0: Z ~ N(0,I) vs. Z ~ T^{-1}(p_ref(theta | x_0))
+                        P, Q = (
+                            base_dist_samples["cal"],
+                            reference_inv_transform_samples["cal"][n_obs],
+                        )
+                        P_eval, Q_eval = (
+                            base_dist_samples["eval"],
+                            reference_inv_transform_samples["eval"][n_obs],
+                        )
+                        # no permuation method and precomputed test stats under null
+                        if compute_under_null:
+                            Q = base_dist_samples_null
+                        t_stats_null = t_stats_null_c2st_nf
 
+                    t0 = time.time()
+                    c2st_results_obs = eval_htest(
+                        conf_alpha=alpha,
+                        t_stats_estimator=t_stats_c2st,
+                        metrics=test_stat_names,
+                        t_stats_null=t_stats_null,
+                        # kwargs for t_stats_c2st
+                        P=P,
+                        Q=Q,
+                        P_eval=P_eval,
+                        Q_eval=Q_eval,
+                        use_permutation=True,
+                        n_trials_null=n_trials_null,
+                        # kwargs for c2st_scores
+                        **kwargs_c2st,
+                    )
+                    runtime = time.time() - t0
+
+                    for i, result_name in enumerate(result_keys):
+                        for t_stat_name in test_stat_names:
+                            if result_name == "run_time":
+                                results_dict[m][result_name][t_stat_name].append(
+                                    runtime
+                                )
+                            else:
+                                results_dict[m][result_name][t_stat_name].append(
+                                    c2st_results_obs[i][t_stat_name]
+                                )
+
+            elif "lc2st" in m:
+                print()
+                print("     L-C2ST: amortized")
+                print()
+
+                x_P, x_Q = x_cal, x_cal
+
+                if m == "lc2st":
+                    P, Q = npe_samples_x_cal, theta_cal
+                    P_eval_obs = npe_samples_obs["eval"]
+
+                if m == "lc2st_nf" or m == "lc2st_nf_perm":
+                    P, Q = base_dist_samples["cal"], inv_transform_samples_theta_cal
+                    P_eval_obs = {
+                        n_obs: base_dist_samples["eval"]
+                        for n_obs in observation_dict.keys()
+                    }
+                if m == "lc2st" or m == "lc2st_nf_perm":
+                    # permutation method and no precomputed test stats under null
+                    t_stats_null = {n_obs: None for n_obs in observation_dict.keys()}
+                    if compute_under_null:
+                        joint_P_x = torch.cat([P, x_P], dim=1)
+                        joint_Q_x = torch.cat([Q, x_Q], dim=1)
+                        joint_P_x, joint_Q_x = permute_data(
+                            joint_P_x, joint_Q_x, seed=seed
+                        )
+                        P, x_P = (
+                            joint_P_x[:, : P.shape[-1]],
+                            joint_P_x[:, P.shape[-1] :],
+                        )
+                        Q, x_Q = (
+                            joint_Q_x[:, : Q.shape[-1]],
+                            joint_Q_x[:, Q.shape[-1] :],
+                        )
+                else:
+                    # no permutation method and precomputed test stats under null
+                    t_stats_null = t_stats_null_lc2st_nf
+                    if compute_under_null:
+                        Q = base_dist_samples_null
+
+                # train classifier on the joint
+                print(f"{m}: TRAINING CLASSIFIER on the joint ...")
+                print()
                 t0 = time.time()
-                c2st_results_obs = eval_htest(
-                    conf_alpha=alpha,
-                    t_stats_estimator=t_stats_c2st,
-                    metrics=test_stat_names,
-                    # kwargs for t_stats_c2st
-                    P=P,
-                    Q=Q,
-                    P_eval=P_eval,
-                    Q_eval=Q_eval,
-                    use_permutation=True,  # it takes to long to sample new data from the reference / npe
-                    n_trials_null=n_trials_null,
-                    # kwargs for c2st_scores
-                    **kwargs_c2st,
-                )
-                runtime = time.time() - t0
-                for i, result_name in enumerate(result_keys):
-                    for t_stat_name in test_stat_names:
-                        if result_name == "run_time":
-                            results_dict["c2st"][result_name][t_stat_name].append(
-                                runtime
-                            )
-                        else:
-                            results_dict["c2st"][result_name][t_stat_name].append(
-                                c2st_results_obs[i][t_stat_name]
-                            )
-            if save_results:
-                torch.save(
-                    results_dict["c2st"],
-                    result_path / f"c2st_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
-                )
-
-        # C2ST-NF:
-        # class 0: Z ~ N(0,I) vs. Z ~ T^{-1}(p_ref(theta | x_0))
-        if "c2st_nf" in methods:
-            # loop over observations x_0
-            for n_obs in tqdm(
-                observation_dict.keys(),
-                desc=f"C2ST-NF: Computing T for every observation x_0",
-            ):
-                P = base_dist_samples["cal"]
-                Q = reference_inv_transform_samples["cal"][n_obs]
-                P_eval = base_dist_samples["eval"]
-                Q_eval = reference_inv_transform_samples["eval"][n_obs]
-
-                if compute_under_null:
-                    P, Q = permute_data(P, Q, seed=seed)
-                    P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
-
-                t0 = time.time()
-                c2st_nf_results_obs = eval_htest(
-                    conf_alpha=alpha,
-                    t_stats_estimator=t_stats_c2st,
-                    metrics=test_stat_names,
-                    t_stats_null=t_stats_null_c2st_nf,  # use precomputed test statistics
-                    # kwargs for t_stats_estimator
-                    P=P,
-                    Q=Q,
-                    P_eval=P_eval,
-                    Q_eval=Q_eval,
-                    # kwargs for c2st_scores
-                    **kwargs_c2st,
-                )
-                runtime = time.time() - t0
-                for i, result_name in enumerate(result_keys):
-                    for t_stat_name in test_stat_names:
-                        if result_name == "run_time":
-                            results_dict["c2st_nf"][result_name][t_stat_name].append(
-                                runtime
-                            )
-                        else:
-                            results_dict["c2st_nf"][result_name][t_stat_name].append(
-                                c2st_nf_results_obs[i][t_stat_name]
-                            )
-            if save_results:
-                torch.save(
-                    results_dict["c2st_nf"],
-                    result_path / f"c2st_nf_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
-                )
-    print()
-    print("     2. L-C2ST: amortized")
-    try:
-        if "lc2st" in methods:
-            results_dict["lc2st"] = torch.load(
-                result_path / f"lc2st_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
-            )
-            train_runtime["lc2st"] = torch.load(
-                result_path / f"runtime_lc2st_n_cal_{n_cal}.pkl"
-            )
-
-        if "lc2st_nf" in methods:
-            results_dict["lc2st_nf"] = torch.load(
-                result_path / f"lc2st_nf_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
-            )
-            train_runtime["lc2st_nf"] = torch.load(
-                result_path / f"runtime_lc2st_nf_n_cal_{n_cal}.pkl"
-            )
-
-        if "lc2st_nf_perm" in methods:
-            results_dict["lc2st_nf_perm"] = torch.load(
-                result_path / f"lc2st_nf_perm_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
-            )
-            train_runtime["lc2st_nf_perm"] = torch.load(
-                result_path / f"runtime_lc2st_nf_perm_n_cal_{n_cal}.pkl"
-            )
-
-    except FileNotFoundError:
-        result_keys = ["reject", "p_value", "t_stat", "t_stats_null", "run_time"]
-        results_dict["lc2st"] = dict(
-            zip(
-                result_keys,
-                [
-                    dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-                    for _ in result_keys
-                ],
-            )
-        )
-        results_dict["lc2st_nf"] = dict(
-            zip(
-                result_keys,
-                [
-                    dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-                    for _ in result_keys
-                ],
-            )
-        )
-        results_dict["lc2st_nf_perm"] = dict(
-            zip(
-                result_keys,
-                [
-                    dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-                    for _ in result_keys
-                ],
-            )
-        )
-
-        # L-C2ST:
-        if "lc2st" in methods:
-            # train classifier on the joint
-            print()
-            print("L-C2ST: TRAINING CLASSIFIER on the joint ...")
-
-            P = npe_samples_x_cal
-            Q = theta_cal
-            x_P = x_cal
-            x_Q = x_cal
-            if compute_under_null:
-                joint_P_x = torch.cat([P, x_P], dim=1)
-                joint_Q_x = torch.cat([Q, x_Q], dim=1)
-                joint_P_x, joint_Q_x = permute_data(joint_P_x, joint_Q_x, seed=seed)
-                P, x_P = joint_P_x[:, : P.shape[-1]], joint_P_x[:, P.shape[-1] :]
-                Q, x_Q = joint_Q_x[:, : Q.shape[-1]], joint_Q_x[:, Q.shape[-1] :]
-
-            t0 = time.time()
-            _, _, trained_clfs_lc2st = lc2st_scores(
-                P=P,
-                Q=Q,
-                x_P=x_P,
-                x_Q=x_Q,
-                x_eval=None,
-                eval=False,
-                **kwargs_lc2st,
-            )
-            runtime = time.time() - t0
-            train_runtime["lc2st"] = runtime
-            if save_results:
-                torch.save(runtime, result_path / f"runtime_lc2st_n_cal_{n_cal}.pkl")
-
-            # train classifier on the joint under null
-            _, _, trained_clfs_null_lc2st = t_stats_lc2st(
-                null_hypothesis=True,
-                n_trials_null=n_trials_null,
-                use_permutation=True,
-                P=P,
-                Q=Q,
-                x_P=x_P,
-                x_Q=x_Q,
-                x_eval=None,
-                P_eval=None,
-                return_clfs_null=True,
-                # kwargs for lc2st_sores
-                eval=False,
-                **kwargs_lc2st,
-            )
-
-            for num_observation, observation in tqdm(
-                observation_dict.items(),
-                desc=f"L-C2ST: Computing T for every observation x_0",
-            ):
-                t0 = time.time()
-                lc2st_results_obs = eval_htest(
-                    conf_alpha=alpha,
-                    t_stats_estimator=t_stats_lc2st,
-                    metrics=test_stat_names,
-                    # kwargs for t_stats_estimator
-                    x_eval=observation,
-                    P_eval=npe_samples_obs["eval"][num_observation],
-                    Q_eval=None,
-                    use_permutation=True,
-                    n_trials_null=n_trials_null,
-                    return_probas=False,
-                    # unnessary args as we have pretrained clfs
+                _, _, trained_clfs_lc2st = lc2st_scores(
                     P=P,
                     Q=Q,
                     x_P=x_P,
                     x_Q=x_Q,
-                    # use same clf for all observations (amortized)
-                    trained_clfs=trained_clfs_lc2st,
-                    trained_clfs_null=trained_clfs_null_lc2st,
-                    # kwargs for lc2st_scores
-                    **kwargs_lc2st,
-                )
-                runtime = (time.time() - t0) / n_trials_null
-
-                for i, result_name in enumerate(result_keys):
-                    for t_stat_name in test_stat_names:
-                        if result_name == "run_time":
-                            results_dict["lc2st"][result_name][t_stat_name].append(
-                                runtime
-                            )
-                        else:
-                            results_dict["lc2st"][result_name][t_stat_name].append(
-                                lc2st_results_obs[i][t_stat_name]
-                            )
-            if save_results:
-                torch.save(
-                    results_dict["lc2st"],
-                    result_path / f"lc2st_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
-                )
-
-        # L-C2ST-NF:
-        if "lc2st_nf" or "lc2st_nf_perm" in methods:
-            # train classifier on the joint
-            print()
-            print("L-C2ST-NF: TRAINING CLASSIFIER on the joint ...")
-
-            P = base_dist_samples["cal"]
-            Q = inv_transform_samples_theta_cal
-            x_P = x_cal
-            x_Q = x_cal
-            if compute_under_null:
-                for m in ["lc2st_nf", "lc2st_nf_perm"]:
-                    if m in methods:
-                        if "perm" in m:
-                            joint_P_x = torch.cat([P, x_P], dim=1)
-                            joint_Q_x = torch.cat([Q, x_Q], dim=1)
-                            joint_P_x, joint_Q_x = permute_data(
-                                joint_P_x, joint_Q_x, seed=seed
-                            )
-                            P, x_P = (
-                                joint_P_x[:, : P.shape[-1]],
-                                joint_P_x[:, P.shape[-1] :],
-                            )
-                            Q, x_Q = (
-                                joint_Q_x[:, : Q.shape[-1]],
-                                joint_Q_x[:, Q.shape[-1] :],
-                            )
-                        else:
-                            Q = base_dist_samples_null
-                        t0 = time.time()
-                        _, _, trained_clfs_lc2st_nf = lc2st_scores(
-                            P=P,
-                            Q=Q,
-                            x_P=x_P,
-                            x_Q=x_Q,
-                            x_eval=None,
-                            eval=False,
-                            **kwargs_lc2st,
-                        )
-                        runtime = time.time() - t0
-                        train_runtime[m] = runtime
-                        if save_results:
-                            torch.save(
-                                runtime, result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
-                            )
-            else:
-                t0 = time.time()
-                _, _, trained_clfs_lc2st_nf = lc2st_scores(
-                    P=base_dist_samples["cal"],
-                    Q=inv_transform_samples_theta_cal,
-                    x_P=x_cal,
-                    x_Q=x_cal,
                     x_eval=None,
                     eval=False,
                     **kwargs_lc2st,
                 )
                 runtime = time.time() - t0
-                train_runtime["lc2st_nf"] = runtime
-                train_runtime["lc2st_nf_perm"] = runtime
-
+                train_runtime[m] = runtime
                 if save_results:
-                    torch.save(
-                        runtime, result_path / f"runtime_lc2st_nf_n_cal_{n_cal}.pkl"
+                    torch.save(runtime, result_path / f"runtime_{m}_n_cal_{n_cal}.pkl")
+
+                if t_stats_null is None:
+                    # train classifier on the joint under null
+                    _, _, trained_clfs_null_lc2st = t_stats_lc2st(
+                        null_hypothesis=True,
+                        n_trials_null=n_trials_null,
+                        use_permutation=True,
+                        P=P,
+                        Q=Q,
+                        x_P=x_P,
+                        x_Q=x_Q,
+                        x_eval=None,
+                        P_eval=None,
+                        return_clfs_null=True,
+                        # kwargs for lc2st_sores
+                        eval=False,
+                        **kwargs_lc2st,
                     )
-                    torch.save(
-                        runtime,
-                        result_path / f"runtime_lc2st_nf_perm_n_cal_{n_cal}.pkl",
-                    )
+                else:
+                    trained_clfs_null_lc2st = None
 
-            _, _, trained_clfs_null_perm = t_stats_lc2st(
-                null_hypothesis=True,
-                n_trials_null=n_trials_null,
-                use_permutation=True,
-                P=base_dist_samples["cal"],
-                Q=inv_transform_samples_theta_cal,
-                x_P=x_cal,
-                x_Q=x_cal,
-                x_eval=None,
-                P_eval=None,
-                return_clfs_null=True,
-                # kwargs for lc2st_scores
-                eval=False,
-                **kwargs_lc2st,
-            )
-
-            # if not permuation method, there is no need to train lc2st_nf
-            # on the joint under the null hypothesis
-            # we use precomuted test-statistics...
-
-            for num_observation, observation in tqdm(
-                observation_dict.items(),
-                desc=f"L-C2ST-NF: Computing T for every observation x_0",
-            ):
-                if "lc2st_nf" in methods:
+                for num_observation, observation in tqdm(
+                    observation_dict.items(),
+                    desc=f"{m}: Computing T for every observation x_0",
+                ):
                     t0 = time.time()
-                    lc2st_nf_results_obs = eval_htest(
+                    lc2st_results_obs = eval_htest(
                         conf_alpha=alpha,
                         t_stats_estimator=t_stats_lc2st,
                         metrics=test_stat_names,
-                        t_stats_null=t_stats_null_lc2st_nf[
-                            num_observation
-                        ],  # use precomputed test statistics under null
+                        t_stats_null=t_stats_null[num_observation],
                         # kwargs for t_stats_estimator
                         x_eval=observation,
-                        P_eval=base_dist_samples["eval"],
-                        Q_eval=None,
-                        return_probas=False,
-                        # unnecessary args as we have pretrained clfs and precomputed test statistics
-                        P=base_dist_samples["cal"],
-                        Q=inv_transform_samples_theta_cal,
-                        x_P=x_cal,
-                        x_Q=x_cal,
-                        # use same clf for all observations (amortized)
-                        trained_clfs=trained_clfs_lc2st_nf,
-                        # kwargs for lc2st_scores
-                        **kwargs_lc2st,
-                    )
-                    runtime = (time.time() - t0) / n_trials_null
-
-                    for i, result_name in enumerate(result_keys):
-                        for t_stat_name in test_stat_names:
-                            if result_name == "run_time":
-                                results_dict["lc2st_nf"][result_name][
-                                    t_stat_name
-                                ].append(runtime)
-                            else:
-                                results_dict["lc2st_nf"][result_name][
-                                    t_stat_name
-                                ].append(lc2st_nf_results_obs[i][t_stat_name])
-
-                if "lc2st_nf_perm" in methods:
-                    t0 = time.time()
-                    lc2st_nf_perm_results_obs = eval_htest(
-                        t_stats_estimator=t_stats_lc2st,
-                        metrics=test_stat_names,
-                        # args for t_stats_estimator
-                        x_eval=observation,
-                        P_eval=base_dist_samples["eval"],
+                        P_eval=P_eval_obs[num_observation],
                         Q_eval=None,
                         use_permutation=True,
                         n_trials_null=n_trials_null,
                         return_probas=False,
-                        # unnessary args as we pretrained the clfs
-                        P=base_dist_samples["cal"],
-                        Q=inv_transform_samples_theta_cal,
-                        x_P=x_cal,
-                        x_Q=x_cal,
+                        # unnessary args as we have pretrained clfs
+                        P=P,
+                        Q=Q,
+                        x_P=x_P,
+                        x_Q=x_Q,
                         # use same clf for all observations (amortized)
                         trained_clfs=trained_clfs_lc2st,
-                        trained_clfs_null=trained_clfs_null_perm,
+                        trained_clfs_null=trained_clfs_null_lc2st,
                         # kwargs for lc2st_scores
                         **kwargs_lc2st,
                     )
                     runtime = (time.time() - t0) / n_trials_null
+
                     for i, result_name in enumerate(result_keys):
                         for t_stat_name in test_stat_names:
                             if result_name == "run_time":
-                                results_dict["lc2st_nf_perm"][result_name][
-                                    t_stat_name
-                                ].append(runtime)
+                                results_dict[m][result_name][t_stat_name].append(
+                                    runtime
+                                )
                             else:
-                                results_dict["lc2st_nf_perm"][result_name][
-                                    t_stat_name
-                                ].append(lc2st_nf_perm_results_obs[i][t_stat_name])
+                                results_dict[m][result_name][t_stat_name].append(
+                                    lc2st_results_obs[i][t_stat_name]
+                                )
+
+            elif m == "lhpd":
+                print()
+                print("     Local HPD: amortized")
+                print()
+
+                npe = torch.load(
+                    task_path / f"npe_{n_train}" / "posterior_estimator.pkl"
+                ).flow
+
+                def npe_sample_fn(n_samples, x):
+                    return sample_from_npe_obs(npe, x, n_samples=n_samples)
+
+                print(f"{m}: TRAINING CLASSIFIER on the joint ...")
+                print()
+                t0 = time.time()
+                if compute_under_null:
+                    _, _, trained_clfs_lhpd = t_stats_lhpd(
+                        null_hypothesis=True,
+                        n_trials_null=1,
+                        Y=theta_cal,
+                        X=x_cal,
+                        x_eval=None,
+                        est_log_prob_fn=None,
+                        est_sample_fn=None,
+                        eval=False,
+                        return_clfs_null=True,
+                        **kwargs_lhpd,
+                    )
+                    trained_clfs_lhpd = trained_clfs_lhpd[0]
+                else:
+                    _, _, trained_clfs_lhpd = lhpd_scores(
+                        Y=theta_cal,
+                        X=x_cal,
+                        est_log_prob_fn=npe.log_prob,
+                        est_sample_fn=npe_sample_fn,
+                        return_clfs=True,
+                        x_eval=None,
+                        eval=False,
+                        **kwargs_lhpd,
+                    )
+                runtime = time.time() - t0
+                train_runtime[m] = runtime
+
+                for num_observation, observation in tqdm(
+                    observation_dict.items(),
+                    desc=f"{m}: Computing T for every observation x_0",
+                ):
+                    t0 = time.time()
+                    lhpd_results_obs = eval_htest(
+                        conf_alpha=alpha,
+                        t_stats_estimator=t_stats_lhpd,
+                        metrics=["mse"],
+                        t_stats_null=t_stats_null_lhpd[num_observation],
+                        # kwargs for t_stats_estimator
+                        x_eval=observation,
+                        Y=theta_cal,
+                        X=x_cal,
+                        n_trials_null=n_trials_null,
+                        return_r_alphas=False,
+                        # use same clf for all observations (amortized)
+                        trained_clfs=trained_clfs_lhpd,
+                        # kwargs for lhpd_scores
+                        est_log_prob_fn=None,
+                        est_sample_fn=None,
+                        **kwargs_lhpd,
+                    )
+                    runtime = (time.time() - t0) / n_trials_null
+
+                    for i, result_name in enumerate(result_keys):
+                        if result_name == "run_time":
+                            results_dict[m][result_name]["mse"].append(runtime)
+                        else:
+                            results_dict[m][result_name]["mse"].append(
+                                lhpd_results_obs[i]["mse"]
+                            )
 
             if save_results:
                 torch.save(
-                    results_dict["lc2st_nf"],
-                    result_path / f"lc2st_nf_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
+                    results_dict[m],
+                    result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
                 )
-                if "lc2st_nf_perm" in methods:
-                    torch.save(
-                        results_dict["lc2st_nf_perm"],
-                        result_path
-                        / f"lc2st_nf_perm_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
-                    )
+                torch.save(
+                    train_runtime[m], result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
+                )
 
     return results_dict, train_runtime
 
@@ -1140,7 +1023,6 @@ def precompute_t_stats_null(
     kwargs_lc2st,
     x_cal,
     kwargs_lhpd={},
-    alphas=np.linspace(0.1, 0.9, 20),
     methods=["c2st_nf", "lc2st_nf", "lhpd"],
     save_results=True,
     load_results=True,
@@ -1168,10 +1050,6 @@ def precompute_t_stats_null(
             t_stats_null = torch.load(
                 t_stats_null_path
                 / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl"
-            )
-            print()
-            print(
-                f"Loaded pre-computed test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
         except FileNotFoundError:
             print()
@@ -1252,9 +1130,9 @@ def precompute_t_stats_null(
                 print("L-HPD: TRAINING CLASSIFIERS on the joint ...")
                 print()
                 _, _, trained_clfs_null = t_stats_lhpd(
+                    metrics=["mse"],
                     Y=list_P_null[0],  # for dim inside lhpd_scores
                     X=x_cal,
-                    alphas=alphas,
                     null_hypothesis=True,
                     n_trials_null=n_trials_null,
                     return_clfs_null=True,
@@ -1271,9 +1149,9 @@ def precompute_t_stats_null(
                 t_stats_null = {}
                 for num_obs, observation in observation_dict.items():
                     t_stats_null[num_obs] = t_stats_lhpd(
+                        metrics=["mse"],
                         Y=list_P_null[0],  # for dim inside lhpd_scores
                         X=x_cal,
-                        alphas=alphas,
                         null_hypothesis=True,
                         n_trials_null=n_trials_null,
                         trained_clfs_null=trained_clfs_null,

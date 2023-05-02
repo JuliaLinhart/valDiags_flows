@@ -128,7 +128,7 @@ def lhpd_scores(
             - r_alphas (dict): estimated c.d.f. values.
     """
     # compute joint HPD ranks
-    if joint_hpd_ranks is None:
+    if joint_hpd_ranks is None and trained_clfs is None:
         joint_hpd_ranks = hpd_ranks(
             Y=Y,
             X=X,
@@ -179,6 +179,7 @@ def t_stats_lhpd(
     alphas,
     x_eval,
     scores_fn=lhpd_scores,
+    metrics=["mse"],  # only needed for eval_htest
     trained_clfs=None,
     null_hypothesis=False,
     n_trials_null=100,
@@ -193,14 +194,14 @@ def t_stats_lhpd(
             Y, X, alphas, x_eval, trained_clfs=trained_clfs, verbose=True, **kwargs
         )
         if return_r_alphas:
-            return t_stat_data, r_alphas_data
+            return {"mse": t_stat_data}, r_alphas_data
         else:
-            return t_stat_data
+            return {"mse": t_stat_data}
 
     else:
         r_alphas_null = {alpha: [] for alpha in alphas}
         clfs_null = []
-        t_stats_null = []
+        t_stats_null = {"mse": []}
 
         if trained_clfs_null is None:
             trained_clfs_null = [None for _ in range(n_trials_null)]
@@ -223,7 +224,7 @@ def t_stats_lhpd(
                 **kwargs,
             )
             clfs_null.append(clfs_t)
-            t_stats_null.append(scores_t)
+            t_stats_null["mse"].append(scores_t)
             if r_alphas_t is not None:
                 for alpha in alphas:
                     r_alphas_null[alpha].append(r_alphas_t[alpha])

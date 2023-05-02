@@ -76,6 +76,8 @@ def l_c2st_results_n_train(
         t_stats_null_lc2st_nf = None
 
     if "lhpd" in methods:
+        x_cal = data_samples["joint_cal"]["x"]
+        dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
         t_stats_null_lhpd = precompute_t_stats_null(
             n_cal=n_cal,
             n_eval=n_eval,
@@ -300,6 +302,8 @@ def compute_emp_power_l_c2st(
             t_stats_null_lc2st_nf = None
 
         if "lhpd" in methods:
+            x_cal = data_samples["joint_cal"]["x"]
+            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
             t_stats_null_lhpd = precompute_t_stats_null(
                 n_cal=n_cal,
                 n_eval=n_eval,

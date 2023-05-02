@@ -45,7 +45,7 @@ torch.manual_seed(RANDOM_SEED)
 PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_2")
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at
-NUM_OBSERVATION_LIST = [1, 2]  # , 3, 4, 5, 6, 7, 8, 9, 10]
+NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # test parameters
 ALPHA = 0.05
@@ -126,7 +126,7 @@ print()
 args = parser.parse_args()
 # define task and path
 task = sbibm.get_task(args.task)
-task_path = PATH_EXPERIMENT / args.task / "seed_lc2st_null_joint"
+task_path = PATH_EXPERIMENT / args.task
 
 # ==== sbi set-up for given task ==== #
 # prior, simulator, inference algorithm

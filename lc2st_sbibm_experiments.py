@@ -717,6 +717,8 @@ def compute_test_results_npe_one_run(
     results_dict = dict(zip(methods, [{} for _ in methods]))
 
     result_keys = ["reject", "p_value", "t_stat", "t_stats_null", "run_time"]
+    trained_clfs_lc2st_nf = None
+    runtime_lc2st_nf = None
     for m in methods:
         results_dict[m] = dict(
             zip(
@@ -731,9 +733,10 @@ def compute_test_results_npe_one_run(
             results_dict[m] = torch.load(
                 result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
             )
-            train_runtime[m] = torch.load(
-                result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
-            )
+            if "l" in m:
+                train_runtime[m] = torch.load(
+                    result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
+                )
         except FileNotFoundError:
             if m == "c2st" or m == "c2st_nf":
                 print()
@@ -847,22 +850,34 @@ def compute_test_results_npe_one_run(
                 # train classifier on the joint
                 print(f"{m}: TRAINING CLASSIFIER on the joint ...")
                 print()
-                t0 = time.time()
-                _, _, trained_clfs_lc2st = lc2st_scores(
-                    P=P,
-                    Q=Q,
-                    x_P=x_P,
-                    x_Q=x_Q,
-                    x_eval=None,
-                    eval=False,
-                    **kwargs_lc2st,
-                )
-                runtime = time.time() - t0
-                train_runtime[m] = runtime
+                print("... for the observed data")
+                if m == "lc2st" or compute_under_null or trained_clfs_lc2st_nf is None:
+                    t0 = time.time()
+                    _, _, trained_clfs_lc2st = lc2st_scores(
+                        P=P,
+                        Q=Q,
+                        x_P=x_P,
+                        x_Q=x_Q,
+                        x_eval=None,
+                        eval=False,
+                        **kwargs_lc2st,
+                    )
+                    runtime = time.time() - t0
+                    train_runtime[m] = runtime
+                    if "lc2st_nf" in m and not compute_under_null:
+                        trained_clfs_lc2st_nf = trained_clfs_lc2st
+                        runtime_lc2st_nf = runtime
+                    train_runtime[m] = runtime
+                else:
+                    print("     Using classifier trained for lc2st_nf method")
+                    trained_clfs_lc2st = trained_clfs_lc2st_nf
+                    runtime = runtime_lc2st_nf
+                    train_runtime[m] = runtime
                 if save_results:
                     torch.save(runtime, result_path / f"runtime_{m}_n_cal_{n_cal}.pkl")
 
-                if t_stats_null is None:
+                if t_stats_null[list(observation_dict.keys())[0]] is None:
+                    print("... under the null hypothesis")
                     # train classifier on the joint under null
                     _, _, trained_clfs_null_lc2st = t_stats_lc2st(
                         null_hypothesis=True,
@@ -937,6 +952,7 @@ def compute_test_results_npe_one_run(
 
                 print(f"{m}: TRAINING CLASSIFIER on the joint ...")
                 print()
+                print("... for the observed data")
                 t0 = time.time()
                 if compute_under_null:
                     _, _, trained_clfs_lhpd = t_stats_lhpd(
@@ -1051,6 +1067,8 @@ def precompute_t_stats_null(
                 t_stats_null_path
                 / f"{m}_stats_null_nt_{n_trials_null}_n_cal_{n_cal}.pkl"
             )
+            print()
+            print(f"Loaded pre-computed test statistics for {m}-H_0")
         except FileNotFoundError:
             print()
             print(

@@ -45,7 +45,7 @@ torch.manual_seed(RANDOM_SEED)
 PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_2")
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at
-NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+NUM_OBSERVATION_LIST = [1, 2]  # , 3, 4, 5, 6, 7, 8, 9, 10]
 
 # test parameters
 ALPHA = 0.05
@@ -227,7 +227,13 @@ if args.t_res_ntrain:
         100000,
     ]  # np.logspace(2,5,10, dtpye=int)
 
-    METHODS = ["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm", "lhpd"]
+    METHODS = [
+        "c2st",
+        "lc2st",
+        "lc2st_nf",
+        "lc2st_nf_perm",
+        # "lhpd",
+    ]  # , "lhpd", "c2st_nf"]
 
     for N_cal in N_cal_list:
         avg_results, train_runtime = l_c2st_results_n_train(
@@ -256,115 +262,151 @@ if args.t_res_ntrain:
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
 
-        test_results_dict = {
-            "vanilla C2ST ": {k: v["accuracy"] for k, v in avg_results["c2st"].items()},
-            "Reg-C2ST": {k: v["mse"] for k, v in avg_results["c2st"].items()},
-            "Reg-L-C2ST": {k: v["mse"] for k, v in avg_results["lc2st"].items()},
-            "Reg-L-C2ST (NF)": {
-                k: v["mse"] for k, v in avg_results["lc2st_nf"].items()
-            },
-            "Reg-L-C2ST (NF-Perm)": {
-                k: v["mse"] for k, v in avg_results["lc2st_nf_perm"].items()
-            },
-            "Max-L-C2ST": {k: v["div"] for k, v in avg_results["lc2st"].items()},
-            "Max-L-C2ST (NF)": {
-                k: v["div"] for k, v in avg_results["lc2st_nf"].items()
-            },
-            "Max-L-C2ST (NF-Perm)": {
-                k: v["div"] for k, v in avg_results["lc2st_nf_perm"].items()
-            },
-            "L-HPD": {k: v["mse"] for k, v in avg_results["lhpd"].items()},
-        }
+        from plots_neurips_2023 import plot_sbibm_results_n_train
 
-        colors = [
-            "grey",
-            "blue",
-            "orange",
-            "orange",
-            "gold",
-            "red",
-            "red",
-            "coral",
-            "green",
+        METHODS_ACC = [
+            "vanilla C2ST",
+            "Max-L-C2ST",
+            "Max-L-C2ST (NF)",
+            "Max-L-C2ST (NF-perm)",
         ]
-        linestyles = ["-", "-", "-", "--", "-.", "-", "--", "-.", "-"]
+        METHODS_L2 = [
+            "Reg-C2ST",
+            "Reg-L-C2ST",
+            "Reg-L-C2ST (NF)",
+            "Reg-L-C2ST (NF-perm)",
+            # "L-HPD",
+        ]
 
-        markers = ["o", "o", "o", "*", "*", "o", "*", "*", "o"]
+        plot_sbibm_results_n_train(
+            avg_results=avg_results,
+            train_runtime=train_runtime,
+            fig_path=fig_path,
+            n_train_list=N_TRAIN_LIST,
+            n_cal=N_cal,
+            methods=METHODS_ACC,
+            t_stat_ext="t_acc_max",
+        )
 
-        for k in avg_results["c2st"].keys():
-            for method, color, linestyle, marker in zip(
-                test_results_dict.keys(), colors, linestyles, markers
-            ):
-                plt.plot(
-                    np.arange(len(N_TRAIN_LIST)),
-                    test_results_dict[method][k],
-                    label=method,
-                    color=color,
-                    linestyle=linestyle,
-                    marker=marker,
-                )
-                if "mean" in k:
-                    k_std = k[:-5] + "_std"
-                    plt.fill_between(
-                        np.arange(len(N_TRAIN_LIST)),
-                        np.array(test_results_dict[method][k])
-                        - np.array(test_results_dict[method][k_std]),
-                        np.array(test_results_dict[method][k])
-                        + np.array(test_results_dict[method][k_std]),
-                        alpha=0.2,
-                        color=color,
-                    )
-            if "p_value" in k:
-                plt.plot(
-                    np.arange(len(N_TRAIN_LIST)),
-                    np.ones(len(N_TRAIN_LIST)) * 0.05,
-                    "--",
-                    color="black",
-                    label="alpha-level",
-                )
-            if "t_stat" in k:
-                plt.plot(
-                    np.arange(len(N_TRAIN_LIST)),
-                    np.ones(len(N_TRAIN_LIST)) * 0.5,
-                    "--",
-                    color="black",
-                    label=r"$\mathcal{H}_0$",
-                )
-            if "run_time" in k:
-                plt.plot(
-                    np.arange(len(N_TRAIN_LIST)),
-                    train_runtime["lc2st"],
-                    label="L-C2ST (pre-train)",
-                    color="black",
-                    linestyle="--",
-                    marker="o",
-                )
-                plt.plot(
-                    np.arange(len(N_TRAIN_LIST)),
-                    train_runtime["lc2st_nf"],
-                    label="L-C2ST-NF (pre-train)",
-                    color="black",
-                    linestyle="--",
-                    marker="*",
-                )
-                plt.plot(
-                    np.arange(len(N_TRAIN_LIST)),
-                    train_runtime["lhpd"],
-                    label="L-HPD (pre-train)",
-                    color="darkgrey",
-                    linestyle="-",
-                    marker="o",
-                )
+        plot_sbibm_results_n_train(
+            avg_results=avg_results,
+            train_runtime=train_runtime,
+            fig_path=fig_path,
+            n_train_list=N_TRAIN_LIST,
+            n_cal=N_cal,
+            methods=METHODS_L2,
+            t_stat_ext="t_reg",
+        )
 
-            if "std" not in k:
-                plt.legend()
-                plt.xticks(np.arange(len(N_TRAIN_LIST)), N_TRAIN_LIST)
-                plt.xlabel("N_train")
-                plt.ylabel(k)
-                plt.savefig(fig_path / f"{k}_ntrain_n_cal_{N_cal}.pdf")
-                plt.show()
-            else:
-                plt.close()
+        # test_results_dict = {
+        #     "vanilla C2ST ": {k: v["accuracy"] for k, v in avg_results["c2st"].items()},
+        #     "Reg-C2ST": {k: v["mse"] for k, v in avg_results["c2st"].items()},
+        #     "Reg-L-C2ST": {k: v["mse"] for k, v in avg_results["lc2st"].items()},
+        #     "Reg-L-C2ST (NF)": {
+        #         k: v["mse"] for k, v in avg_results["lc2st_nf"].items()
+        #     },
+        #     "Reg-L-C2ST (NF-Perm)": {
+        #         k: v["mse"] for k, v in avg_results["lc2st_nf_perm"].items()
+        #     },
+        #     "Max-L-C2ST": {k: v["div"] for k, v in avg_results["lc2st"].items()},
+        #     "Max-L-C2ST (NF)": {
+        #         k: v["div"] for k, v in avg_results["lc2st_nf"].items()
+        #     },
+        #     "Max-L-C2ST (NF-Perm)": {
+        #         k: v["div"] for k, v in avg_results["lc2st_nf_perm"].items()
+        #     },
+        #     "L-HPD": {k: v["mse"] for k, v in avg_results["lhpd"].items()},
+        # }
+
+        # colors = [
+        #     "grey",
+        #     "blue",
+        #     "orange",
+        #     "orange",
+        #     "darkorange",
+        #     "red",
+        #     "red",
+        #     "darkred",
+        #     "green",
+        # ]
+        # linestyles = ["-", "-", "-", "--", "-.", "-", "--", "-.", "-"]
+
+        # markers = ["o", "o", "o", "*", "*", "o", "*", "*", "o"]
+
+        # for k in avg_results["c2st"].keys():
+        #     for method, color, linestyle, marker in zip(
+        #         test_results_dict.keys(), colors, linestyles, markers
+        #     ):
+        #         plt.plot(
+        #             np.arange(len(N_TRAIN_LIST)),
+        #             test_results_dict[method][k],
+        #             label=method,
+        #             color=color,
+        #             linestyle=linestyle,
+        #             marker=marker,
+        #         )
+        #         if "mean" in k:
+        #             k_std = k[:-5] + "_std"
+        #             plt.fill_between(
+        #                 np.arange(len(N_TRAIN_LIST)),
+        #                 np.array(test_results_dict[method][k])
+        #                 - np.array(test_results_dict[method][k_std]),
+        #                 np.array(test_results_dict[method][k])
+        #                 + np.array(test_results_dict[method][k_std]),
+        #                 alpha=0.2,
+        #                 color=color,
+        #             )
+        #     if "p_value" in k:
+        #         plt.plot(
+        #             np.arange(len(N_TRAIN_LIST)),
+        #             np.ones(len(N_TRAIN_LIST)) * 0.05,
+        #             "--",
+        #             color="black",
+        #             label="alpha-level",
+        #         )
+        #     if "t_stat" in k:
+        #         plt.plot(
+        #             np.arange(len(N_TRAIN_LIST)),
+        #             np.ones(len(N_TRAIN_LIST)) * 0.5,
+        #             "--",
+        #             color="black",
+        #             label=r"$\mathcal{H}_0$",
+        #         )
+        #     if "run_time" in k:
+        #         plt.plot(
+        #             np.arange(len(N_TRAIN_LIST)),
+        #             train_runtime["lc2st"],
+        #             label="L-C2ST (pre-train)",
+        #             color="black",
+        #             linestyle="--",
+        #             marker="o",
+        #         )
+        #         plt.plot(
+        #             np.arange(len(N_TRAIN_LIST)),
+        #             train_runtime["lc2st_nf"],
+        #             label="L-C2ST-NF (pre-train)",
+        #             color="black",
+        #             linestyle="--",
+        #             marker="*",
+        #         )
+        #         plt.plot(
+        #             np.arange(len(N_TRAIN_LIST)),
+        #             train_runtime["lhpd"],
+        #             label="L-HPD (pre-train)",
+        #             color="darkgrey",
+        #             linestyle="-",
+        #             marker="o",
+        #         )
+
+        #     if "std" not in k:
+        #         plt.legend()
+        #         plt.xticks(np.arange(len(N_TRAIN_LIST)), N_TRAIN_LIST)
+        #         plt.xlabel("N_train")
+        #         plt.ylabel(k)
+        #         plt.savefig(fig_path / f"{k}_ntrain_n_cal_{N_cal}.pdf")
+        #         plt.show()
+        #     else:
+        #         plt.close()
 
 if args.power_ncal:
     print()

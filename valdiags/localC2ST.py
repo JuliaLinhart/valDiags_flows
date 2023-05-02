@@ -468,7 +468,6 @@ def t_stats_lc2st(
                 else:
                     # does this make sense? using the same data for each trial?
                     P_eval_t, Q_eval_t = P_eval, Q_eval
-
             # directly use the samples from P to test under the null hypothesis
             else:
                 if (list_P_null is None or list_x_P_null is None) and (

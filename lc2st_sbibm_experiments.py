@@ -591,7 +591,7 @@ def generate_data_one_run(
         npe_samples_obs["cal"][N_train] = {}
         reference_inv_transform_samples_cal[N_train] = {}
 
-        npe_path = task_path / f"npe_{N_train}"
+        npe_path = task_path / f"npe_{N_train}" / "new"
         # ==== C2ST calibration dataset ==== #
         print("     1. C2ST: at fixed observation x_0")
         try:
@@ -604,14 +604,10 @@ def generate_data_one_run(
                 npe_path / f"npe_samples_obs_n_eval_{n_eval}.pkl"
             )
             reference_inv_transform_samples_cal[N_train] = torch.load(
-                task_path
-                / f"npe_{N_train}"
-                / f"reference_inv_transform_samples_n_cal_{n_cal}.pkl"
+                npe_path / f"reference_inv_transform_samples_n_cal_{n_cal}.pkl"
             )
             reference_inv_transform_samples_eval[N_train] = torch.load(
-                task_path
-                / f"npe_{N_train}"
-                / f"reference_inv_transform_samples_n_eval_{n_eval}.pkl"
+                npe_path / f"reference_inv_transform_samples_n_eval_{n_eval}.pkl"
             )
         except FileNotFoundError:
             (
@@ -639,21 +635,15 @@ def generate_data_one_run(
                 )
                 torch.save(
                     reference_inv_transform_samples_cal[N_train],
-                    task_path
-                    / f"npe_{N_train}"
-                    / f"reference_inv_transform_samples_n_cal_{n_cal}.pkl",
+                    npe_path / f"reference_inv_transform_samples_n_cal_{n_cal}.pkl",
                 )
                 torch.save(
                     npe_samples_obs["eval"][N_train],
-                    task_path
-                    / f"npe_{N_train}"
-                    / f"npe_samples_obs_n_eval_{n_eval}.pkl",
+                    npe_path / f"npe_samples_obs_n_eval_{n_eval}.pkl",
                 )
                 torch.save(
                     reference_inv_transform_samples_eval[N_train],
-                    task_path
-                    / f"npe_{N_train}"
-                    / f"reference_inv_transform_samples_n_eval_{n_eval}.pkl",
+                    npe_path / f"reference_inv_transform_samples_n_eval_{n_eval}.pkl",
                 )
 
         # ==== L-C2ST calibration dataset ==== #
@@ -665,9 +655,7 @@ def generate_data_one_run(
                 npe_path / f"npe_samples_x_cal_{n_cal}.pkl"
             )
             inv_transform_samples_theta_cal[N_train] = torch.load(
-                task_path
-                / f"npe_{N_train}"
-                / f"inv_transform_samples_theta_cal_{n_cal}.pkl"
+                npe_path / f"inv_transform_samples_theta_cal_{n_cal}.pkl"
             )
         except FileNotFoundError:
             (
@@ -683,9 +671,7 @@ def generate_data_one_run(
                 )
                 torch.save(
                     inv_transform_samples_theta_cal[N_train],
-                    task_path
-                    / f"npe_{N_train}"
-                    / f"inv_transform_samples_theta_cal_{n_cal}.pkl",
+                    npe_path / f"inv_transform_samples_theta_cal_{n_cal}.pkl",
                 )
 
     base_dist_samples = {"cal": base_dist_samples_cal, "eval": base_dist_samples_eval}

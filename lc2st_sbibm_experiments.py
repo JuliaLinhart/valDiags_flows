@@ -150,32 +150,36 @@ def l_c2st_results_n_train(
                 for k, v in avg_result_keys.items():
                     for t_stat_name in test_stat_names:
                         if method == "lhpd" and t_stat_name != "mse":
-                            results_t = [0] * len(observation_dict)  # only "mse exists"
-                        else:
-                            results_t = results[v][t_stat_name]
+                            continue
 
                         if "std" in k:
                             if "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.std(np.array(results_t) / n_trials_null)
+                                    np.std(
+                                        np.array(results[v][t_stat_name])
+                                        / n_trials_null
+                                    )
                                 )
                             else:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.std(results_t)
+                                    np.std(results[v][t_stat_name])
                                 )
                         else:
                             if "t_stat" in k and t_stat_name == "mse":
                                 avg_results[method][k][t_stat_name].append(
-                                    np.mean(results_t)
+                                    np.mean(results[v][t_stat_name])
                                     + 0.5  # for comparison with other t_stats
                                 )
                             elif "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.mean(np.array(results_t) / n_trials_null)
+                                    np.mean(
+                                        np.array(results[v][t_stat_name])
+                                        / n_trials_null
+                                    )
                                 )
                             else:
                                 avg_results[method][k][t_stat_name].append(
-                                    np.mean(results_t)
+                                    np.mean(results[v][t_stat_name])
                                 )
     return avg_results, train_runtime
 
@@ -199,6 +203,7 @@ def compute_emp_power_l_c2st(
     test_stat_names=["accuracy", "mse", "div"],
     compute_emp_power=True,
     compute_type_I_error=False,
+    result_path="",
 ):
     """Compute the empirical power of the (L)C2ST methods for a given task and npe-flow
     (corresponding to n_train). We also compute the type I error if specified.
@@ -251,13 +256,29 @@ def compute_emp_power_l_c2st(
         p_values[method] = dict(
             zip(
                 test_stat_names,
-                [np.zeros(len(observation_dict)) for _ in test_stat_names],
+                [
+                    dict(
+                        zip(
+                            observation_dict.keys(),
+                            [[] for _ in observation_dict.items()],
+                        )
+                        for _ in test_stat_names
+                    )
+                ],
             )
         )
         p_values_h0[method] = dict(
             zip(
                 test_stat_names,
-                [np.zeros(len(observation_dict)) for _ in test_stat_names],
+                [
+                    dict(
+                        zip(
+                            observation_dict.keys(),
+                            [[] for _ in observation_dict.items()],
+                        )
+                        for _ in test_stat_names
+                    )
+                ],
             )
         )
 
@@ -354,18 +375,27 @@ def compute_emp_power_l_c2st(
             for m in methods:
                 for t_stat_name in test_stat_names:
                     if m == "lhpd" and t_stat_name != "mse":
-                        p_value_t = [0] * len(observation_dict)
-                    else:
-                        p_value_t = H1_results_dict[m]["p_value"][t_stat_name]
+                        continue
+                    p_value_t = H1_results_dict[m]["p_value"][t_stat_name]
                     # increment list of average rejections of H0 under H1
                     emp_power[m][t_stat_name] += (
                         (np.array(p_value_t) <= alpha) * 1 / n_runs
                     )
                     # increment p_values for every observation
                     for num_obs in observation_dict.keys():
-                        p_values[m][t_stat_name][num_obs - 1] += (
-                            p_value_t[num_obs - 1] / n_runs
-                        )
+                        p_values[m][t_stat_name][num_obs].append(p_value_t[num_obs - 1])
+
+                if n % 10 == 0:
+                    torch.save(
+                        emp_power[m],
+                        result_path / f"emp_power_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                    )
+                    torch.save(
+                        p_values[m],
+                        result_path
+                        / f"p_values_obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                    )
+
         else:
             emp_power, p_values = None, None
 
@@ -373,7 +403,9 @@ def compute_emp_power_l_c2st(
         # count rejection of H0 under H0 (p_value <= alpha) for every run
         # and for every observation: [reject(obs1), reject(obs2), ...]
         if compute_type_I_error:
+            print()
             print("Computing Type I error...")
+            print()
 
             # fixed distribution for null hypothesis (base distribution)
             from scipy.stats import multivariate_normal as mvn
@@ -412,18 +444,28 @@ def compute_emp_power_l_c2st(
             for m in methods:
                 for t_stat_name in test_stat_names:
                     if m == "lhpd" and t_stat_name != "mse":
-                        p_value_t = [0] * len(observation_dict)
-                    else:
-                        p_value_t = H0_results_dict[m]["p_value"][t_stat_name]
+                        continue
+
+                    p_value_t = H0_results_dict[m]["p_value"][t_stat_name]
                     # increment list of average rejections of H0 under H0
                     type_I_error[m][t_stat_name] += (
                         (np.array(p_value_t) <= alpha) * 1 / n_runs
                     )
                     # increment p_value for every observation
                     for num_obs in observation_dict.keys():
-                        p_values_h0[m][t_stat_name][num_obs - 1] += (
-                            p_value_t[num_obs - 1] / n_runs
+                        p_values_h0[m][t_stat_name][num_obs].append(
+                            p_value_t[num_obs - 1]
                         )
+                if n % 10 == 0:
+                    torch.save(
+                        type_I_error[m],
+                        result_path / f"type_I_error_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                    )
+                    torch.save(
+                        p_values_h0[m],
+                        result_path
+                        / f"p_values_h0__obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                    )
 
         else:
             type_I_error = None
@@ -548,16 +590,18 @@ def generate_data_one_run(
         print(f"Data for npe with N_train = {N_train}:")
         npe_samples_obs["cal"][N_train] = {}
         reference_inv_transform_samples_cal[N_train] = {}
+
+        npe_path = task_path / f"npe_{N_train}"
         # ==== C2ST calibration dataset ==== #
         print("     1. C2ST: at fixed observation x_0")
         try:
             if not load_data:
                 raise FileNotFoundError
             npe_samples_obs["cal"][N_train] = torch.load(
-                task_path / f"npe_{N_train}" / f"npe_samples_obs_n_cal_{n_cal}.pkl"
+                npe_path / f"npe_samples_obs_n_cal_{n_cal}.pkl"
             )
             npe_samples_obs["eval"][N_train] = torch.load(
-                task_path / f"npe_{N_train}" / f"npe_samples_obs_n_eval_{n_eval}.pkl"
+                npe_path / f"npe_samples_obs_n_eval_{n_eval}.pkl"
             )
             reference_inv_transform_samples_cal[N_train] = torch.load(
                 task_path
@@ -591,7 +635,7 @@ def generate_data_one_run(
             if save_data:
                 torch.save(
                     npe_samples_obs["cal"][N_train],
-                    task_path / f"npe_{N_train}" / f"npe_samples_obs_n_cal_{n_cal}.pkl",
+                    npe_path / f"npe_samples_obs_n_cal_{n_cal}.pkl",
                 )
                 torch.save(
                     reference_inv_transform_samples_cal[N_train],
@@ -618,7 +662,7 @@ def generate_data_one_run(
             if not load_data:
                 raise FileNotFoundError
             npe_samples_x_cal[N_train] = torch.load(
-                task_path / f"npe_{N_train}" / f"npe_samples_x_cal_{n_cal}.pkl"
+                npe_path / f"npe_samples_x_cal_{n_cal}.pkl"
             )
             inv_transform_samples_theta_cal[N_train] = torch.load(
                 task_path
@@ -635,7 +679,7 @@ def generate_data_one_run(
             if save_data:
                 torch.save(
                     npe_samples_x_cal[N_train],
-                    task_path / f"npe_{N_train}" / f"npe_samples_x_cal_{n_cal}.pkl",
+                    npe_path / f"npe_samples_x_cal_{n_cal}.pkl",
                 )
                 torch.save(
                     inv_transform_samples_theta_cal[N_train],

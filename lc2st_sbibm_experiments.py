@@ -241,6 +241,7 @@ def compute_emp_power_l_c2st(
     p_values = {}
     p_values_h0 = {}
     for method in methods:
+        print(method)
         emp_power[method] = dict(
             zip(
                 test_stat_names,
@@ -260,10 +261,10 @@ def compute_emp_power_l_c2st(
                     dict(
                         zip(
                             observation_dict.keys(),
-                            [[] for _ in observation_dict.items()],
+                            [[] for _ in observation_dict.keys()],
                         )
-                        for _ in test_stat_names
                     )
+                    for _ in test_stat_names
                 ],
             )
         )
@@ -274,10 +275,10 @@ def compute_emp_power_l_c2st(
                     dict(
                         zip(
                             observation_dict.keys(),
-                            [[] for _ in observation_dict.items()],
+                            [[] for _ in observation_dict.keys()],
                         )
-                        for _ in test_stat_names
                     )
+                    for _ in test_stat_names
                 ],
             )
         )
@@ -591,7 +592,7 @@ def generate_data_one_run(
         npe_samples_obs["cal"][N_train] = {}
         reference_inv_transform_samples_cal[N_train] = {}
 
-        npe_path = task_path / f"npe_{N_train}" / "new"
+        npe_path = task_path / f"npe_{N_train}"
         # ==== C2ST calibration dataset ==== #
         print("     1. C2ST: at fixed observation x_0")
         try:

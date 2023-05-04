@@ -205,8 +205,10 @@ def compute_emp_power_l_c2st(
     test_stat_names=["accuracy", "mse", "div"],
     compute_emp_power=True,
     compute_type_I_error=False,
+    n_run_load_results=0,
     result_path="",
     load_eval_data=True,
+    save_every_n_runs=5,
 ):
     """Compute the empirical power of the (L)C2ST methods for a given task and npe-flow
     (corresponding to n_train). We also compute the type I error if specified.
@@ -243,51 +245,57 @@ def compute_emp_power_l_c2st(
     type_I_error = {}
     p_values = {}
     p_values_h0 = {}
-    for method in methods:
-        emp_power[method] = dict(
-            zip(
-                test_stat_names,
-                [np.zeros(len(observation_dict)) for _ in test_stat_names],
-            )
-        )
-        type_I_error[method] = dict(
-            zip(
-                test_stat_names,
-                [np.zeros(len(observation_dict)) for _ in test_stat_names],
-            )
-        )
-        p_values[method] = dict(
-            zip(
-                test_stat_names,
-                [
-                    dict(
-                        zip(
-                            observation_dict.keys(),
-                            [[] for _ in observation_dict.keys()],
-                        )
+    for result_dict, p_values_dict, name, name_p, compute in zip(
+        [emp_power, type_I_error],
+        [p_values, p_values_h0],
+        ["emp_power", "type_I_error"],
+        ["p_values", "p_values_h0_"],
+        [compute_emp_power, compute_type_I_error],
+    ):
+        try:
+            if not compute:
+                raise FileNotFoundError
+            for method in methods:
+                # load result if it exists
+                result_dict[method] = torch.load(
+                    result_path
+                    / f"n_runs_{n_run_load_results}"
+                    / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+                )
+                p_values_dict[method] = torch.load(
+                    result_path
+                    / f"n_runs_{n_run_load_results}"
+                    / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+                )
+            start_run = n_run_load_results + 2
+            print(f"Loaded {name} results from run {n_run_load_results} ...")
+        except FileNotFoundError:
+            start_run = 1
+            for method in methods:
+                result_dict[method] = dict(
+                    zip(
+                        test_stat_names,
+                        [np.zeros(len(observation_dict)) for _ in test_stat_names],
                     )
-                    for _ in test_stat_names
-                ],
-            )
-        )
-        p_values_h0[method] = dict(
-            zip(
-                test_stat_names,
-                [
-                    dict(
-                        zip(
-                            observation_dict.keys(),
-                            [[] for _ in observation_dict.keys()],
-                        )
+                )
+                p_values_dict[method] = dict(
+                    zip(
+                        test_stat_names,
+                        [
+                            dict(
+                                zip(
+                                    observation_dict.keys(),
+                                    [[] for _ in observation_dict.keys()],
+                                )
+                            )
+                            for _ in test_stat_names
+                        ],
                     )
-                    for _ in test_stat_names
-                ],
-            )
-        )
+                )
 
-    for n in range(n_runs):
+    for n in range(start_run, n_runs + 1):
         print()
-        print("====> RUN: ", n + 1, "/", n_runs, f", N_cal = {n_cal} <====")
+        print("====> RUN: ", n, "/", n_runs, f", N_cal = {n_cal} <====")
         # GENERATE DATA
         data_samples = generate_data_one_run(
             n_cal=n_cal,
@@ -355,7 +363,7 @@ def compute_emp_power_l_c2st(
         if compute_emp_power:
             print()
             print("Computing empirical power...")
-            print()
+
             H1_results_dict, _ = compute_test_results_npe_one_run(
                 alpha=alpha,
                 data_samples=data_samples,
@@ -389,16 +397,32 @@ def compute_emp_power_l_c2st(
                     for num_obs in observation_dict.keys():
                         p_values[m][t_stat_name][num_obs].append(p_value_t[num_obs - 1])
 
-                if n % 10 == 0:
+                if n % save_every_n_runs == 0:
+                    # set up path to save results
+                    result_path_n = result_path / f"n_runs_{n}"
+                    if not os.path.exists(result_path_n):
+                        os.makedirs(result_path_n)
+
                     torch.save(
                         emp_power[m],
-                        result_path / f"emp_power_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                        result_path_n / f"emp_power_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                     )
                     torch.save(
                         p_values[m],
-                        result_path
+                        result_path_n
                         / f"p_values_obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                     )
+
+                    result_path_previous = result_path / f"n_runs_{n-save_every_n_runs}"
+                    if os.path.exists(result_path_previous):
+                        os.remove(
+                            result_path_previous
+                            / f"emp_power_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                        )
+                        os.remove(
+                            result_path_previous
+                            / f"p_values_obs_per_run_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                        )
 
         else:
             emp_power, p_values = None, None
@@ -460,16 +484,33 @@ def compute_emp_power_l_c2st(
                         p_values_h0[m][t_stat_name][num_obs].append(
                             p_value_t[num_obs - 1]
                         )
-                if n % 10 == 0:
+                if n % save_every_n_runs == 0:
+                    # set up path to save results
+                    result_path_n = result_path / f"n_runs_{n}"
+                    if not os.path.exists(result_path_n):
+                        os.makedirs(result_path_n)
+
                     torch.save(
                         type_I_error[m],
-                        result_path / f"type_I_error_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                        result_path_n
+                        / f"type_I_error_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                     )
                     torch.save(
                         p_values_h0[m],
-                        result_path
+                        result_path_n
                         / f"p_values_h0__obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                     )
+
+                    result_path_previous = result_path / f"n_runs_{n-save_every_n_runs}"
+                    if os.path.exists(result_path_previous):
+                        os.remove(
+                            result_path_previous
+                            / f"type_I_error_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                        )
+                        os.remove(
+                            result_path_previous
+                            / f"p_values_h0__obs_per_run_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                        )
 
         else:
             type_I_error = None

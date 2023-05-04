@@ -992,7 +992,12 @@ def compute_test_results_npe_one_run(
                 ).flow
 
                 def npe_sample_fn(n_samples, x):
+                    npe.set_default_x(x)
                     return sample_from_npe_obs(npe, x, n_samples=n_samples)
+
+                def npe_log_prob_fn(theta, x):
+                    npe.set_default_x(x)
+                    return npe.log_prob(theta, x)
 
                 print(f"{m}: TRAINING CLASSIFIER on the joint ...")
                 print()
@@ -1016,7 +1021,7 @@ def compute_test_results_npe_one_run(
                     _, _, trained_clfs_lhpd = lhpd_scores(
                         Y=theta_cal,
                         X=x_cal,
-                        est_log_prob_fn=npe.log_prob,
+                        est_log_prob_fn=npe_log_prob_fn,
                         est_sample_fn=npe_sample_fn,
                         return_clfs=True,
                         x_eval=None,
@@ -1241,78 +1246,79 @@ def precompute_t_stats_null(
 if __name__ == "__main__":
     import torch
     import sbibm
-    from valdiags.localHPD import hpd_ranks, t_stats_lhpd
+    from valdiags.localHPD import hpd_values, t_stats_lhpd
     from tasks.sbibm.npe_utils import sample_from_npe_obs
+    from valdiags.localC2ST import sbibm_clf_kwargs
 
     import matplotlib.pyplot as plt
 
-    task = sbibm.get_task("two_moons")
+    task = sbibm.get_task("slcp")
     npe = torch.load(
-        "saved_experiments/neurips_2023/exp_2/two_moons/npe_1000/posterior_estimator.pkl"
+        "saved_experiments/neurips_2023/exp_2/slcp/npe_100/posterior_estimator.pkl"
     ).flow
     joint_samples = torch.load(
-        "saved_experiments/neurips_2023/exp_2/two_moons/joint_samples_n_cal_10000.pkl"
+        "saved_experiments/neurips_2023/exp_2/slcp/joint_samples_n_cal_10000.pkl"
     )
-    x, theta = joint_samples["x"], joint_samples["theta"]
+    x, theta = joint_samples["x"][:100], joint_samples["theta"][:100]
     observation = task.get_observation(1)
 
     def sample_fn(n_samples, x):
+        npe.set_default_x(x)
         return sample_from_npe_obs(npe, x, n_samples)
 
-    alphas = np.linspace(0.1, 0.9, 20)
+    def log_prob_fn(theta, x):
+        npe.set_default_x(x)
+        return npe.log_prob(theta, x)
+
+    joint_hpd_values = hpd_values(theta, log_prob_fn, sample_fn, x)
+    # hpd_values[-1] = 1
+    # alphas = np.linspace(0.1, 0.9, 11)
+    # for alpha in alphas:
+    #     print((joint_hpd_values <= alpha).sum())
+
+    kwargs = sbibm_clf_kwargs(theta.shape[-1])
+    kwargs["early_stopping"] = False
+
     t_stat, r_alphas = t_stats_lhpd(
-        Y=theta[:100],
-        X=x[:100],
-        alphas=alphas,
+        Y=theta,
+        X=x,
+        n_alphas=11,
         x_eval=observation,
         est_log_prob_fn=npe.log_prob,
         est_sample_fn=sample_fn,
         return_r_alphas=True,
+        joint_hpd_values=joint_hpd_values,
+        clf_kwargs=kwargs,
     )
-    # t_stats_null, r_alphas_null = t_stats_lhpd(
-    #     null_hypothesis=True,
-    #     Y=theta[:100],
-    #     X=x[:100],
-    #     x_eval=observation,
-    #     alphas=alphas,
-    #     est_log_prob_fn=npe.log_prob,
-    #     est_sample_fn=sample_fn,
-    #     return_r_alphas=True,
-    # )
 
-    t_stats_null = precompute_t_stats_null(
-        methods=["lhpd"],
-        x_cal=x[:100],
-        metrics=None,
-        n_cal=100,
-        n_eval=None,
-        dim_theta=theta.shape[-1],
+    t_stats_null, r_alphas_null = t_stats_lhpd(
+        null_hypothesis=True,
+        X=x[:100],
+        Y=theta[:100],
         n_trials_null=10,
-        observation_dict={1: observation},
-        t_stats_null_path="",
-        save_results=False,
-        load_results=False,
-        kwargs_c2st={},
-        kwargs_lc2st={},
-        kwargs_lhpd={},
-        alphas=alphas,
-    )["lhpd"][1]
+        x_eval=observation,
+        return_r_alphas=True,
+        est_log_prob_fn=None,
+        est_sample_fn=None,
+        **{"clf_kwargs": kwargs, "n_alphas": 11},
+    )
 
     from valdiags.test_utils import compute_pvalue
 
-    pvalue = compute_pvalue(t_stat, t_stats_null)
+    pvalue = compute_pvalue(t_stat["mse"], t_stats_null["mse"])
     print(t_stat)
     print(pvalue)
 
-    alphas = np.concatenate([np.array([0]), alphas, np.array([1])])
-    r_alphas = {**{0.0: 0.0}, **r_alphas, **{1.0: 1.0}}
+    alphas = list(r_alphas.keys())
+    alphas = np.concatenate([alphas, [1]])
+    r_alphas = {**r_alphas, **{1.0: 1.0}}
     plt.plot(alphas, r_alphas.values())
 
-    # import pandas as pd
+    import pandas as pd
 
-    # r_alphas_null = {**{0.0: [0.0] * 100}, **r_alphas_null, **{1.0: [1.0] * 100}}
-    # lower_band = pd.DataFrame(r_alphas_null).quantile(q=0.05 / 2, axis=0)
-    # upper_band = pd.DataFrame(r_alphas_null).quantile(q=1 - 0.05 / 2, axis=0)
+    r_alphas_null = {**r_alphas_null, **{len(alphas): [1.0] * 10}}
+    lower_band = pd.DataFrame(r_alphas_null).quantile(q=0.05 / 2, axis=0)
+    upper_band = pd.DataFrame(r_alphas_null).quantile(q=1 - 0.05 / 2, axis=0)
 
-    # plt.fill_between(alphas, lower_band, upper_band, color="grey", alpha=0.2)
+    plt.fill_between(alphas, lower_band, upper_band, color="grey", alpha=0.2)
     plt.show()

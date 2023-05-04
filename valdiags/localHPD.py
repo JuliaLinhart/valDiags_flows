@@ -12,7 +12,7 @@ from scipy.stats import uniform
 DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
-def hpd_ranks(
+def hpd_values(
     Y,
     est_log_prob_fn,
     est_sample_fn,
@@ -20,7 +20,7 @@ def hpd_ranks(
     n_samples=1000,
     verbose=True,
 ):
-    """Highest Predictive Density Ranks for a (conditional) estimator q:
+    """Highest Predictive Density values for a (conditional) estimator q:
 
     We check if a true sample x_0 is in the highest predictive density region of the est-estimator q
     at level 1-alpha, which is equivalent to the proportion of samples x ~ q
@@ -35,38 +35,45 @@ def hpd_ranks(
     https://github.com/francois-rozet/lampe/blob/master/lampe/diagnostics.py
     adapted to non-lampe distributions.
     """
-    ranks = []
+    values = []
 
     with torch.no_grad():
         if X is None:
-            for y_0 in tqdm(Y, desc="Computing HPD ranks", disable=(not verbose)):
+            for y_0 in tqdm(Y, desc="Computing HPD values", disable=(not verbose)):
                 samples = est_sample_fn(n_samples)
                 mask = est_log_prob_fn(y_0[None, :]) < est_log_prob_fn(samples)
                 rank = mask.sum() / mask.numel()
-                ranks.append(rank)
+                values.append(rank)
         else:
             for y_0, x_0 in tqdm(
-                zip(Y, X), desc="Computing joint HPD ranks", disable=(not verbose)
+                zip(Y, X), desc="Computing joint HPD values", disable=(not verbose)
             ):
                 y_0, x_0 = y_0[None, :], x_0[None, :]
                 samples = est_sample_fn(n_samples, x_0)
                 mask = est_log_prob_fn(y_0, x_0) < est_log_prob_fn(samples, x_0)
                 rank = mask.sum() / mask.numel()
-                ranks.append(rank)
+                values.append(rank)
 
-    ranks = torch.stack(ranks).cpu()
-    # ranks = torch.cat((ranks, torch.tensor([0.0, 1.0])))
+    values = torch.stack(values).cpu()
+
+    # values = torch.cat((values, torch.tensor([0.0, 1.0])))
 
     # ranks = torch.sort(ranks).values
     # alphas = torch.linspace(0.0, 1.0, len(ranks))
-    return ranks
+    return values
 
 
-def train_lhpd(X, hpd_ranks, alphas, clf, verbose=True):
+def train_lhpd(X, joint_hpd_values, n_alphas, clf, verbose=True):
+    # define range of alpha levels such that the highest value will yield
+    # data from both classes: hpd_values <= max(alpha) not always 1
+
+    max_v = max(joint_hpd_values)
+    alphas = np.linspace(0, max_v - 0.001, n_alphas)
+
     clfs = {}
     for alpha in tqdm(alphas, desc="Training L-HPD", disable=(not verbose)):
         # compute the binary regression targets
-        W_a = (hpd_ranks <= alpha) * 1
+        W_a = (joint_hpd_values <= alpha) * 1
         # define classifier
         clf = sklearn.base.clone(clf)
         # train regression model
@@ -88,14 +95,14 @@ def eval_lhpd(x_eval, clfs):
 def lhpd_scores(
     Y,
     X,
-    alphas,
+    n_alphas,
     x_eval,
     est_log_prob_fn,
     est_sample_fn,
     clf_class=MLPClassifier,
     clf_kwargs={"alpha": 0, "max_iter": 25000},
     n_ensemble=1,
-    joint_hpd_ranks=None,
+    joint_hpd_values=None,
     trained_clfs=None,
     return_clfs=False,
     eval=True,
@@ -127,9 +134,9 @@ def lhpd_scores(
             - scores (float): L2-distance between the estimated and the uniform c.d.f (alphas).
             - r_alphas (dict): estimated c.d.f. values.
     """
-    # compute joint HPD ranks
-    if joint_hpd_ranks is None and trained_clfs is None:
-        joint_hpd_ranks = hpd_ranks(
+    # compute joint HPD values
+    if joint_hpd_values is None and trained_clfs is None:
+        joint_hpd_values = hpd_values(
             Y=Y,
             X=X,
             est_log_prob_fn=est_log_prob_fn,
@@ -138,7 +145,6 @@ def lhpd_scores(
         )
 
     # estimate r_alphas
-    ens_r_alphas = {alpha: [] for alpha in alphas}
     clfs_list = []
     for n in range(n_ensemble):
         if trained_clfs is not None:
@@ -148,13 +154,15 @@ def lhpd_scores(
             classifier = clf_class(random_state=n, **clf_kwargs)
             # train classifier
             clfs_n = train_lhpd(
-                X, joint_hpd_ranks, alphas, clf=classifier, verbose=verbose
+                X, joint_hpd_values, n_alphas, clf=classifier, verbose=verbose
             )
         clfs_list.append(clfs_n)
 
     if not eval:
         return None, None, clfs_list
 
+    alphas = np.array(list(clfs_list[0].keys()))
+    ens_r_alphas = {alpha: [] for alpha in alphas}
     for clfs_n in clfs_list:
         # eval classifier
         r_alphas = eval_lhpd(x_eval, clfs_n)
@@ -176,7 +184,7 @@ def lhpd_scores(
 def t_stats_lhpd(
     Y,
     X,
-    alphas,
+    n_alphas,
     x_eval,
     scores_fn=lhpd_scores,
     metrics=["mse"],  # only needed for eval_htest
@@ -191,7 +199,7 @@ def t_stats_lhpd(
 ):
     if not null_hypothesis:
         t_stat_data, r_alphas_data = scores_fn(
-            Y, X, alphas, x_eval, trained_clfs=trained_clfs, verbose=True, **kwargs
+            Y, X, n_alphas, x_eval, trained_clfs=trained_clfs, verbose=True, **kwargs
         )
         if return_r_alphas:
             return {"mse": t_stat_data}, r_alphas_data
@@ -199,7 +207,7 @@ def t_stats_lhpd(
             return {"mse": t_stat_data}
 
     else:
-        r_alphas_null = {alpha: [] for alpha in alphas}
+        r_alphas_null = {i: [] for i in range(n_alphas)}
         clfs_null = []
         t_stats_null = {"mse": []}
 
@@ -215,9 +223,9 @@ def t_stats_lhpd(
             scores_t, r_alphas_t, clfs_t = scores_fn(
                 Y,
                 X,
-                alphas,
+                n_alphas,
                 x_eval,
-                joint_hpd_ranks=uniform().rvs((Y.shape[0], 1), random_state=t),
+                joint_hpd_values=uniform().rvs((Y.shape[0]), random_state=t),
                 trained_clfs=trained_clfs_null[t],
                 return_clfs=True,
                 verbose=False,
@@ -225,9 +233,10 @@ def t_stats_lhpd(
             )
             clfs_null.append(clfs_t)
             t_stats_null["mse"].append(scores_t)
+
             if r_alphas_t is not None:
-                for alpha in alphas:
-                    r_alphas_null[alpha].append(r_alphas_t[alpha])
+                for i, alpha in enumerate(clfs_t[0].keys()):
+                    r_alphas_null[i].append(r_alphas_t[alpha])
 
         if return_clfs_null:
             return t_stats_null, r_alphas_null, clfs_null

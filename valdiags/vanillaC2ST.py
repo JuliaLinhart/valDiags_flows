@@ -259,7 +259,7 @@ def c2st_scores(
         probas = []
         # cross-validation
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-        for train_index, val_index in kf.split(P):
+        for n, (train_index, val_index) in enumerate(kf.split(P)):
             # split data into train and val sets for n^th cv-fold
             P_train = P[train_index]
             P_val = P[val_index]

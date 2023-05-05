@@ -22,7 +22,6 @@ from scipy.stats import hmean, uniform
 
 
 def PP_vals(RV_values, alphas):
-
     pp_vals = [np.mean(RV_values <= alpha) for alpha in alphas]
     return pp_vals
 
@@ -79,14 +78,14 @@ def cdf_flow(x, context, flow, base_dist=D.Normal(0, 1)):
 
 
 def cde_pit_values(samples_theta, samples_x, flow, local=False):
-    """ Compute global (resp. local) PIT-values for univariate (1D) target data,
+    """Compute global (resp. local) PIT-values for univariate (1D) target data,
     on N samples (theta, x) from the joint (resp. (theta, x_0) from the true posterior at x_0).
 
     inputs:
     - samples_theta: torch.Tensor, size: (N, dim)
     - samples_x: torch.Tensor, size: (N, nb_features, 1)
     - flow: class based on pyknos.nflows.distributions.base.Distribution
-        Pytorch neural network defining our Normalizing Flow, 
+        Pytorch neural network defining our Normalizing Flow,
         hence conditional (posterior) density estimator.
 
     -local: bool
@@ -94,7 +93,7 @@ def cde_pit_values(samples_theta, samples_x, flow, local=False):
         - samples_theta are true posterior samples at x_0,
         - samples_x is a tensor of x_0 repeated N times.
         Default is False.
-    
+
     outputs:
     - pit_values: numpy arrays, size: (N, )
     """
@@ -113,16 +112,18 @@ def cde_pit_values(samples_theta, samples_x, flow, local=False):
 
 
 def multi_cde_pit_values(
-    samples_theta, samples_x, flow,
+    samples_theta,
+    samples_x,
+    flow,
 ):
-    """ Compute PIT-values for multivaraite target data,
+    """Compute PIT-values for multivaraite target data,
     computed on N samples (theta, x) from the joint.
 
     inputs:
     - samples_theta: torch.Tensor, size: (N, dim)
     - samples_x: torch.Tensor, size: (N, nb_features, 1)
     - flow: class based on pyknos.nflows.distributions.base.Distribution
-        Pytorch neural network defining our Normalizing Flow, 
+        Pytorch neural network defining our Normalizing Flow,
         hence conditional (posterior) density estimator.
 
     outputs:
@@ -155,18 +156,20 @@ def cde_pit_values_zuko(target, context, flow):
 
 
 def multi_cde_pit_values_zuko(
-    samples_theta, samples_x, flow,
+    samples_theta,
+    samples_x,
+    flow,
 ):
-    """ Compute PIT-values for multivaraite target data,
+    """Compute PIT-values for multivaraite target data,
     computed on N samples (theta, x) from the joint.
 
     inputs:
     - samples_theta: torch.Tensor, size: (N, dim)
     - samples_x: torch.Tensor, size: (N, nb_features, 1)
     - flow: class based on zuko.distributions.FlowModule
-        Pytorch neural network defining our Normalizing Flow, 
+        Pytorch neural network defining our Normalizing Flow,
         hence conditional (posterior) density estimator.
-    
+
     outputs:
     - pit_values: list of length dim with numpy arrays of size (N, )
         List of pit-values for each dimension.
@@ -203,14 +206,14 @@ def PP_plot_1D(
     N=None,
 ):
     """1D PP-plot: c.d.f of the 1D PIT vs. c.d.f of the uniform distribution.
-        It shows the deviation to the identity function and thus allows to 
-        visualize deviances of the estimated distribution w.r.t the target  
+        It shows the deviation to the identity function and thus allows to
+        visualize deviances of the estimated distribution w.r.t the target
         distribution and determine their nature (bias / dispersion).
 
     inputs:
     - PIT_values: numpy array, size: (N,)
         1D PIT-values of a given estimator (e.g. output of "cde_pit_values")
-    - alphas: numpy array, size: (K,) 
+    - alphas: numpy array, size: (K,)
         Values to evaluate the PIT-c.d.f in.
     - r_alpha_learned: dict, keys: alphas
         Regressed local c.d.f values (for local PIT).
@@ -307,21 +310,21 @@ def multi_pp_plots(
     confidence_int=False,
     conf_alpha=0.05,
 ):
-    """PP-plot for multivariate target data: 
-    C.d.f of every 1D element of the multivariate PIT (one for each dimension) 
+    """PP-plot for multivariate target data:
+    C.d.f of every 1D element of the multivariate PIT (one for each dimension)
     vs. c.d.f of the uniform distribution.
 
     inputs:
     - lct_paths: list of lists of strings
-        One list for each regression method that includes paths for 
-        lct results of every x_eval. The lct-results are dicts as outputted 
+        One list for each regression method that includes paths for
+        lct results of every x_eval. The lct-results are dicts as outputted
         by the function "multivariate_lct" defined in multi_local_test.py.
     - x_eval_names: list of strings
         Names of the observations that will appear in the title of the plot.
     - param_names: list of strings
         Names of the simulator parameters that will appear in the legend.
     pvalues: bool
-        Whether to show the (harmonic mean) pvalue of the corresponding 
+        Whether to show the (harmonic mean) pvalue of the corresponding
         multivariate LCT.
         Default is False.
     - title: string
@@ -384,15 +387,15 @@ def sbc_plot(
     conf_alpha=0.05,
     title="SBC",
 ):
-    """ PP-plot for SBC validation method: 
+    """PP-plot for SBC validation method:
     Empirical distribution of the SBC ranks computed for every parameter seperately.
-    
+
     inputs:
     - sbc_ranks: numpy array, size: (N, dim)
-        For example one can use the output of sbi.analysis.sbc.run_sbc computed on 
-        N samples of the joint (Theta, X). 
+        For example one can use the output of sbi.analysis.sbc.run_sbc computed on
+        N samples of the joint (Theta, X).
     - colors: list of strings, length: dim
-    - labels: list of strings, length: dim 
+    - labels: list of strings, length: dim
     - alphas: numpy array, size: (K,)
         Default is np.linspace(0,1,100).
     - confidence_int: bool
@@ -419,7 +422,6 @@ def sbc_plot(
     plt.xlabel("ranks", fontsize=15)
     plt.title(title, fontsize=18)
     plt.legend()
-    plt.show()
 
 
 # Script for local PIT regression method comparison
@@ -680,4 +682,3 @@ def eval_space_with_proba_intensity(
 
     else:
         print("Not implemented.")
-

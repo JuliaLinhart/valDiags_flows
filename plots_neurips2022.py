@@ -40,8 +40,17 @@ def multi_global_consistency(
     plt.rcParams["font.size"] = 23.0
     plt.rcParams["axes.titlesize"] = 27.0
 
+    if multi_PIT_values is None:
+        n_cols = 2
+        ax_sbc = 0
+        ax_hpd = 1
+    else:
+        n_cols = 3
+        ax_sbc = 1
+        ax_hpd = 2
+
     fig, axs = plt.subplots(
-        nrows=1, ncols=3, sharex=True, sharey=True, constrained_layout=False
+        nrows=1, ncols=n_cols, sharex=True, sharey=True, constrained_layout=False
     )
 
     for i, ax in enumerate(axs):
@@ -83,24 +92,25 @@ def multi_global_consistency(
         ax.set_aspect("equal")
 
     # global pit
-    for i, Z in enumerate(multi_PIT_values):
-        # compute quantiles P_{target}(PIT_values <= alpha)
-        pp_vals = PP_vals(Z, alphas)
-        # Plot the quantiles as a function of alpha
-        axs[0].plot(
-            alphas, pp_vals, color=colors_pit[i], label=labels_pit[i], linewidth=2
-        )
+    if multi_PIT_values is not None:
+        for i, Z in enumerate(multi_PIT_values):
+            # compute quantiles P_{target}(PIT_values <= alpha)
+            pp_vals = PP_vals(Z, alphas)
+            # Plot the quantiles as a function of alpha
+            axs[0].plot(
+                alphas, pp_vals, color=colors_pit[i], label=labels_pit[i], linewidth=2
+            )
 
-    axs[0].set_yticks([0.0, 0.5, 1.0])
-    axs[0].set_ylabel(ylabel_pit)
-    axs[0].set_xlabel(r"$\alpha$")
-    axs[0].set_title("Global PIT")
-    axs[0].legend(loc="upper left")
+        axs[0].set_yticks([0.0, 0.5, 1.0])
+        axs[0].set_ylabel(ylabel_pit)
+        axs[0].set_xlabel(r"$\alpha$")
+        axs[0].set_title("Global PIT")
+        axs[0].legend(loc="upper left")
 
     # sbc ranks
     for i in range(len(sbc_ranks[0])):
         sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
-        axs[1].plot(
+        axs[ax_sbc].plot(
             alphas,
             sbc_cdf / sbc_cdf.max(),
             color=colors_sbc[i],
@@ -108,25 +118,25 @@ def multi_global_consistency(
             linewidth=2,
         )
 
-    axs[1].set_ylabel(ylabel_sbc)
-    axs[1].set_ylim(0, 1)
-    axs[1].set_xlim(0, 1)
-    axs[1].set_xlabel(r"posterior rank $\theta_i$")
-    axs[1].set_title("SBC")
-    axs[1].legend(loc="upper left")
+    axs[ax_sbc].set_ylabel(ylabel_sbc)
+    axs[ax_sbc].set_ylim(0, 1)
+    axs[ax_sbc].set_xlim(0, 1)
+    axs[ax_sbc].set_xlabel(r"posterior rank $\theta_i$")
+    axs[ax_sbc].set_title("SBC")
+    axs[ax_sbc].legend(loc="upper left")
 
     # hpd_values
     if hpd_values is not None:
         alphas = torch.linspace(0.0, 1.0, len(hpd_values))
-        axs[2].plot(
+        axs[ax_hpd].plot(
             alphas, hpd_values, color="#1f77b4", label=r"$HPD(\mathbf{\theta})$"
         )
-        axs[2].set_ylabel(r"MC-est. $\mathbb{P}(HPD \leq \alpha)$")
-        axs[2].set_ylim(0, 1)
-        axs[2].set_xlim(0, 1)
-        axs[2].set_xlabel(r"$\alpha$")
-        axs[2].set_title("Global HPD")
-        axs[2].legend(loc="upper left")
+        axs[ax_hpd].set_ylabel(r"MC-est. $\mathbb{P}(HPD \leq \alpha)$")
+        axs[ax_hpd].set_ylim(0, 1)
+        axs[ax_hpd].set_xlim(0, 1)
+        axs[ax_hpd].set_xlabel(r"$\alpha$")
+        axs[ax_hpd].set_title("Global HPD")
+        axs[ax_hpd].legend(loc="upper left")
 
     return fig
 
@@ -166,7 +176,6 @@ def multi_local_consistency(
     r_alpha_null_list=None,
     conf_alpha=0.05,
 ):
-
     # plt.rcParams.update(
     #     figsizes.neurips2022(nrows=2, ncols=3, height_to_width_ratio=1,)
     # )

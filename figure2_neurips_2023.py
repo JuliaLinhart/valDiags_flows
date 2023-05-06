@@ -20,6 +20,8 @@ import argparse
 from pathlib import Path
 import os
 
+import matplotlib.pyplot as plt
+
 import numpy as np
 import torch
 import sbibm
@@ -32,7 +34,7 @@ from experiment_utils_sbibm import (
     l_c2st_results_n_train,
 )
 
-from plots_neurips2023 import plot_sbibm_results_n_train
+from plots_neurips2023_new import plot_sbibm_results_n_train
 
 # set seed for reproducibility
 RANDOM_SEED = 42
@@ -46,16 +48,26 @@ METHODS_ACC = [
     r"oracle C2ST ($\hat{t}_{Acc}$)",
     r"L-C2ST ($\hat{t}_{Max0}$)",
     r"L-C2ST-NF ($\hat{t}_{Max0}$)",
-    r"L-C2ST-NF-perm ($\hat{t}_{Max0}$)",
+    # r"L-C2ST-NF-perm ($\hat{t}_{Max0}$)",
 ]
 METHODS_L2 = [
     r"oracle C2ST ($\hat{t}_{Reg}$)",
     r"L-C2ST ($\hat{t}_{Reg0}$)",
     r"L-C2ST-NF ($\hat{t}_{Reg0}$)",
-    r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    # r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
     "L-HPD",
 ]
-METHODS_ALL = METHODS_ACC + METHODS_L2
+METHODS_ALL = [
+    r"oracle C2ST ($\hat{t}_{Acc}$)",
+    r"oracle C2ST ($\hat{t}_{Reg}$)",
+    r"L-C2ST ($\hat{t}_{Max0}$)",
+    r"L-C2ST-NF ($\hat{t}_{Max0}$)",
+    # r"L-C2ST-NF-perm ($\hat{t}_{Max0}$)",
+    r"L-C2ST ($\hat{t}_{Reg0}$)",
+    r"L-C2ST-NF ($\hat{t}_{Reg0}$)",
+    # r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    "L-HPD",
+]
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at
 NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -135,7 +147,12 @@ parser.add_argument(
     help="Exp 2: Plot the the empirical power / type 1 error as a function N_cal (at fixed N_train=100_000).",
 )
 
-parser.add_argument("--plot", action="store_true", help="Plot results only.")
+parser.add_argument(
+    "--plot",
+    "-p",
+    action="store_true",
+    help="Plot results only.",
+)
 
 # Parse arguments
 args = parser.parse_args()
@@ -209,25 +226,25 @@ kwargs_lhpd = {
 # they are independant of the estimator and the observation space (x)
 # N.B> L-C2ST is still dependent on the observation space (x)
 # as its trained on the joint samples (theta, x)
-t_stats_null_c2st_nf = {10000: None}
-for n_cal in n_cal_list:
-    t_stats_null_c2st_nf[n_cal] = precompute_t_stats_null(
-        metrics=ALL_METRICS,
-        n_cal=n_cal,
-        n_eval=n_eval,
-        dim_theta=dim_theta,
-        n_trials_null=N_TRIALS_PRECOMPUTE,
-        t_stats_null_path=task_path / "t_stats_null" / eval_params,
-        methods=["c2st_nf"],
-        kwargs_c2st=kwargs_c2st,
-        save_results=True,
-        load_results=True,
-        # args for lc2st only
-        kwargs_lc2st=None,
-        kwargs_lhpd=None,
-        x_cal=None,
-        observation_dict=None,
-    )["c2st_nf"]
+t_stats_null_c2st_nf = {ncal: None for ncal in n_cal_list}
+# if not args.plot:
+#     t_stats_null_c2st_nf[n_cal] = precompute_t_stats_null(
+#         metrics=ALL_METRICS,
+#         n_cal=n_cal,
+#         n_eval=n_eval,
+#         dim_theta=dim_theta,
+#         n_trials_null=N_TRIALS_PRECOMPUTE,
+#         t_stats_null_path=task_path / "t_stats_null" / eval_params,
+#         methods=["c2st_nf"],
+#         kwargs_c2st=kwargs_c2st,
+#         save_results=True,
+#         load_results=True,
+#         # args for lc2st only
+#         kwargs_lc2st=None,
+#         kwargs_lhpd=None,
+#         x_cal=None,
+#         observation_dict=None,
+#     )["c2st_nf"]
 
 # perform the experiment
 # ==== EXP 1: test stats as a function of N_train (n_cal = max)==== #
@@ -265,46 +282,57 @@ if args.t_res_ntrain:
         kwargs_lhpd=kwargs_lhpd,
         task_path=task_path,
         t_stats_null_path=task_path / "t_stats_null" / eval_params,
-        results_n_train_path=Path("results") / test_params / eval_params,
+        results_n_train_path=Path(f"results") / test_params / eval_params,
         methods=methods,
         test_stat_names=ALL_METRICS,
         seed=RANDOM_SEED,
+        plot_mode=args.plot,
     )
 
     # path to save figures
-    fig_path = task_path / "figures" / eval_params / test_params
+    fig_path = (
+        task_path
+        / "figures"
+        # / f"nt_precompute_{N_TRIALS_PRECOMPUTE}"
+        / eval_params
+        / test_params
+    )
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
-    plot_sbibm_results_n_train(
-        avg_results=avg_results,
-        train_runtime=train_runtime,
-        fig_path=fig_path,
-        n_train_list=n_train_list,
-        n_cal=n_cal,
-        methods=METHODS_ACC,
-        t_stat_ext="t_acc_max",
-    )
+    # plot_sbibm_results_n_train(
+    #     avg_results=avg_results,
+    #     train_runtime=train_runtime,
+    #     fig_path=fig_path,
+    #     n_train_list=n_train_list,
+    #     n_cal=n_cal,
+    #     methods=METHODS_ACC,
+    #     t_stat_ext="t_acc_max",
+    # )
 
-    plot_sbibm_results_n_train(
-        avg_results=avg_results,
-        train_runtime=train_runtime,
-        fig_path=fig_path,
-        n_train_list=n_train_list,
-        n_cal=n_cal,
-        methods=METHODS_L2,
-        t_stat_ext="t_reg_lhpd",
-    )
+    # plot_sbibm_results_n_train(
+    #     avg_results=avg_results,
+    #     train_runtime=train_runtime,
+    #     fig_path=fig_path,
+    #     n_train_list=n_train_list,
+    #     n_cal=n_cal,
+    #     methods=METHODS_L2,
+    #     t_stat_ext="t_reg_lhpd",
+    # )
 
-    plot_sbibm_results_n_train(
+    fig = plot_sbibm_results_n_train(
         avg_results=avg_results,
         train_runtime=train_runtime,
         fig_path=fig_path,
         n_train_list=n_train_list,
         n_cal=n_cal,
-        methods=METHODS_ALL,
-        t_stat_ext="t_all",
+        methods_acc=METHODS_ACC,
+        methods_reg=METHODS_L2,
+        methods_all=METHODS_ALL,
+        t_stat_ext="new",
     )
+    plt.savefig(fig_path / f"results_ntrain_n_cal_{n_cal}.pdf")
+    plt.show()
 
 
 if args.power_ncal:
@@ -316,7 +344,7 @@ if args.power_ncal:
     print(f"... for N_train = {n_train}")
     print()
 
-    methods = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm", "lhpd"]  # "c2st_nf",
+    methods = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm"]  # , "lhpd"]  # "c2st_nf",
     n_runs = 100
 
     result_path = task_path / f"npe_{n_train}" / "results" / test_params / eval_params
@@ -330,29 +358,32 @@ if args.power_ncal:
     compute_fpr = True
 
     for n_cal in n_cal_list:
+        emp_power_dict[n_cal], type_I_error_dict[n_cal] = {}, {}
+        p_values_dict[n_cal], p_values_h0_dict[n_cal] = {}, {}
         try:
-            if compute_tpr:
-                emp_power_dict[n_cal] = torch.load(
-                    result_path
-                    / f"n_runs_{n_runs}"
-                    / f"emp_power_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
-                )
-                p_values_dict[n_cal] = torch.load(
-                    result_path
-                    / f"n_runs_{n_runs}"
-                    / f"p_values_avg_n_runs_{n_runs}_n_cal{n_cal}.pkl",
-                )
-            if compute_fpr:
-                type_I_error_dict[n_cal] = torch.load(
-                    result_path
-                    / f"n_runs_{n_runs}"
-                    / f"type_I_error_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
-                )
-                p_values_h0_dict[n_cal] = torch.load(
-                    result_path
-                    / f"n_runs_{n_runs}"
-                    / f"p_values_h0_avg_n_runs_{n_runs}_n_cal{n_cal}.pkl",
-                )
+            for m in methods:
+                if compute_tpr:
+                    emp_power_dict[n_cal][m] = torch.load(
+                        result_path
+                        / f"n_runs_{n_runs}"
+                        / f"emp_power_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
+                    )
+                    p_values_dict[n_cal][m] = torch.load(
+                        result_path
+                        / f"n_runs_{n_runs}"
+                        / f"p_values_obs_per_run_{m}_n_runs_{n_runs}_n_cal{n_cal}.pkl",
+                    )
+                if compute_fpr:
+                    type_I_error_dict[n_cal][m] = torch.load(
+                        result_path
+                        / f"n_runs_{n_runs}"
+                        / f"type_I_error_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
+                    )
+                    p_values_h0_dict[n_cal][m] = torch.load(
+                        result_path
+                        / f"n_runs_{n_runs}"
+                        / f"p_values_h0__obs_per_run_{m}_n_runs_{n_runs}_n_cal{n_cal}.pkl",
+                    )
             print(f"Loaded Empirical Results for n_cal = {n_cal} ...")
         except FileNotFoundError:
             emp_power, type_I_error, p_values, p_values_h0 = compute_emp_power_l_c2st(
@@ -375,7 +406,8 @@ if args.power_ncal:
                 compute_type_I_error=compute_fpr,
                 task_path=task_path,
                 load_eval_data=True,
-                # n_run_load_results=90,
+                result_path=result_path,
+                n_run_load_results=100,
                 # save_every_n_runs=10,
             )
             emp_power_dict[n_cal] = emp_power
@@ -383,4 +415,44 @@ if args.power_ncal:
             p_values_dict[n_cal] = p_values
             p_values_h0_dict[n_cal] = p_values_h0
 
-    #
+    emp_power_mean_dict = {
+        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
+    }
+    emp_power_std_dict = {
+        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
+    }
+    for n_cal in n_cal_list:
+        for m in methods:
+            for t_stat_name in ALL_METRICS:
+                emp_power_mean_dict[m][t_stat_name].append(
+                    np.mean(emp_power_dict[n_cal][m][t_stat_name])
+                )
+                emp_power_std_dict[m][t_stat_name].append(
+                    np.std(emp_power_dict[n_cal][m][t_stat_name])
+                )
+
+    # plot empirical power
+    for m in methods:
+        for t_stat_name in ALL_METRICS:
+            if "lc2st" in m and t_stat_name == "accuracy":
+                continue
+            if not "lc2st" in m and t_stat_name == "div":
+                continue
+            plt.plot(
+                np.arange(len(n_cal_list)),
+                emp_power_mean_dict[m]["accuracy"],
+                label=m + " " + t_stat_name,
+            )
+            plt.fill_between(
+                np.arange(len(n_cal_list)),
+                np.array(emp_power_mean_dict[m]["accuracy"])
+                - np.array(emp_power_std_dict[m]["accuracy"]),
+                np.array(emp_power_mean_dict[m]["accuracy"])
+                + np.array(emp_power_std_dict[m]["accuracy"]),
+                alpha=0.2,
+            )
+    plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
+    plt.xlabel("n_cal")
+    plt.ylabel("Empirical Power")
+    plt.legend()
+    plt.show()

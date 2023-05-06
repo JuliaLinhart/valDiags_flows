@@ -103,81 +103,101 @@ avg_result_keys = {
 def plot_sbibm_results_n_train(
     avg_results,
     train_runtime,
-    methods,
+    methods_acc,
+    methods_reg,
+    methods_all,
     n_train_list,
     n_cal,
     fig_path,
     t_stat_ext="t_all",
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
-    plt.rcParams["figure.figsize"] = (10, 5)
+    plt.rcParams["figure.figsize"] = (24, 10)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams.update(axes.color(base="black"))
-    plt.rcParams["legend.fontsize"] = 23.0
+    plt.rcParams["legend.fontsize"] = 15.0
     plt.rcParams["xtick.labelsize"] = 23.0
     plt.rcParams["ytick.labelsize"] = 23.0
     plt.rcParams["axes.labelsize"] = 23.0
     plt.rcParams["font.size"] = 23.0
     plt.rcParams["axes.titlesize"] = 27.0
 
+    fig, axs = plt.subplots(
+        nrows=2, ncols=3, sharex=True, sharey=False, constrained_layout=True
+    )
     # ==== t_stats of L-C2ST(-NF) w.r.t to oracle ====
 
-    # plot theoretical H_0 value
-    plt.plot(
+    # plot theoretical H_0 value for acc/max t-stats
+    axs[0][0].plot(
         np.arange(len(n_train_list)),
         np.ones(len(n_train_list)) * 0.5,
         "--",
         color="black",
         label=r"theoretical $t \mid \mathcal{H}_0$",
     )
+    # plot theoretical H_0 value for reg t-stats
+    axs[1][0].plot(
+        np.arange(len(n_train_list)),
+        np.ones(len(n_train_list)) * 0.0,
+        "--",
+        color="black",
+        label=r"theoretical $t \mid \mathcal{H}_0$",
+    )
     # plot estimated T values
-    for method in methods:
-        if "perm" in method or "L-HPD" in method:
-            continue
+    for i, methods in enumerate([methods_acc, methods_reg]):
+        for method in methods:
+            if "perm" in method or "L-HPD" in method:
+                continue
+            test_name = METHODS_DICT[method]["test_name"]
+            t_stat_name = METHODS_DICT[method]["t_stat_name"]
 
-        test_name = METHODS_DICT[method]["test_name"]
-        t_stat_name = METHODS_DICT[method]["t_stat_name"]
-        plt.plot(
-            np.arange(len(n_train_list)),
-            avg_results[test_name]["t_stat_mean"][t_stat_name],
-            label=method,
-            color=METHODS_DICT[method]["color"],
-            linestyle=METHODS_DICT[method]["linestyle"],
-            marker=METHODS_DICT[method]["marker"],
-            markersize=METHODS_DICT[method]["markersize"],
-            alpha=0.8,
-        )
-        err = np.array(avg_results[test_name]["t_stat_std"][t_stat_name])
-        plt.fill_between(
-            np.arange(len(n_train_list)),
-            np.array(avg_results[test_name]["t_stat_mean"][t_stat_name]) - err,
-            np.array(avg_results[test_name]["t_stat_mean"][t_stat_name]) + err,
-            alpha=0.2,
-            color=METHODS_DICT[method]["color"],
-        )
-    plt.legend()
-    plt.xticks(np.arange(len(n_train_list)), n_train_list)
-    plt.xlabel("N_train")
-    plt.ylabel("test statistic (mean +/- std)")
-    plt.savefig(fig_path / f"t_stats_{t_stat_ext}_ntrain_n_cal_{n_cal}.pdf")
-    plt.show()
+            axs[i][0].plot(
+                np.arange(len(n_train_list)),
+                avg_results[test_name]["t_stat_mean"][t_stat_name],
+                label=method,
+                color=METHODS_DICT[method]["color"],
+                linestyle=METHODS_DICT[method]["linestyle"],
+                marker=METHODS_DICT[method]["marker"],
+                markersize=METHODS_DICT[method]["markersize"],
+                alpha=0.8,
+            )
+            err = np.array(avg_results[test_name]["t_stat_std"][t_stat_name])
+            axs[i][0].fill_between(
+                np.arange(len(n_train_list)),
+                np.array(avg_results[test_name]["t_stat_mean"][t_stat_name]) - err,
+                np.array(avg_results[test_name]["t_stat_mean"][t_stat_name]) + err,
+                alpha=0.2,
+                color=METHODS_DICT[method]["color"],
+            )
+    axs[0][0].legend()  # loc="lower left")
+    axs[1][0].legend()  # loc="lower left")
+    axs[1][0].set_xticks(
+        np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
+    )
+    axs[0][0].set_ylabel("test statistic (mean +/- std)")
+    axs[0][0].set_ylim(0.48, 1.02)
+    axs[0][0].set_yticks([0.5, 0.75, 1.0])
+    axs[1][0].set_ylabel("test statistic (mean +/- std)")
+    axs[1][0].set_ylim(-0.01, 0.26)
+    axs[1][0].set_yticks([0.0, 0.12, 0.25])
+    axs[1][0].set_xlabel(r"$N_{train}$")
 
     # ==== p-value of all methods w.r.t to oracle ===
 
     # plot alpha-level
-    plt.plot(
+    axs[0][1].plot(
         np.arange(len(n_train_list)),
         np.ones(len(n_train_list)) * 0.05,
         "--",
         color="black",
-        label="alpha-level",
+        label="alpha-level: 0.05",
     )
 
     # plot estimated p-values
-    for method in methods:
+    for method in methods_all:
         test_name = METHODS_DICT[method]["test_name"]
         t_stat_name = METHODS_DICT[method]["t_stat_name"]
-        plt.plot(
+        axs[0][1].plot(
             np.arange(len(n_train_list)),
             avg_results[test_name]["p_value_mean"][t_stat_name],
             label=method,
@@ -189,82 +209,45 @@ def plot_sbibm_results_n_train(
         )
         low = np.array(avg_results[test_name]["p_value_min"][t_stat_name])
         high = np.array(avg_results[test_name]["p_value_max"][t_stat_name])
-        plt.fill_between(
+        axs[0][1].fill_between(
             np.arange(len(n_train_list)),
             low,
             high,
             alpha=0.2,
             color=METHODS_DICT[method]["color"],
         )
-    plt.legend()
-    plt.xticks(np.arange(len(n_train_list)), n_train_list)
-    plt.xlabel("N_train")
-    plt.ylabel("p-value (mean / min-max)")
-    plt.savefig(fig_path / f"p_values_{t_stat_ext}_ntrain_n_cal_{n_cal}.pdf")
-    plt.show()
+    axs[0][1].legend(loc="upper right")
+    axs[0][1].set_xticks(
+        np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
+    )
+    # axs[0][1].set_xlabel(r"$N_{train}$")
+    axs[0][1].set_ylabel("p-value (mean / min-max)")
 
     # plot rejection rate of all methods w.r.t to oracle
-    for method in methods:
+    for method in methods_all:
         test_name = METHODS_DICT[method]["test_name"]
         t_stat_name = METHODS_DICT[method]["t_stat_name"]
-        plt.plot(
+
+        axs[1][1].plot(
             np.arange(len(n_train_list)),
             avg_results[test_name]["TPR"][t_stat_name],
-            label=method,
+            # label=method,
             color=METHODS_DICT[method]["color"],
             linestyle=METHODS_DICT[method]["linestyle"],
             marker=METHODS_DICT[method]["marker"],
             markersize=METHODS_DICT[method]["markersize"],
             alpha=0.8,
         )
-    plt.legend()
-    plt.xticks(np.arange(len(n_train_list)), n_train_list)
-    plt.xlabel("N_train")
-    plt.ylabel("rejection rate")
-    plt.savefig(fig_path / f"rejection_rate_{t_stat_ext}_ntrain_n_cal_{n_cal}.pdf")
-    plt.show()
+    # axs[1][1].legend(loc="lower left")
+    axs[1][1].set_xticks(
+        np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
+    )
+    axs[1][1].set_ylim(-0.04, 1.04)
+    axs[1][1].set_yticks([0, 0.5, 1])
+    axs[1][1].set_xlabel(r"$N_{train}$")
+    axs[1][1].set_ylabel("rejection rate")
 
-    # plot run time of amortized methods w.r.t to oracle
-    for method in methods:
-        if "perm" in method:
-            continue
-        test_name = METHODS_DICT[method]["test_name"]
-        t_stat_name = METHODS_DICT[method]["t_stat_name"]
-        plt.plot(
-            np.arange(len(n_train_list)),
-            avg_results[test_name]["run_time_mean"][t_stat_name],
-            label=method,
-            color=METHODS_DICT[method]["color"],
-            linestyle=METHODS_DICT[method]["linestyle"],
-            marker=METHODS_DICT[method]["marker"],
-            markersize=METHODS_DICT[method]["markersize"],
-            alpha=0.8,
-        )
-        err = np.array(avg_results[test_name]["run_time_std"][t_stat_name])
-        plt.fill_between(
-            np.arange(len(n_train_list)),
-            np.array(avg_results[test_name]["run_time_mean"][t_stat_name]) - err,
-            np.array(avg_results[test_name]["run_time_mean"][t_stat_name]) + err,
-            alpha=0.2,
-            color=METHODS_DICT[method]["color"],
-        )
-        if not "oracle" in method:
-            plt.plot(
-                np.arange(len(n_train_list)),
-                train_runtime[METHODS_DICT[method]["test_name"]],
-                label=f"{method} (pre-train)",
-                color="black",
-                linestyle=METHODS_DICT[method]["linestyle"],
-                marker=METHODS_DICT[method]["marker"],
-                markersize=METHODS_DICT[method]["markersize"],
-            )
-
-    plt.legend()
-    plt.xticks(np.arange(len(n_train_list)), n_train_list)
-    plt.xlabel("N_train")
-    plt.ylabel("runtime (s) (mean +/- std)")
-    plt.savefig(fig_path / f"runtime_{t_stat_ext}_ntrain_n_cal_{n_cal}.pdf")
-    plt.show()
+    return fig
 
 
 ### ======== FIGURE 3 ========== ###

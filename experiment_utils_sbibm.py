@@ -40,6 +40,7 @@ def l_c2st_results_n_train(
     methods=["c2st", "lc2st", "lc2st_nf"],
     test_stat_names=["accuracy", "mse", "div"],
     seed=42,
+    plot_mode=False,
 ):
     # GENERATE DATA
     data_samples = generate_data_one_run(
@@ -55,53 +56,53 @@ def l_c2st_results_n_train(
         seed=seed,  # fixed seed for reproducibility
     )
 
-    # precompute test statistics under null hypothesis for lc2st_nf
-    # same for every estimator (no need to recompute for every n_train)
-    if "lc2st_nf" in methods:
-        x_cal = data_samples["joint_cal"]["x"]
-        dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-        t_stats_null_lc2st_nf = precompute_t_stats_null(
-            n_cal=n_cal,
-            n_eval=n_eval,
-            dim_theta=dim_theta,
-            n_trials_null=n_trials_null_precompute,
-            kwargs_lc2st=kwargs_lc2st,
-            x_cal=x_cal,
-            observation_dict=observation_dict,
-            methods=["lc2st_nf"],
-            metrics=test_stat_names,
-            t_stats_null_path=t_stats_null_path,
-            save_results=True,
-            load_results=True,
-            # args only for c2st
-            kwargs_c2st=None,
-            kwargs_lhpd=None,
-        )["lc2st_nf"]
-    else:
-        t_stats_null_lc2st_nf = None
+    t_stats_null_lc2st_nf = None
+    t_stats_null_lhpd = None
 
-    if "lhpd" in methods:
-        x_cal = data_samples["joint_cal"]["x"]
-        dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-        t_stats_null_lhpd = precompute_t_stats_null(
-            n_cal=n_cal,
-            n_eval=n_eval,
-            dim_theta=dim_theta,
-            n_trials_null=n_trials_null_precompute,
-            kwargs_lhpd=kwargs_lhpd,
-            x_cal=x_cal,
-            observation_dict=observation_dict,
-            methods=["lhpd"],
-            metrics=["mse"],
-            t_stats_null_path=t_stats_null_path,
-            save_results=True,
-            load_results=True,
-            # args only for c2st and lc2st
-            kwargs_c2st=None,
-            kwargs_lc2st=None,
-        )["lhpd"]
-    else:
-        t_stats_null_lhpd = None
+    if not plot_mode:
+        # precompute test statistics under null hypothesis for lc2st_nf
+        # same for every estimator (no need to recompute for every n_train)
+        if "lc2st_nf" in methods:
+            x_cal = data_samples["joint_cal"]["x"]
+            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+            t_stats_null_lc2st_nf = precompute_t_stats_null(
+                n_cal=n_cal,
+                n_eval=n_eval,
+                dim_theta=dim_theta,
+                n_trials_null=n_trials_null_precompute,
+                kwargs_lc2st=kwargs_lc2st,
+                x_cal=x_cal,
+                observation_dict=observation_dict,
+                methods=["lc2st_nf"],
+                metrics=test_stat_names,
+                t_stats_null_path=t_stats_null_path,
+                save_results=True,
+                load_results=True,
+                # args only for c2st
+                kwargs_c2st=None,
+                kwargs_lhpd=None,
+            )["lc2st_nf"]
+
+        if "lhpd" in methods:
+            x_cal = data_samples["joint_cal"]["x"]
+            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+            t_stats_null_lhpd = precompute_t_stats_null(
+                n_cal=n_cal,
+                n_eval=n_eval,
+                dim_theta=dim_theta,
+                n_trials_null=n_trials_null_precompute,
+                kwargs_lhpd=kwargs_lhpd,
+                x_cal=x_cal,
+                observation_dict=observation_dict,
+                methods=["lhpd"],
+                metrics=["mse"],
+                t_stats_null_path=t_stats_null_path,
+                save_results=True,
+                load_results=True,
+                # args only for c2st and lc2st
+                kwargs_c2st=None,
+                kwargs_lc2st=None,
+            )["lhpd"]
 
     avg_result_keys = {
         "TPR": "reject",
@@ -180,12 +181,12 @@ def l_c2st_results_n_train(
                                 np.max(results[v][t_stat_name])
                             )
                         else:
-                            if "t_stat" in k and t_stat_name == "mse":
-                                avg_results[method][k][t_stat_name].append(
-                                    np.mean(results[v][t_stat_name])
-                                    + 0.5  # for comparison with other t_stats
-                                )
-                            elif "run_time" in k:
+                            # if "t_stat" in k and t_stat_name == "mse":
+                            #     avg_results[method][k][t_stat_name].append(
+                            #         np.mean(results[v][t_stat_name])
+                            #         + 0.5  # for comparison with other t_stats
+                            #     )
+                            if "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
                                     np.mean(
                                         np.array(results[v][t_stat_name])
@@ -280,7 +281,7 @@ def compute_emp_power_l_c2st(
                     / f"n_runs_{n_run_load_results}"
                     / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
                 )
-            start_run = n_run_load_results + 2
+            start_run = n_run_load_results + 1
             print(f"Loaded {name} results from run {n_run_load_results} ...")
         except FileNotFoundError:
             start_run = 1

@@ -221,6 +221,8 @@ def compute_emp_power_l_c2st(
     compute_type_I_error=False,
     n_run_load_results=0,
     result_path="",
+    t_stats_null_path="",
+    results_n_train_path="",
     load_eval_data=True,
     save_every_n_runs=5,
 ):
@@ -254,6 +256,103 @@ def compute_emp_power_l_c2st(
             The dict keys are the test statistic names.
             The dict values are lists of length len(num_observation_list) of empirical power values.
     """
+    # ==== precompute test statistics under null hypothesis ====
+    # generate data for 10000 samples
+    data_samples = generate_data_one_run(
+        n_cal=10000,
+        n_eval=n_eval,
+        task=task,
+        observation_dict=observation_dict,
+        n_train_list=[n_train],
+        task_path=task_path,
+        save_data=True,
+        load_cal_data=True,
+        load_eval_data=True,
+    )
+    # reduce number of calibration samples to n_cal
+    data_samples["base_dist"]["cal"] = data_samples["base_dist"]["cal"][:n_cal]
+    data_samples["ref_posterior"]["cal"] = {
+        k: v[:n_cal] for k, v in data_samples["ref_posterior"]["cal"].items()
+    }
+    data_samples["npe_obs"]["cal"][n_train] = {
+        k: v[:n_cal] for k, v in data_samples["npe_obs"]["cal"][n_train].items()
+    }
+    data_samples["ref_inv_transform"]["cal"][n_train] = {
+        k: v[:n_cal]
+        for k, v in data_samples["ref_inv_transform"]["cal"][n_train].items()
+    }
+    data_samples["joint_cal"]["x"] = data_samples["joint_cal"]["x"][:n_cal]
+    data_samples["joint_cal"]["theta"] = data_samples["joint_cal"]["theta"][:n_cal]
+    data_samples["npe_x_cal"][n_train] = data_samples["npe_x_cal"][n_train][:n_cal]
+    data_samples["inv_transform_theta_cal"][n_train] = data_samples[
+        "inv_transform_theta_cal"
+    ][n_train][:n_cal]
+
+    # compute test statistics under null hypothesis...
+    t_stats_null_dict = {
+        m: None for m in ["c2st", "lc2st", "lc2st_nf", "lhpd", "lc2st_nf_perm"]
+    }
+    # ... for methods independent of n_train
+    for m, metrics in zip(["lc2st_nf", "lhpd"], [test_stat_names, ["mse"]]):
+        if m in methods:
+            if m == "lc2st_nf":
+                kwargs_lc2st_temp = kwargs_lc2st
+                kwargs_lhpd_temp = {}
+            else:
+                kwargs_lc2st_temp = {}
+                kwargs_lhpd_temp = kwargs_lhpd
+
+            x_cal = data_samples["joint_cal"]["x"]
+            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+            t_stats_null_dict[m] = precompute_t_stats_null(
+                n_cal=n_cal,
+                n_eval=n_eval,
+                dim_theta=dim_theta,
+                n_trials_null=n_trials_null_precompute,  # high number of trials as they can be computed once and then be used for any estimator
+                kwargs_lc2st=kwargs_lc2st_temp,
+                kwargs_lhpd=kwargs_lhpd_temp,
+                x_cal=x_cal,
+                observation_dict=observation_dict,
+                methods=[m],
+                metrics=metrics,
+                t_stats_null_path=t_stats_null_path,
+                save_results=True,
+                load_results=True,
+                # args only for c2st
+                kwargs_c2st=None,
+            )[m]
+
+    # ... for methods dependent on n_train
+    for m in ["c2st", "lc2st", "lc2st_nf_perm"]:
+        if m in methods:
+            print()
+            print(
+                f"Pre-compute test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
+            )
+            print()
+            _, _, t_stats_null = compute_test_results_npe_one_run(
+                alpha=alpha,
+                data_samples=data_samples,
+                n_train=n_train,
+                observation_dict=observation_dict,
+                kwargs_c2st=kwargs_c2st,
+                kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
+                n_trials_null=n_trials_null,  # low number of trials as they need to be recomputed for every estimator
+                t_stats_null_lc2st_nf=None,
+                t_stats_null_c2st_nf=t_stats_null_c2st_nf,
+                t_stats_null_lhpd=None,
+                t_stats_null_dict_npe=t_stats_null_dict,
+                test_stat_names=test_stat_names,
+                methods=[m],
+                compute_under_null=False,
+                task_path=task_path,
+                results_n_train_path=results_n_train_path,
+                save_results=True,
+                return_t_stats_null=True,
+            )
+            t_stats_null_dict[m] = t_stats_null[m]
+
     # initialize dict of p-values
     emp_power = {}
     type_I_error = {}
@@ -324,54 +423,6 @@ def compute_emp_power_l_c2st(
             seed=n,  # different seed for every run (fixed for reproducibility)
         )
 
-        # precompute test statistics under null hypothesis for lc2st_nf
-        # we need to do this for every run because we use different data
-        if "lc2st_nf" in methods and (compute_emp_power + compute_type_I_error != 0):
-            x_cal = data_samples["joint_cal"]["x"]
-            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-            t_stats_null_lc2st_nf = precompute_t_stats_null(
-                n_cal=n_cal,
-                n_eval=n_eval,
-                dim_theta=dim_theta,
-                n_trials_null=n_trials_null_precompute,
-                kwargs_lc2st=kwargs_lc2st,
-                x_cal=x_cal,
-                observation_dict=observation_dict,
-                methods=["lc2st_nf"],
-                metrics=test_stat_names,
-                t_stats_null_path="",
-                save_results=False,
-                load_results=False,
-                # args only for c2st
-                kwargs_c2st=None,
-                kwargs_lhpd=None,
-            )["lc2st_nf"]
-        else:
-            t_stats_null_lc2st_nf = None
-
-        if "lhpd" in methods:
-            x_cal = data_samples["joint_cal"]["x"]
-            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-            t_stats_null_lhpd = precompute_t_stats_null(
-                n_cal=n_cal,
-                n_eval=n_eval,
-                dim_theta=dim_theta,
-                n_trials_null=n_trials_null_precompute,
-                kwargs_lhpd=kwargs_lhpd,
-                x_cal=x_cal,
-                observation_dict=observation_dict,
-                methods=["lhpd"],
-                metrics=["mse"],
-                t_stats_null_path="",
-                save_results=False,
-                load_results=False,
-                # args only for c2st and lc2st
-                kwargs_c2st=None,
-                kwargs_lc2st=None,
-            )["lhpd"]
-        else:
-            t_stats_null_lhpd = None
-
         # Empirical Power = True Positive Rate (TPR)
         # count rejection of H0 under H1 (p_value <= alpha) for every run
         # and for every observation: [reject(obs1), reject(obs2), ...]
@@ -388,9 +439,10 @@ def compute_emp_power_l_c2st(
                 kwargs_lc2st=kwargs_lc2st,
                 kwargs_lhpd=kwargs_lhpd,
                 n_trials_null=n_trials_null,
-                t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
+                t_stats_null_lc2st_nf=t_stats_null_dict["lc2st_nf"],
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf,
-                t_stats_null_lhpd=t_stats_null_lhpd,
+                t_stats_null_lhpd=t_stats_null_dict["lhpd"],
+                t_stats_null_dict_npe=t_stats_null_dict,
                 test_stat_names=test_stat_names,
                 methods=methods,
                 compute_under_null=False,
@@ -472,9 +524,10 @@ def compute_emp_power_l_c2st(
                 kwargs_lc2st=kwargs_lc2st,
                 kwargs_lhpd=kwargs_lhpd,
                 n_trials_null=n_trials_null,
-                t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
+                t_stats_null_lc2st_nf=t_stats_null_dict["lc2st_nf"],
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf,
-                t_stats_null_lhpd=t_stats_null_lhpd,
+                t_stats_null_lhpd=t_stats_null_dict["lhpd"],
+                t_stats_null_dict_npe=t_stats_null_dict,
                 test_stat_names=test_stat_names,
                 methods=methods,
                 compute_under_null=True,
@@ -775,6 +828,7 @@ def compute_test_results_npe_one_run(
     t_stats_null_c2st_nf,
     t_stats_null_lc2st_nf,
     t_stats_null_lhpd,
+    t_stats_null_dict_npe,
     task_path,
     results_n_train_path,
     test_stat_names=["accuracy", "mse", "div"],
@@ -782,6 +836,7 @@ def compute_test_results_npe_one_run(
     alpha=0.05,
     compute_under_null=False,
     base_dist_samples_null=None,
+    return_t_stats_null=False,
     save_results=True,
     seed=42,  # fix seed for reproducibility
 ):
@@ -815,6 +870,9 @@ def compute_test_results_npe_one_run(
 
     train_runtime = dict(zip(methods, [0 for _ in methods]))
     results_dict = dict(zip(methods, [{} for _ in methods]))
+    t_stats_null_dict = {
+        m: {num_obs: {} for num_obs in observation_dict.keys()} for m in methods
+    }
 
     result_keys = ["reject", "p_value", "t_stat", "t_stats_null", "run_time"]
     trained_clfs_lc2st_nf = None
@@ -861,7 +919,10 @@ def compute_test_results_npe_one_run(
                         if compute_under_null:
                             P, Q = permute_data(P, Q, seed=seed)
                             P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
-                        t_stats_null = None
+                        if t_stats_null_dict_npe["c2st"] is None:
+                            t_stats_null = None
+                        else:
+                            t_stats_null = t_stats_null_dict_npe["c2st"][n_obs]
 
                     elif m == "c2st_nf":
                         # class 0: Z ~ N(0,I) vs. Z ~ T^{-1}(p_ref(theta | x_0))
@@ -926,7 +987,7 @@ def compute_test_results_npe_one_run(
                     }
                 if m == "lc2st" or m == "lc2st_nf_perm":
                     # permutation method and no precomputed test stats under null
-                    t_stats_null = {n_obs: None for n_obs in observation_dict.keys()}
+                    t_stats_null = t_stats_null_dict_npe[m]
                     if compute_under_null:
                         joint_P_x = torch.cat([P, x_P], dim=1)
                         joint_Q_x = torch.cat([Q, x_Q], dim=1)
@@ -976,7 +1037,7 @@ def compute_test_results_npe_one_run(
                 if save_results:
                     torch.save(runtime, result_path / f"runtime_{m}_n_cal_{n_cal}.pkl")
 
-                if t_stats_null[list(observation_dict.keys())[0]] is None:
+                if t_stats_null is None:
                     print("... under the null hypothesis")
                     # train classifier on the joint under null
                     _, _, trained_clfs_null_lc2st = t_stats_lc2st(
@@ -994,6 +1055,7 @@ def compute_test_results_npe_one_run(
                         eval=False,
                         **kwargs_lc2st,
                     )
+                    t_stats_null = {n_obs: None for n_obs in observation_dict.keys()}
                 else:
                     trained_clfs_null_lc2st = None
 
@@ -1129,7 +1191,28 @@ def compute_test_results_npe_one_run(
                     train_runtime[m], result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
                 )
 
-    return results_dict, train_runtime
+        for t_stat_name in test_stat_names:
+            if m == "lhpd" and t_stat_name != "mse":
+                continue
+            for num_obs in observation_dict.keys():
+                t_stats_null_dict[m][num_obs][t_stat_name] = results_dict[m][
+                    "t_stats_null"
+                ][t_stat_name][num_obs - 1]
+
+        if save_results:
+            t_stats_null_path = task_path / f"npe_{n_train}" / "t_stats_null"
+            if not os.path.exists(t_stats_null_path):
+                os.makedirs(t_stats_null_path)
+            torch.save(
+                t_stats_null_dict[m],
+                t_stats_null_path
+                / f"t_stats_null_{m}_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
+            )
+
+    if return_t_stats_null:
+        return results_dict, train_runtime, t_stats_null_dict
+    else:
+        return results_dict, train_runtime
 
 
 if __name__ == "__main__":

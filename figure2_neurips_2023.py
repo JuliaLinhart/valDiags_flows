@@ -371,7 +371,7 @@ if args.power_ncal:
                     p_values_dict[n_cal][m] = torch.load(
                         result_path
                         / f"n_runs_{n_runs}"
-                        / f"p_values_obs_per_run_{m}_n_runs_{n_runs}_n_cal{n_cal}.pkl",
+                        / f"p_values_obs_per_run_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
                     )
                 if compute_fpr:
                     type_I_error_dict[n_cal][m] = torch.load(
@@ -407,7 +407,9 @@ if args.power_ncal:
                 task_path=task_path,
                 load_eval_data=True,
                 result_path=result_path,
-                n_run_load_results=100,
+                t_stats_null_path=task_path / "t_stats_null" / eval_params,
+                results_n_train_path=Path(f"results") / test_params / eval_params,
+                n_run_load_results=0,
                 # save_every_n_runs=10,
             )
             emp_power_dict[n_cal] = emp_power

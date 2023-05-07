@@ -1,4 +1,5 @@
 import os
+import copy
 
 import torch
 import numpy as np
@@ -206,7 +207,7 @@ def compute_emp_power_l_c2st(
     task,
     n_train,
     observation_dict,
-    n_cal,
+    n_cal_list,
     n_eval,
     kwargs_c2st,
     kwargs_lc2st,
@@ -257,82 +258,63 @@ def compute_emp_power_l_c2st(
             The dict values are lists of length len(num_observation_list) of empirical power values.
     """
     # ==== precompute test statistics under null hypothesis ====
-    # generate data for 10000 samples
-    data_samples = generate_data_one_run(
-        n_cal=10000,
-        n_eval=n_eval,
-        task=task,
-        observation_dict=observation_dict,
-        n_train_list=[n_train],
-        task_path=task_path,
-        save_data=True,
-        load_cal_data=True,
-        load_eval_data=True,
-    )
-    # reduce number of calibration samples to n_cal
-    data_samples["base_dist"]["cal"] = data_samples["base_dist"]["cal"][:n_cal]
-    data_samples["ref_posterior"]["cal"] = {
-        k: v[:n_cal] for k, v in data_samples["ref_posterior"]["cal"].items()
-    }
-    data_samples["npe_obs"]["cal"][n_train] = {
-        k: v[:n_cal] for k, v in data_samples["npe_obs"]["cal"][n_train].items()
-    }
-    data_samples["ref_inv_transform"]["cal"][n_train] = {
-        k: v[:n_cal]
-        for k, v in data_samples["ref_inv_transform"]["cal"][n_train].items()
-    }
-    data_samples["joint_cal"]["x"] = data_samples["joint_cal"]["x"][:n_cal]
-    data_samples["joint_cal"]["theta"] = data_samples["joint_cal"]["theta"][:n_cal]
-    data_samples["npe_x_cal"][n_train] = data_samples["npe_x_cal"][n_train][:n_cal]
-    data_samples["inv_transform_theta_cal"][n_train] = data_samples[
-        "inv_transform_theta_cal"
-    ][n_train][:n_cal]
 
-    # compute test statistics under null hypothesis...
-    t_stats_null_dict = {
-        m: None for m in ["c2st", "lc2st", "lc2st_nf", "lhpd", "lc2st_nf_perm"]
-    }
-    # ... for methods independent of n_train
-    for m, metrics in zip(["lc2st_nf", "lhpd"], [test_stat_names, ["mse"]]):
-        if m in methods:
-            if m == "lc2st_nf":
-                kwargs_lc2st_temp = kwargs_lc2st
-                kwargs_lhpd_temp = {}
-            else:
-                kwargs_lc2st_temp = {}
-                kwargs_lhpd_temp = kwargs_lhpd
+    # initialize dict of precomputed test statistics under null hypothesis
+    all_methods = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm", "lhpd"]
+    t_stats_null_dict = {n_cal: {m: None for m in all_methods} for n_cal in n_cal_list}
 
-            x_cal = data_samples["joint_cal"]["x"]
-            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-            t_stats_null_dict[m] = precompute_t_stats_null(
-                n_cal=n_cal,
-                n_eval=n_eval,
-                dim_theta=dim_theta,
-                n_trials_null=n_trials_null_precompute,  # high number of trials as they can be computed once and then be used for any estimator
-                kwargs_lc2st=kwargs_lc2st_temp,
-                kwargs_lhpd=kwargs_lhpd_temp,
-                x_cal=x_cal,
-                observation_dict=observation_dict,
-                methods=[m],
-                metrics=metrics,
-                t_stats_null_path=t_stats_null_path,
-                save_results=True,
-                load_results=True,
-                # args only for c2st
-                kwargs_c2st=None,
-            )[m]
+    # pre-compute test statistics under null hypothesis for c2st:
+    # independent of x_cal so it's possible to compute them once and use them for all test runs
+    if "c2st" in methods:
+        # generate data for 10000 samples
+        data_samples = generate_data_one_run(
+            n_cal=max(n_cal_list),
+            n_eval=n_eval,
+            task=task,
+            observation_dict=observation_dict,
+            n_train_list=[n_train],
+            task_path=task_path,
+            save_data=True,
+            load_cal_data=True,
+            load_eval_data=True,
+        )
+        for n_cal in n_cal_list:
+            # reduce number of calibration samples to n_cal
+            data_samples_n = copy.deepcopy(data_samples)
+            data_samples_n["base_dist"]["cal"] = data_samples_n["base_dist"]["cal"][
+                :n_cal
+            ]
+            data_samples_n["ref_posterior"]["cal"] = {
+                k: v[:n_cal] for k, v in data_samples_n["ref_posterior"]["cal"].items()
+            }
+            data_samples_n["npe_obs"]["cal"][n_train] = {
+                k: v[:n_cal]
+                for k, v in data_samples_n["npe_obs"]["cal"][n_train].items()
+            }
+            data_samples_n["ref_inv_transform"]["cal"][n_train] = {
+                k: v[:n_cal]
+                for k, v in data_samples_n["ref_inv_transform"]["cal"][n_train].items()
+            }
+            data_samples_n["joint_cal"]["x"] = data_samples_n["joint_cal"]["x"][:n_cal]
+            data_samples_n["joint_cal"]["theta"] = data_samples_n["joint_cal"]["theta"][
+                :n_cal
+            ]
+            data_samples_n["npe_x_cal"][n_train] = data_samples_n["npe_x_cal"][n_train][
+                :n_cal
+            ]
+            data_samples_n["inv_transform_theta_cal"][n_train] = data_samples_n[
+                "inv_transform_theta_cal"
+            ][n_train][:n_cal]
 
-    # ... for methods dependent on n_train
-    for m in ["c2st", "lc2st", "lc2st_nf_perm"]:
-        if m in methods:
+            # compute test statistics for c2st-H_0
             print()
             print(
-                f"Pre-compute test statistics for {m}-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
+                f"Pre-compute test statistics for c2st-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
             )
             print()
             _, _, t_stats_null = compute_test_results_npe_one_run(
                 alpha=alpha,
-                data_samples=data_samples,
+                data_samples=data_samples_n,
                 n_train=n_train,
                 observation_dict=observation_dict,
                 kwargs_c2st=kwargs_c2st,
@@ -342,76 +324,83 @@ def compute_emp_power_l_c2st(
                 t_stats_null_lc2st_nf=None,
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf,
                 t_stats_null_lhpd=None,
-                t_stats_null_dict_npe=t_stats_null_dict,
+                t_stats_null_dict_npe=t_stats_null_dict[n_cal],
                 test_stat_names=test_stat_names,
-                methods=[m],
+                methods=["c2st"],
                 compute_under_null=False,
                 task_path=task_path,
                 results_n_train_path=results_n_train_path,
                 save_results=True,
                 return_t_stats_null=True,
             )
-            t_stats_null_dict[m] = t_stats_null[m]
+            t_stats_null_dict[n_cal]["c2st"] = t_stats_null["c2st"]
 
     # initialize dict of p-values
     emp_power = {}
     type_I_error = {}
     p_values = {}
     p_values_h0 = {}
-    for result_dict, p_values_dict, name, name_p, compute in zip(
-        [emp_power, type_I_error],
-        [p_values, p_values_h0],
-        ["emp_power", "type_I_error"],
-        ["p_values", "p_values_h0_"],
-        [compute_emp_power, compute_type_I_error],
-    ):
-        try:
-            if not compute:
-                raise FileNotFoundError
-            for method in methods:
-                # load result if it exists
-                result_dict[method] = torch.load(
-                    result_path
-                    / f"n_runs_{n_run_load_results}"
-                    / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
-                )
-                p_values_dict[method] = torch.load(
-                    result_path
-                    / f"n_runs_{n_run_load_results}"
-                    / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
-                )
-            start_run = n_run_load_results + 1
-            print(f"Loaded {name} results from run {n_run_load_results} ...")
-        except FileNotFoundError:
-            start_run = 1
-            for method in methods:
-                result_dict[method] = dict(
-                    zip(
-                        test_stat_names,
-                        [np.zeros(len(observation_dict)) for _ in test_stat_names],
+
+    for n_cal in n_cal_list:
+        emp_power[n_cal], p_values[n_cal] = {}, {}
+        type_I_error[n_cal], p_values_h0[n_cal] = {}, {}
+
+        for result_dict, p_values_dict, name, name_p, compute in zip(
+            [emp_power, type_I_error],
+            [p_values, p_values_h0],
+            ["emp_power", "type_I_error"],
+            ["p_values", "p_values_h0_"],
+            [compute_emp_power, compute_type_I_error],
+        ):
+            try:
+                if not compute:
+                    raise FileNotFoundError
+                for method in methods:
+                    # load result if it exists
+                    result_dict[n_cal][method] = torch.load(
+                        result_path
+                        / f"n_runs_{n_run_load_results}"
+                        / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
                     )
+                    p_values_dict[n_cal][method] = torch.load(
+                        result_path
+                        / f"n_runs_{n_run_load_results}"
+                        / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+                    )
+                start_run = n_run_load_results + 1
+                print(
+                    f"Loaded {name} results for N_cal = {n_cal} from run {n_run_load_results} ..."
                 )
-                p_values_dict[method] = dict(
-                    zip(
-                        test_stat_names,
-                        [
-                            dict(
-                                zip(
-                                    observation_dict.keys(),
-                                    [[] for _ in observation_dict.keys()],
+            except FileNotFoundError:
+                start_run = 1
+                for method in methods:
+                    result_dict[n_cal][method] = dict(
+                        zip(
+                            test_stat_names,
+                            [np.zeros(len(observation_dict)) for _ in test_stat_names],
+                        )
+                    )
+                    p_values_dict[n_cal][method] = dict(
+                        zip(
+                            test_stat_names,
+                            [
+                                dict(
+                                    zip(
+                                        observation_dict.keys(),
+                                        [[] for _ in observation_dict.keys()],
+                                    )
                                 )
-                            )
-                            for _ in test_stat_names
-                        ],
+                                for _ in test_stat_names
+                            ],
+                        )
                     )
-                )
 
     for n in range(start_run, n_runs + 1):
         print()
-        print("====> RUN: ", n, "/", n_runs, f", N_cal = {n_cal} <====")
+        print("====> RUN: ", n, "/", n_runs, f", N_cal = {n_cal_list} <====")
         # GENERATE DATA
         data_samples = generate_data_one_run(
-            n_cal=n_cal,
+            n_cal=max(n_cal_list),
             n_eval=n_eval,
             task=task,
             observation_dict=observation_dict,
@@ -423,166 +412,236 @@ def compute_emp_power_l_c2st(
             seed=n,  # different seed for every run (fixed for reproducibility)
         )
 
-        # Empirical Power = True Positive Rate (TPR)
-        # count rejection of H0 under H1 (p_value <= alpha) for every run
-        # and for every observation: [reject(obs1), reject(obs2), ...]
-        if compute_emp_power:
+        for n_cal in n_cal_list:
             print()
-            print("Computing empirical power...")
-
-            H1_results_dict, _ = compute_test_results_npe_one_run(
-                alpha=alpha,
-                data_samples=data_samples,
-                n_train=n_train,
-                observation_dict=observation_dict,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
-                kwargs_lhpd=kwargs_lhpd,
-                n_trials_null=n_trials_null,
-                t_stats_null_lc2st_nf=t_stats_null_dict["lc2st_nf"],
-                t_stats_null_c2st_nf=t_stats_null_c2st_nf,
-                t_stats_null_lhpd=t_stats_null_dict["lhpd"],
-                t_stats_null_dict_npe=t_stats_null_dict,
-                test_stat_names=test_stat_names,
-                methods=methods,
-                compute_under_null=False,
-                task_path=task_path,
-                results_n_train_path="",
-                save_results=False,
-                seed=n,  # different seed for every run (fixed for reproducibility)
-            )
-            for m in methods:
-                for t_stat_name in test_stat_names:
-                    if m == "lhpd" and t_stat_name != "mse":
-                        continue
-                    p_value_t = H1_results_dict[m]["p_value"][t_stat_name]
-                    # increment list of average rejections of H0 under H1
-                    emp_power[m][t_stat_name] += (
-                        (np.array(p_value_t) <= alpha) * 1 / n_runs
-                    )
-                    # increment p_values for every observation
-                    for num_obs in observation_dict.keys():
-                        p_values[m][t_stat_name][num_obs].append(p_value_t[num_obs - 1])
-
-                if n % save_every_n_runs == 0:
-                    # set up path to save results
-                    result_path_n = result_path / f"n_runs_{n}"
-                    if not os.path.exists(result_path_n):
-                        os.makedirs(result_path_n)
-
-                    torch.save(
-                        emp_power[m],
-                        result_path_n / f"emp_power_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
-                    )
-                    torch.save(
-                        p_values[m],
-                        result_path_n
-                        / f"p_values_obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
-                    )
-
-                    result_path_previous = result_path / f"n_runs_{n-save_every_n_runs}"
-                    if os.path.exists(result_path_previous):
-                        os.remove(
-                            result_path_previous
-                            / f"emp_power_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
-                        )
-                        os.remove(
-                            result_path_previous
-                            / f"p_values_obs_per_run_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
-                        )
-
-        else:
-            emp_power, p_values = None, None
-
-        # Type I error = False Positive Rate (FPR)
-        # count rejection of H0 under H0 (p_value <= alpha) for every run
-        # and for every observation: [reject(obs1), reject(obs2), ...]
-        if compute_type_I_error:
+            print("================")
+            print("N_cal = ", n_cal)
+            print("================")
             print()
-            print("Computing Type I error...")
-            print()
+            # reduce number of calibration samples to n_cal
+            data_samples_n = copy.deepcopy(data_samples)
+            data_samples_n["base_dist"]["cal"] = data_samples_n["base_dist"]["cal"][
+                :n_cal
+            ]
+            data_samples_n["ref_posterior"]["cal"] = {
+                k: v[:n_cal] for k, v in data_samples_n["ref_posterior"]["cal"].items()
+            }
+            data_samples_n["npe_obs"]["cal"][n_train] = {
+                k: v[:n_cal]
+                for k, v in data_samples_n["npe_obs"]["cal"][n_train].items()
+            }
+            data_samples_n["ref_inv_transform"]["cal"][n_train] = {
+                k: v[:n_cal]
+                for k, v in data_samples_n["ref_inv_transform"]["cal"][n_train].items()
+            }
+            data_samples_n["joint_cal"]["x"] = data_samples_n["joint_cal"]["x"][:n_cal]
+            data_samples_n["joint_cal"]["theta"] = data_samples_n["joint_cal"]["theta"][
+                :n_cal
+            ]
+            data_samples_n["npe_x_cal"][n_train] = data_samples_n["npe_x_cal"][n_train][
+                :n_cal
+            ]
+            data_samples_n["inv_transform_theta_cal"][n_train] = data_samples_n[
+                "inv_transform_theta_cal"
+            ][n_train][:n_cal]
 
-            # fixed distribution for null hypothesis (base distribution)
-            from scipy.stats import multivariate_normal as mvn
+            # compute test statistics for methods dependent of x_cal
+            for m, metrics in zip(["lc2st_nf", "lhpd"], [test_stat_names, ["mse"]]):
+                if m in methods:
+                    if m == "lc2st_nf":
+                        kwargs_lc2st_temp = kwargs_lc2st
+                        kwargs_lhpd_temp = {}
+                    else:
+                        kwargs_lc2st_temp = {}
+                        kwargs_lhpd_temp = kwargs_lhpd
 
-            # generate data for L-C2ST-NF (Q_h0 = P_h0 = N(0,1))
-            base_dist_samples_null = mvn(
-                mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta)
-            ).rvs(
-                n_cal, random_state=n + 1
-            )  # not same random state as for other data generation (we dont want same data for P and Q)
+                    x_cal = data_samples_n["joint_cal"]["x"]
+                    dim_theta = data_samples_n["joint_cal"]["theta"].shape[-1]
+                    t_stats_null_dict[n_cal][m] = precompute_t_stats_null(
+                        n_cal=n_cal,
+                        n_eval=n_eval,
+                        dim_theta=dim_theta,
+                        n_trials_null=n_trials_null_precompute,  # high number of trials as they can be computed once and then be used for any estimator
+                        kwargs_lc2st=kwargs_lc2st_temp,
+                        kwargs_lhpd=kwargs_lhpd_temp,
+                        x_cal=x_cal,
+                        observation_dict=observation_dict,
+                        methods=[m],
+                        metrics=metrics,
+                        t_stats_null_path=t_stats_null_path,
+                        save_results=False,
+                        load_results=False,
+                        # args only for c2st
+                        kwargs_c2st=None,
+                    )[m]
 
-            # compatible with torch data
-            base_dist_samples_null = torch.FloatTensor(base_dist_samples_null)
+            # Empirical Power = True Positive Rate (TPR)
+            # count rejection of H0 under H1 (p_value <= alpha) for every run
+            # and for every observation: [reject(obs1), reject(obs2), ...]
+            if compute_emp_power:
+                print()
+                print("Computing empirical power...")
 
-            H0_results_dict, _ = compute_test_results_npe_one_run(
-                alpha=alpha,
-                data_samples=data_samples,
-                n_train=n_train,
-                observation_dict=observation_dict,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
-                kwargs_lhpd=kwargs_lhpd,
-                n_trials_null=n_trials_null,
-                t_stats_null_lc2st_nf=t_stats_null_dict["lc2st_nf"],
-                t_stats_null_c2st_nf=t_stats_null_c2st_nf,
-                t_stats_null_lhpd=t_stats_null_dict["lhpd"],
-                t_stats_null_dict_npe=t_stats_null_dict,
-                test_stat_names=test_stat_names,
-                methods=methods,
-                compute_under_null=True,
-                base_dist_samples_null=base_dist_samples_null,
-                task_path=task_path,
-                results_n_train_path="",
-                save_results=False,
-                seed=n,  # different seed for every run (fixed for reproducibility)
-            )
-            for m in methods:
-                for t_stat_name in test_stat_names:
-                    if m == "lhpd" and t_stat_name != "mse":
-                        continue
-
-                    p_value_t = H0_results_dict[m]["p_value"][t_stat_name]
-                    # increment list of average rejections of H0 under H0
-                    type_I_error[m][t_stat_name] += (
-                        (np.array(p_value_t) <= alpha) * 1 / n_runs
-                    )
-                    # increment p_value for every observation
-                    for num_obs in observation_dict.keys():
-                        p_values_h0[m][t_stat_name][num_obs].append(
-                            p_value_t[num_obs - 1]
+                H1_results_dict, _ = compute_test_results_npe_one_run(
+                    alpha=alpha,
+                    data_samples=data_samples_n,
+                    n_train=n_train,
+                    observation_dict=observation_dict,
+                    kwargs_c2st=kwargs_c2st,
+                    kwargs_lc2st=kwargs_lc2st,
+                    kwargs_lhpd=kwargs_lhpd,
+                    n_trials_null=n_trials_null,
+                    t_stats_null_lc2st_nf=t_stats_null_dict[n_cal]["lc2st_nf"],
+                    t_stats_null_c2st_nf=t_stats_null_c2st_nf,
+                    t_stats_null_lhpd=t_stats_null_dict[n_cal]["lhpd"],
+                    t_stats_null_dict_npe=t_stats_null_dict[n_cal],
+                    test_stat_names=test_stat_names,
+                    methods=methods,
+                    compute_under_null=False,
+                    task_path=task_path,
+                    results_n_train_path="",
+                    save_results=False,
+                    seed=n,  # different seed for every run (fixed for reproducibility)
+                )
+                for m in methods:
+                    for t_stat_name in test_stat_names:
+                        if m == "lhpd" and t_stat_name != "mse":
+                            continue
+                        p_value_t = H1_results_dict[m]["p_value"][t_stat_name]
+                        # increment list of average rejections of H0 under H1
+                        emp_power[n_cal][m][t_stat_name] += (
+                            (np.array(p_value_t) <= alpha) * 1 / n_runs
                         )
-                if n % save_every_n_runs == 0:
-                    # set up path to save results
-                    result_path_n = result_path / f"n_runs_{n}"
-                    if not os.path.exists(result_path_n):
-                        os.makedirs(result_path_n)
+                        # increment p_values for every observation
+                        for num_obs in observation_dict.keys():
+                            p_values[n_cal][m][t_stat_name][num_obs].append(
+                                p_value_t[num_obs - 1]
+                            )
 
-                    torch.save(
-                        type_I_error[m],
-                        result_path_n
-                        / f"type_I_error_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
-                    )
-                    torch.save(
-                        p_values_h0[m],
-                        result_path_n
-                        / f"p_values_h0__obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
-                    )
+                    if n % save_every_n_runs == 0:
+                        # set up path to save results
+                        result_path_n = result_path / f"n_runs_{n}"
+                        if not os.path.exists(result_path_n):
+                            os.makedirs(result_path_n)
 
-                    result_path_previous = result_path / f"n_runs_{n-save_every_n_runs}"
-                    if os.path.exists(result_path_previous):
-                        os.remove(
-                            result_path_previous
-                            / f"type_I_error_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                        torch.save(
+                            emp_power[n_cal][m],
+                            result_path_n
+                            / f"emp_power_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                         )
-                        os.remove(
-                            result_path_previous
-                            / f"p_values_h0__obs_per_run_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                        torch.save(
+                            p_values[n_cal][m],
+                            result_path_n
+                            / f"p_values_obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                         )
 
-        else:
-            type_I_error = None
-            p_values_h0 = None
+                        result_path_previous = (
+                            result_path / f"n_runs_{n-save_every_n_runs}"
+                        )
+                        if os.path.exists(result_path_previous):
+                            os.remove(
+                                result_path_previous
+                                / f"emp_power_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                            )
+                            os.remove(
+                                result_path_previous
+                                / f"p_values_obs_per_run_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                            )
+
+            else:
+                emp_power[n_cal], p_values[n_cal] = None, None
+
+            # Type I error = False Positive Rate (FPR)
+            # count rejection of H0 under H0 (p_value <= alpha) for every run
+            # and for every observation: [reject(obs1), reject(obs2), ...]
+            if compute_type_I_error:
+                print()
+                print("Computing Type I error...")
+                print()
+
+                # fixed distribution for null hypothesis (base distribution)
+                from scipy.stats import multivariate_normal as mvn
+
+                # generate data for L-C2ST-NF (Q_h0 = P_h0 = N(0,1))
+                base_dist_samples_null = mvn(
+                    mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta)
+                ).rvs(
+                    n_cal, random_state=n + 1
+                )  # not same random state as for other data generation (we dont want same data for P and Q)
+
+                # compatible with torch data
+                base_dist_samples_null = torch.FloatTensor(base_dist_samples_null)
+
+                H0_results_dict, _ = compute_test_results_npe_one_run(
+                    alpha=alpha,
+                    data_samples=data_samples_n,
+                    n_train=n_train,
+                    observation_dict=observation_dict,
+                    kwargs_c2st=kwargs_c2st,
+                    kwargs_lc2st=kwargs_lc2st,
+                    kwargs_lhpd=kwargs_lhpd,
+                    n_trials_null=n_trials_null,
+                    t_stats_null_lc2st_nf=t_stats_null_dict[n_cal]["lc2st_nf"],
+                    t_stats_null_c2st_nf=t_stats_null_c2st_nf,
+                    t_stats_null_lhpd=t_stats_null_dict[n_cal]["lhpd"],
+                    t_stats_null_dict_npe=t_stats_null_dict[n_cal],
+                    test_stat_names=test_stat_names,
+                    methods=methods,
+                    compute_under_null=True,
+                    base_dist_samples_null=base_dist_samples_null,
+                    task_path=task_path,
+                    results_n_train_path="",
+                    save_results=False,
+                    seed=n,  # different seed for every run (fixed for reproducibility)
+                )
+                for m in methods:
+                    for t_stat_name in test_stat_names:
+                        if m == "lhpd" and t_stat_name != "mse":
+                            continue
+
+                        p_value_t = H0_results_dict[m]["p_value"][t_stat_name]
+                        # increment list of average rejections of H0 under H0
+                        type_I_error[n_cal][m][t_stat_name] += (
+                            (np.array(p_value_t) <= alpha) * 1 / n_runs
+                        )
+                        # increment p_value for every observation
+                        for num_obs in observation_dict.keys():
+                            p_values_h0[n_cal][m][t_stat_name][num_obs].append(
+                                p_value_t[num_obs - 1]
+                            )
+                    if n % save_every_n_runs == 0:
+                        # set up path to save results
+                        result_path_n = result_path / f"n_runs_{n}"
+                        if not os.path.exists(result_path_n):
+                            os.makedirs(result_path_n)
+
+                        torch.save(
+                            type_I_error[n_cal][m],
+                            result_path_n
+                            / f"type_I_error_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                        )
+                        torch.save(
+                            p_values_h0[n_cal][m],
+                            result_path_n
+                            / f"p_values_h0__obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
+                        )
+
+                        result_path_previous = (
+                            result_path / f"n_runs_{n-save_every_n_runs}"
+                        )
+                        if os.path.exists(result_path_previous):
+                            os.remove(
+                                result_path_previous
+                                / f"type_I_error_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                            )
+                            os.remove(
+                                result_path_previous
+                                / f"p_values_h0__obs_per_run_{m}_n_runs_{n-save_every_n_runs}_n_cal_{n_cal}.pkl"
+                            )
+
+            else:
+                type_I_error[n_cal] = None
+                p_values_h0[n_cal] = None
 
     return emp_power, type_I_error, p_values, p_values_h0
 

@@ -344,7 +344,7 @@ if args.power_ncal:
     print(f"... for N_train = {n_train}")
     print()
 
-    methods = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm"]  # , "lhpd"]  # "c2st_nf",
+    methods = ["lc2st", "lc2st_nf", "lc2st_nf_perm"]  # , "lhpd"]  # "c2st_nf",
     n_runs = 100
 
     result_path = task_path / f"npe_{n_train}" / "results" / test_params / eval_params
@@ -357,10 +357,10 @@ if args.power_ncal:
     compute_tpr = True
     compute_fpr = True
 
-    for n_cal in n_cal_list:
-        emp_power_dict[n_cal], type_I_error_dict[n_cal] = {}, {}
-        p_values_dict[n_cal], p_values_h0_dict[n_cal] = {}, {}
-        try:
+    try:
+        for n_cal in n_cal_list:
+            emp_power_dict[n_cal], type_I_error_dict[n_cal] = {}, {}
+            p_values_dict[n_cal], p_values_h0_dict[n_cal] = {}, {}
             for m in methods:
                 if compute_tpr:
                     emp_power_dict[n_cal][m] = torch.load(
@@ -382,40 +382,41 @@ if args.power_ncal:
                     p_values_h0_dict[n_cal][m] = torch.load(
                         result_path
                         / f"n_runs_{n_runs}"
-                        / f"p_values_h0__obs_per_run_{m}_n_runs_{n_runs}_n_cal{n_cal}.pkl",
+                        / f"p_values_h0__obs_per_run_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
                     )
             print(f"Loaded Empirical Results for n_cal = {n_cal} ...")
-        except FileNotFoundError:
-            emp_power, type_I_error, p_values, p_values_h0 = compute_emp_power_l_c2st(
-                n_runs=n_runs,
-                alpha=ALPHA,
-                task=task,
-                n_train=n_train,
-                observation_dict=observation_dict,
-                n_cal=n_cal,
-                n_eval=n_eval,
-                n_trials_null=args.n_trials_null,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
-                kwargs_lhpd=kwargs_lhpd,
-                t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
-                n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
-                methods=methods,
-                test_stat_names=ALL_METRICS,
-                compute_emp_power=compute_tpr,
-                compute_type_I_error=compute_fpr,
-                task_path=task_path,
-                load_eval_data=True,
-                result_path=result_path,
-                t_stats_null_path=task_path / "t_stats_null" / eval_params,
-                results_n_train_path=Path(f"results") / test_params / eval_params,
-                n_run_load_results=0,
-                # save_every_n_runs=10,
-            )
-            emp_power_dict[n_cal] = emp_power
-            type_I_error_dict[n_cal] = type_I_error
-            p_values_dict[n_cal] = p_values
-            p_values_h0_dict[n_cal] = p_values_h0
+    except FileNotFoundError:
+        (
+            emp_power_dict,
+            type_I_error_dict,
+            p_values_dict,
+            p_values_h0_dict,
+        ) = compute_emp_power_l_c2st(
+            n_runs=n_runs,
+            alpha=ALPHA,
+            task=task,
+            n_train=n_train,
+            observation_dict=observation_dict,
+            n_cal_list=n_cal_list,
+            n_eval=n_eval,
+            n_trials_null=args.n_trials_null,
+            kwargs_c2st=kwargs_c2st,
+            kwargs_lc2st=kwargs_lc2st,
+            kwargs_lhpd=kwargs_lhpd,
+            t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
+            n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
+            methods=methods,
+            test_stat_names=ALL_METRICS,
+            compute_emp_power=compute_tpr,
+            compute_type_I_error=compute_fpr,
+            task_path=task_path,
+            load_eval_data=True,
+            result_path=result_path,
+            t_stats_null_path=task_path / "t_stats_null" / eval_params,
+            results_n_train_path=Path(f"results") / test_params / eval_params,
+            n_run_load_results=0,
+            # save_every_n_runs=10,
+        )
 
     emp_power_mean_dict = {
         m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods

@@ -14,6 +14,7 @@ import pandas as pd
 import torch
 import torch.distributions as D
 from matplotlib.lines import Line2D
+from matplotlib.colors import Normalize
 
 from scipy.stats import hmean, uniform
 
@@ -465,10 +466,17 @@ def compare_pp_plots_regression(
 # PP-plot of clasifier predicted class probabilities
 
 
-def pp_plot_c2st(probas, probas_null, labels, colors):
+def pp_plot_c2st(probas, probas_null, labels, colors, ax=None):
+    if ax == None:
+        ax = plt.gca()
     alphas = np.linspace(0, 1, 100)
     pp_vals_dirac = PP_vals([0.5] * len(probas), alphas)
-    plt.plot(alphas, pp_vals_dirac, "--", color="black")
+    ax.plot(
+        alphas,
+        pp_vals_dirac,
+        "--",
+        color="black",
+    )
 
     pp_vals_null = {}
     for t in range(len(probas_null)):
@@ -476,7 +484,7 @@ def pp_plot_c2st(probas, probas_null, labels, colors):
 
     low_null = pd.DataFrame(pp_vals_null).quantile(0.05 / 2, axis=1)
     up_null = pd.DataFrame(pp_vals_null).quantile(1 - 0.05 / 2, axis=1)
-    plt.fill_between(
+    ax.fill_between(
         alphas,
         low_null,
         up_null,
@@ -487,125 +495,42 @@ def pp_plot_c2st(probas, probas_null, labels, colors):
 
     for p, l, c in zip(probas, labels, colors):
         pp_vals = pd.Series(PP_vals(p, alphas))
-        plt.plot(alphas, pp_vals, label=l, color=c)
-
-    plt.legend()
+        ax.plot(alphas, pp_vals, label=l, color=c)
+    return ax
 
 
 # Interpretability plots for C2ST: regions of high/low predicted class probabilities
 
 
-def z_space_with_proba_intensity(
-    probas, probas_null, P_eval, theta_space=None, dim=1, thresholding=False
-):
-    df = pd.DataFrame({"probas": probas})
-
-    # define low and high thresholds w.r.t to null (95% confidence region)
-    low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
-    high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
-    # high/low proba regions for bad NF
-    df["intensity"] = ["uncertain"] * len(df)
-    df.loc[df["probas"] > high, "intensity"] = (
-        r"high ($p \geq$ " + f"{np.round(high,2)})"
-    )
-    df.loc[df["probas"] < low, "intensity"] = r"low ($p \leq$ " + f"{np.round(low,2)})"
-
-    if dim == 1:
-        from matplotlib import cm
-
-        df["z"] = P_eval[:, 0]
-        values = "z"
-        xlabel = r"$z$"
-        x = df.z
-        if theta_space is not None:
-            df["theta"] = theta_space
-            values = "theta"
-            xlabel = r"$\theta$"
-            x = df.theta
-
-        if thresholding:
-            df.pivot(columns="intensity", values=values).plot.hist(
-                bins=50, color=["red", "blue", "grey"], alpha=0.3
-            )
-        else:
-            _, bins, patches = plt.hist(x, 50, density=True, color="green")
-            bins[-1] = 10
-            df["bins"] = np.select([x <= i for i in bins[1:]], list(range(50)), 1000)
-
-            weights = df.groupby(["bins"]).mean().probas
-            id = list(set(range(50)) - set(df.bins))
-            patches = np.delete(patches, id)
-
-            cmap = plt.cm.get_cmap("bwr")
-            for c, p in zip(weights, patches):
-                plt.setp(p, "facecolor", cmap(c))
-            plt.colorbar(
-                cm.ScalarMappable(cmap=cmap),
-                label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$",
-            )
-        plt.xlabel(xlabel)
-
-    elif dim == 2:
-        df["z_1"] = P_eval[:, 0]
-        df["z_2"] = P_eval[:, 1]
-        x, y = df.z_1, df.z_2
-        xlabel = r"$Z_1$"
-        ylabel = r"$Z_2$"
-        if theta_space is not None:
-            df["theta_1"] = theta_space[:, 0]
-            df["theta_2"] = theta_space[:, 1]
-            x, y = df.theta_1, df.theta_2
-            xlabel = r"$\Theta_1 = T_{\phi,1}(Z; x_0)$"
-            ylabel = r"$\Theta_2 = T_{\phi,2}(Z; x_0)$"
-        if not thresholding:
-            plt.scatter(x, y, c=df.probas, cmap="bwr", alpha=0.3)
-            plt.colorbar(label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$")
-        else:
-            cdict = {
-                "uncertain": "grey",
-                r"high ($p \geq$ " + f"{np.round(high,2)})": "red",
-                r"low ($p \leq$ " + f"{np.round(low,2)})": "blue",
-            }
-            groups = df.groupby("intensity")
-
-            _, ax = plt.subplots()
-            for name, group in groups:
-                x = group.z_1
-                y = group.z_2
-                if theta_space is not None:
-                    x = group.theta_1
-                    y = group.theta_2
-                ax.plot(
-                    x,
-                    y,
-                    marker="o",
-                    linestyle="",
-                    alpha=0.3,
-                    label=name,
-                    color=cdict[name],
-                )
-            plt.legend(title=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$")
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-
-    else:
-        print("Not implemented.")
-
-
 def eval_space_with_proba_intensity(
-    probas, probas_null, P_eval, dim=1, z_space=True, thresholding=False
+    probas,
+    probas_null,
+    P_eval,
+    dim=1,
+    z_space=True,
+    thresholding=False,
+    n_bins=50,
+    ax=None,
+    show_colorbar=True,
+    scatter=True,
 ):
+    if ax is None:
+        ax = plt.gca()
     df = pd.DataFrame({"probas": probas})
 
     # define low and high thresholds w.r.t to null (95% confidence region)
     low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
     high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
-    # high/low proba regions for bad NF
-    df["intensity"] = ["uncertain"] * len(df)
-    df.loc[df["probas"] > high, "intensity"] = (
-        r"high ($p \geq$ " + f"{np.round(high,2)})"
-    )
-    df.loc[df["probas"] < low, "intensity"] = r"low ($p \leq$ " + f"{np.round(low,2)})"
+
+    if thresholding:
+        # high/low proba regions
+        df["intensity"] = ["uncertain"] * len(df)
+        df.loc[df["probas"] > high, "intensity"] = (
+            r"high ($p \geq$ " + f"{np.round(high,2)})"
+        )
+        df.loc[df["probas"] < low, "intensity"] = (
+            r"low ($p \leq$ " + f"{np.round(low,2)})"
+        )
 
     if dim == 1:
         from matplotlib import cm
@@ -614,29 +539,34 @@ def eval_space_with_proba_intensity(
 
         if thresholding:
             df.pivot(columns="intensity", values="z").plot.hist(
-                bins=50, color=["red", "blue", "grey"], alpha=0.3
+                bins=n_bins, color=["red", "blue", "grey"], alpha=0.3
             )
         else:
-            _, bins, patches = plt.hist(df.z, 50, density=True, color="green")
-            bins[-1] = 10
-            df["bins"] = np.select([x <= i for i in bins[1:]], list(range(50)), 1000)
+            _, bins, patches = ax.hist(df.z, n_bins, density=True, color="green")
+            # bins[-1] = 10
+            df["bins"] = np.select(
+                [df.z <= i for i in bins[1:]], list(range(n_bins))
+            )  # , 1000)
 
             weights = df.groupby(["bins"]).mean().probas
-            id = list(set(range(50)) - set(df.bins))
+            id = list(set(range(n_bins)) - set(df.bins))
             patches = np.delete(patches, id)
 
             cmap = plt.cm.get_cmap("bwr")
+            norm = Normalize(vmin=0, vmax=1)
+
             for c, p in zip(weights, patches):
-                plt.setp(p, "facecolor", cmap(c))
-            plt.colorbar(
-                cm.ScalarMappable(cmap=cmap),
-                label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$",
-            )
+                p.set_facecolor(cmap(c))
+            if show_colorbar:
+                ax.colorbar(
+                    cm.ScalarMappable(cmap=cmap, norm=norm),
+                    label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$",
+                )
         if z_space:
             xlabel = r"$z$"
         else:
             xlabel = r"$\theta$"
-        plt.xlabel(xlabel)
+        # plt.xlabel(xlabel)
 
     elif dim == 2:
         if z_space:
@@ -652,8 +582,31 @@ def eval_space_with_proba_intensity(
         df["z_2"] = P_eval[:, 1]
 
         if not thresholding:
-            plt.scatter(df.z_1, df.z_2, c=df.probas, cmap="bwr", alpha=0.3)
-            plt.colorbar(label=legend)
+            if scatter:
+                ax.scatter(df.z_1, df.z_2, c=df.probas, cmap="bwr", alpha=0.3)
+            else:
+                # h_prob = np.histogram2d(probas, probas, bins=n_bins)[0]
+                h, x, y, pc = ax.hist2d(df.z_1, df.z_2, bins=n_bins, edgecolor="white")
+                df["bins_x"] = np.select(
+                    [df.z_1 <= i for i in x[1:]], list(range(n_bins))
+                )
+                df["bins_y"] = np.select(
+                    [df.z_2 <= i for i in y[1:]], list(range(n_bins))
+                )
+                prob_mean = df.groupby(["bins_x", "bins_y"]).mean().probas
+                weights = np.zeros((n_bins, n_bins))
+                for i in range(n_bins):
+                    for j in range(n_bins):
+                        try:
+                            weights[i, j] = prob_mean.loc[i].loc[j]
+
+                        except KeyError:
+                            weights[i, j] = 0.5
+
+                norm = Normalize(vmin=0, vmax=1)
+                ax.pcolormesh(x, y, weights.T, cmap="bwr", norm=norm)
+            if show_colorbar:
+                plt.colorbar(label=legend)
         else:
             cdict = {
                 "uncertain": "grey",
@@ -677,8 +630,10 @@ def eval_space_with_proba_intensity(
                 )
             plt.legend(title=legend)
 
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
+        # plt.xlabel(xlabel)
+        # plt.ylabel(ylabel)
 
     else:
         print("Not implemented.")
+
+    return ax

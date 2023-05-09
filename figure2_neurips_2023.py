@@ -424,6 +424,12 @@ if args.power_ncal:
     emp_power_std_dict = {
         m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
     }
+    type_I_error_mean_dict = {
+        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
+    }
+    type_I_error_std_dict = {
+        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
+    }
     for n_cal in n_cal_list:
         for m in methods:
             for t_stat_name in ALL_METRICS:
@@ -432,6 +438,12 @@ if args.power_ncal:
                 )
                 emp_power_std_dict[m][t_stat_name].append(
                     np.std(emp_power_dict[n_cal][m][t_stat_name])
+                )
+                type_I_error_mean_dict[m][t_stat_name].append(
+                    np.mean(type_I_error_dict[n_cal][m][t_stat_name])
+                )
+                type_I_error_std_dict[m][t_stat_name].append(
+                    np.std(type_I_error_dict[n_cal][m][t_stat_name])
                 )
 
     # plot empirical power
@@ -457,5 +469,31 @@ if args.power_ncal:
     plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
     plt.xlabel("n_cal")
     plt.ylabel("Empirical Power")
+    plt.legend()
+    plt.show()
+
+    # plot type I error
+    for m in methods:
+        for t_stat_name in ALL_METRICS:
+            if "lc2st" in m and t_stat_name == "accuracy":
+                continue
+            if not "lc2st" in m and t_stat_name == "div":
+                continue
+            plt.plot(
+                np.arange(len(n_cal_list)),
+                type_I_error_mean_dict[m]["accuracy"],
+                label=m + " " + t_stat_name,
+            )
+            plt.fill_between(
+                np.arange(len(n_cal_list)),
+                np.array(type_I_error_mean_dict[m]["accuracy"])
+                - np.array(type_I_error_std_dict[m]["accuracy"]),
+                np.array(type_I_error_mean_dict[m]["accuracy"])
+                + np.array(type_I_error_std_dict[m]["accuracy"]),
+                alpha=0.2,
+            )
+    plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
+    plt.xlabel("n_cal")
+    plt.ylabel("Type I Error")
     plt.legend()
     plt.show()

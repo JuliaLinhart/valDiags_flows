@@ -331,6 +331,7 @@ def compute_emp_power_l_c2st(
                 task_path=task_path,
                 results_n_train_path=results_n_train_path,
                 save_results=True,
+                load_results=False,
                 return_t_stats_null=True,
             )
             t_stats_null_dict[n_cal]["c2st"] = t_stats_null["c2st"]
@@ -352,48 +353,48 @@ def compute_emp_power_l_c2st(
             ["p_values", "p_values_h0_"],
             [compute_emp_power, compute_type_I_error],
         ):
-            try:
-                if not compute:
-                    raise FileNotFoundError
-                for method in methods:
-                    # load result if it exists
-                    result_dict[n_cal][method] = torch.load(
-                        result_path
-                        / f"n_runs_{n_run_load_results}"
-                        / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
-                    )
-                    p_values_dict[n_cal][method] = torch.load(
-                        result_path
-                        / f"n_runs_{n_run_load_results}"
-                        / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
-                    )
-                start_run = n_run_load_results + 1
-                print(
-                    f"Loaded {name} results for N_cal = {n_cal} from run {n_run_load_results} ..."
+            # try:
+            if not compute:
+                raise FileNotFoundError
+            for method in methods:
+                # load result if it exists
+                result_dict[n_cal][method] = torch.load(
+                    result_path
+                    / f"n_runs_{n_run_load_results}"
+                    / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
                 )
-            except FileNotFoundError:
-                start_run = 1
-                for method in methods:
-                    result_dict[n_cal][method] = dict(
-                        zip(
-                            test_stat_names,
-                            [np.zeros(len(observation_dict)) for _ in test_stat_names],
-                        )
-                    )
-                    p_values_dict[n_cal][method] = dict(
-                        zip(
-                            test_stat_names,
-                            [
-                                dict(
-                                    zip(
-                                        observation_dict.keys(),
-                                        [[] for _ in observation_dict.keys()],
-                                    )
-                                )
-                                for _ in test_stat_names
-                            ],
-                        )
-                    )
+                p_values_dict[n_cal][method] = torch.load(
+                    result_path
+                    / f"n_runs_{n_run_load_results}"
+                    / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+                )
+            start_run = n_run_load_results + 1
+            print(
+                f"Loaded {name} results for N_cal = {n_cal} from run {n_run_load_results} ..."
+            )
+            # except FileNotFoundError:
+            #     start_run = 1
+            #     for method in methods:
+            #         result_dict[n_cal][method] = dict(
+            #             zip(
+            #                 test_stat_names,
+            #                 [np.zeros(len(observation_dict)) for _ in test_stat_names],
+            #             )
+            #         )
+            #         p_values_dict[n_cal][method] = dict(
+            #             zip(
+            #                 test_stat_names,
+            #                 [
+            #                     dict(
+            #                         zip(
+            #                             observation_dict.keys(),
+            #                             [[] for _ in observation_dict.keys()],
+            #                         )
+            #                     )
+            #                     for _ in test_stat_names
+            #                 ],
+            #             )
+            #         )
 
     for n in range(start_run, n_runs + 1):
         print()
@@ -937,6 +938,7 @@ def compute_test_results_npe_one_run(
     base_dist_samples_null=None,
     return_t_stats_null=False,
     save_results=True,
+    load_results=True,
     seed=42,  # fix seed for reproducibility
 ):
     # extract data samples independent from estimator
@@ -967,6 +969,8 @@ def compute_test_results_npe_one_run(
     if save_results and not os.path.exists(result_path):
         os.makedirs(result_path)
 
+    t_stats_null_path = task_path / f"npe_{n_train}" / "t_stats_null"
+
     train_runtime = dict(zip(methods, [0 for _ in methods]))
     results_dict = dict(zip(methods, [{} for _ in methods]))
     t_stats_null_dict = {
@@ -987,12 +991,18 @@ def compute_test_results_npe_one_run(
             )
         )
         try:
-            results_dict[m] = torch.load(
-                result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
-            )
-            if "l" in m:
-                train_runtime[m] = torch.load(
-                    result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
+            if load_results:
+                results_dict[m] = torch.load(
+                    result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
+                )
+                if "l" in m:
+                    train_runtime[m] = torch.load(
+                        result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
+                    )
+            if return_t_stats_null:
+                t_stats_null_dict[m] = torch.load(
+                    t_stats_null_path
+                    / f"t_stats_null_{m}_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
                 )
         except FileNotFoundError:
             if m == "c2st" or m == "c2st_nf":
@@ -1290,23 +1300,22 @@ def compute_test_results_npe_one_run(
                     train_runtime[m], result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
                 )
 
-        for t_stat_name in test_stat_names:
-            if m == "lhpd" and t_stat_name != "mse":
-                continue
-            for num_obs in observation_dict.keys():
-                t_stats_null_dict[m][num_obs][t_stat_name] = results_dict[m][
-                    "t_stats_null"
-                ][t_stat_name][num_obs - 1]
+            for t_stat_name in test_stat_names:
+                if m == "lhpd" and t_stat_name != "mse":
+                    continue
+                for num_obs in observation_dict.keys():
+                    t_stats_null_dict[m][num_obs][t_stat_name] = results_dict[m][
+                        "t_stats_null"
+                    ][t_stat_name][num_obs - 1]
 
-        if save_results:
-            t_stats_null_path = task_path / f"npe_{n_train}" / "t_stats_null"
-            if not os.path.exists(t_stats_null_path):
-                os.makedirs(t_stats_null_path)
-            torch.save(
-                t_stats_null_dict[m],
-                t_stats_null_path
-                / f"t_stats_null_{m}_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
-            )
+            if save_results:
+                if not os.path.exists(t_stats_null_path):
+                    os.makedirs(t_stats_null_path)
+                torch.save(
+                    t_stats_null_dict[m],
+                    t_stats_null_path
+                    / f"t_stats_null_{m}_n_eval_{n_eval}_n_cal_{n_cal}.pkl",
+                )
 
     if return_t_stats_null:
         return results_dict, train_runtime, t_stats_null_dict

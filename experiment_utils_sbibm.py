@@ -353,9 +353,9 @@ def compute_emp_power_l_c2st(
             ["p_values", "p_values_h0_"],
             [compute_emp_power, compute_type_I_error],
         ):
+            if not compute:
+                continue
             try:
-                if not compute:
-                    raise FileNotFoundError
                 for method in methods:
                     # load result if it exists
                     result_dict[n_cal][method] = torch.load(

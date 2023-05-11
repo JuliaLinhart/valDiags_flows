@@ -209,7 +209,10 @@ def lc2st_scores(
                 clf_n = trained_clfs[n]
             else:
                 # initialize classifier
-                classifier = clf_class(random_state=n, **clf_kwargs)
+                try:
+                    classifier = clf_class(random_state=n, **clf_kwargs)
+                except TypeError:
+                    classifier = clf_class(**clf_kwargs)
                 # train classifier
                 clf_n = train_lc2st(P, Q, x_P, x_Q, clf=classifier)
             clf_list.append(clf_n)
@@ -266,7 +269,10 @@ def lc2st_scores(
                 P_train, x_P_train = P[train_index], x_P[train_index]
                 Q_train, x_Q_train = Q[train_index], x_Q[train_index]
                 # initialize classifier
-                classifier = clf_class(random_state=n, **clf_kwargs)
+                try:
+                    classifier = clf_class(random_state=n, **clf_kwargs)
+                except TypeError:
+                    classifier = clf_class(**clf_kwargs)
                 # train n^th classifier
                 clf_n = train_lc2st(
                     P=P_train, Q=Q_train, x_P=x_P_train, x_Q=x_Q_train, clf=classifier

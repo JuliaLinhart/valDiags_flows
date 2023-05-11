@@ -27,6 +27,7 @@ def c2st_p_values_tfpr(
     compute_FPR=True,
     compute_TPR=True,
     scores_null=None,
+    return_std=False,
 ):
     """Computes the p-values, TPR and FPR over several runs of the Classifier Two Sample Test (C2ST)
     between two distributions P and Q:
@@ -167,20 +168,29 @@ def c2st_p_values_tfpr(
 
     # compute TPR and FPR at every alpha
     TPR = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
+    TPR_std = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
     FPR = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
+    FPR_std = dict(zip(all_metrics, [[] for _ in range(len(all_metrics))]))
     for alpha in alpha_list:
         # append TPR/TPF at alpha for each metric
         for m in all_metrics:
             if compute_TPR and alpha != 0:
                 TPR[m].append(np.mean(np.array(p_values_H1[m]) <= alpha))
+                TPR_std[m].append(np.std(np.array(p_values_H1[m]) <= alpha))
             else:
                 TPR[m].append(0)
+                TPR_std[m].append(0)
             if compute_FPR and alpha != 0:
                 FPR[m].append(np.mean(np.array(p_values_H0[m]) <= alpha))
+                FPR_std[m].append(np.std(np.array(p_values_H0[m]) <= alpha))
             else:
                 FPR[m].append(0)
+                FPR_std[m].append(0)
 
-    return TPR, FPR, p_values_H1, p_values_H0
+    if return_std:
+        return TPR, FPR, TPR_std, FPR_std, p_values_H1, p_values_H0
+    else:
+        return TPR, FPR, p_values_H1, p_values_H0
 
 
 if __name__ == "__main__":

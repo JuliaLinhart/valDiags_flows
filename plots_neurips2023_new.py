@@ -16,6 +16,123 @@ from valdiags.graphical_valdiags import (
     pp_plot_c2st,
 )
 
+# ======== FIGURE 1 ========== #
+METRICS_DICT = {
+    "acc_single_class": {
+        "label": r"$\hat{t}_{\mathrm{Acc}_0}$",
+        "color": "red",
+        "linestyle": "--",
+    },
+    "acc_ref": {
+        "label": r"$\hat{t}_{\mathrm{Acc}}$",
+        "color": "red",
+        "linestyle": "-",
+    },
+    "reg_single_class": {
+        "label": r"$\hat{t}_{\mathrm{Reg}_0}$",
+        "color": "orange",
+        "linestyle": "--",
+    },
+    "reg_ref": {
+        "label": r"$\hat{t}_{\mathrm{Reg}}$",
+        "color": "orange",
+        "linestyle": "-",
+    },
+    "max_single_class": {
+        "label": r"$\hat{t}_{\mathrm{Max}_0}$",
+        "color": "blue",
+        "linestyle": "--",
+    },
+    "max_ref": {
+        "label": r"$\hat{t}_{\mathrm{Max}}$",
+        "color": "blue",
+        "linestyle": "-",
+    },
+}
+
+
+def plot_plot_c2st_single_eval_shift(
+    shift_list,
+    t_stats_dict,
+    TPR_dict,
+    TPR_std_dict,
+    shift_name,
+    dim,
+    h0_label,
+    clf_name,
+):
+    # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
+    plt.rcParams["figure.figsize"] = (10, 5)
+    plt.rcParams.update(fonts.neurips2022())
+    plt.rcParams.update(axes.color(base="black"))
+    plt.rcParams["legend.fontsize"] = 23.0
+    plt.rcParams["xtick.labelsize"] = 23.0
+    plt.rcParams["ytick.labelsize"] = 23.0
+    plt.rcParams["axes.labelsize"] = 23.0
+    plt.rcParams["font.size"] = 23.0
+    plt.rcParams["axes.titlesize"] = 27.0
+
+    fig, axs = plt.subplots(
+        nrows=1, ncols=2, sharex=True, sharey=False, constrained_layout=True
+    )
+    # plot theoretical H_0 value for t-stats
+    axs[0].plot(
+        shift_list,
+        [0.5] * len(shift_list),
+        color="black",
+        linestyle="--",
+        label=r"$t \mid \mathcal{H}_0$",
+    )
+    for t_stat_name, t_stats in t_stats_dict.items():
+        if "max" in t_stat_name:
+            continue
+        if "reg" in t_stat_name:
+            t_stats = np.array(t_stats) + 0.5
+            METRICS_DICT[t_stat_name]["label"] += r" (+0.5)"
+        axs[0].plot(
+            shift_list,
+            t_stats,
+            label=METRICS_DICT[t_stat_name]["label"],
+            color=METRICS_DICT[t_stat_name]["color"],
+            linestyle=METRICS_DICT[t_stat_name]["linestyle"],
+            alpha=0.8,
+        )
+        axs[1].plot(
+            shift_list,
+            TPR_dict[t_stat_name],
+            label=METRICS_DICT[t_stat_name]["label"],
+            color=METRICS_DICT[t_stat_name]["color"],
+            linestyle=METRICS_DICT[t_stat_name]["linestyle"],
+            alpha=0.8,
+            zorder=100,
+        )
+        err = np.array(TPR_std_dict[t_stat_name])
+        axs[1].fill_between(
+            shift_list,
+            np.array(TPR_dict[t_stat_name]) - err,
+            np.array(TPR_dict[t_stat_name]) + err,
+            alpha=0.15,
+            color=METRICS_DICT[t_stat_name]["color"],
+        )
+    if shift_name == "variance":
+        axs[0].set_xlabel(r"$\sigma^2$")
+        axs[1].set_xlabel(r"$\sigma^2$")
+    else:
+        axs[0].set_xlabel(f"{shift_name} shift")
+        axs[1].set_xlabel(f"{shift_name} shift")
+
+    # axs[0].set_ylabel("test statistic")
+    axs[0].set_ylim(0.38, 1.01)
+    axs[0].set_yticks([0.5, 1.0])
+    axs[0].legend()
+    axs[0].set_title("Optimal Bayes (statistics)")
+    # axs[1].set_ylabel("empirical power")
+    axs[1].set_yticks([0.0, 0.5, 1.0])
+    axs[1].set_ylim(-0.02, 1.02)
+    axs[1].set_title(f"{clf_name}-C2ST (power)")
+
+    # plt.suptitle(f"{h0_label}")
+
 
 # ======== FIGURE 2 ========== #
 

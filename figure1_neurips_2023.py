@@ -1,10 +1,18 @@
+# =============================================================================
+
+#       SCRIPT TO REPRODUCE FIGURE 1 IN NEURIPS 2023 SUBMISSION
+#               (and additional experiments of Annex ...)
+
+# =============================================================================
+
+# IMPORTS
 import argparse
 import os
 from functools import partial
-from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 from scipy.stats import multivariate_normal as mvn
 from scipy.stats import t
@@ -25,29 +33,40 @@ from classifiers.optimal_bayes import (
 from c2st_p_values_roc import c2st_p_values_tfpr
 from valdiags.test_utils import eval_htest
 
+from plots_neurips2023_new import plot_plot_c2st_single_eval_shift
+
 # GLOBAL PARAMETERS
+
+# path to save/load the results
 PATH_EXPERIMENT = "saved_experiments/neurips_2023/exp_1/"
 
 # data parameters
 N_SAMPLES_EVAL = 10_000  # N_v (validation set size - used to compute the test statistics for a trained classifier)
 
 # test parameters
-ALPHA = 0.05
-N_RUNS = 500
+ALPHA = 0.05  # significance level
+N_RUNS = 100  # number of runs to compute the power
 
-N_TRIALS_NULL = 1000
-USE_PERMUTATION = False
+N_TRIALS_NULL = 1000  # number of trials to estimate the null distribution
+USE_PERMUTATION = (
+    False  # whether to use the permutation method to estimate the null distribution
+)
 
 # metrics / test statistics
 METRICS = {
-    "accuracy": [r"$\hat{t}_{Acc0}$", r"$\hat{t}_{Acc}$"],
-    "mse": [r"$\hat{t}_{Reg0}$", r"$\hat{t}_{Reg}$"],
-    "div": [r"$\hat{t}_{Max0}$", r"$\hat{t}_{Max}$"],
+    "accuracy": [
+        "acc_ref",
+        "acc_single_class",
+    ],
+    "mse": [
+        "reg_ref",
+        "reg_single_class",
+    ],
+    "div": [
+        "max_ref",
+        "max_single_class",
+    ],
 }
-
-# plot parameters
-test_stat_names = [item for sublist in list(METRICS.values()) for item in sublist]
-colors = ["red", "red", "blue", "blue", "orange", "orange"]
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -64,16 +83,16 @@ parser.add_argument(
     "--q_dist",
     "-q",
     type=str,
-    default=None,
-    choices=["mean", "scale", "df"],
-    help="Variable parameter in the distribution of Q.",
+    default="variance",
+    choices=["mean", "variance", "df"],
+    help="Variable / shifted parameter in the distribution of Q.",
 )
 
 # whether to use the optimal bayes classifier or not
 parser.add_argument(
     "--opt_bayes",
     action="store_true",
-    help="Plot Test Statistics for Optimal Bayes Classifier over distribution shifts.",
+    help="Whether to use the Optimal Bayes Classifier.",
 )
 
 # experiment parameters
@@ -81,19 +100,20 @@ parser.add_argument(
 parser.add_argument(
     "--t_shift",
     action="store_true",
-    help="Compute and Plot Test Statistics for the test over distribution shifts.",
+    help="Compute test statistics over distribution shifts.",
 )
 
 parser.add_argument(
-    "--err_ns",
+    "--power_shift",
     action="store_true",
-    help="Compute and Plot Type 1 error/Power for the test over multiple sample sizes.",
+    help="Compute empirical power over distribution shifts.",
 )
 
 parser.add_argument(
-    "--err_shift",
+    "--plot",
+    "-p",
     action="store_true",
-    help="Compute and Plot Type 1 error/Power for the test over distribution shifts.",
+    help="Only plot the results of the experiments.",
 )
 
 args = parser.parse_args()
@@ -107,30 +127,21 @@ P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # P is a standard Gaussian
 
 # Parameters for different experiments
 if args.q_dist == "mean":
-    # variable sample size or distribution shift
-    if args.err_ns:
-        # N_cal (training set size)
-        n_samples_list = [50, 75, 100, 150, 200]
-        # mean-shift
-        shifts = [np.sqrt(0.05)]
-    elif args.err_shift or args.t_shift:
-        # N_cal (training set size)
-        n_samples_list = [3000]
-        # mean-shift
-        shifts = np.concatenate(
-            [
-                [-1, -0.5, -0.3],
-                np.arange(-0.1, 0.0, 0.02),
-                [0.0],
-                np.arange(0.02, 0.12),
-                [0.3, 0.5, 1],
-            ]
-        )
-    else:
-        raise NotImplementedError
-
     # H_0 label
     h0_label = r"$\mathcal{H}_0: \mathcal{N}(0, I) = \mathcal{N}(m, I)$"
+
+    # N_cal (training set size)
+    n_samples_list = [3000]
+    # mean-shift
+    shifts = np.concatenate(
+        [
+            [-1, -0.5, -0.3],
+            np.arange(-0.1, 0.0, 0.02),
+            [0.0],
+            np.arange(0.02, 0.12),
+            [0.3, 0.5, 1],
+        ]
+    )
 
     # Q - class 1 distrribution: reduced Gaussian with shifted mean (variable)
     Q_dist_list = [mvn(mean=np.array([mu] * dim), cov=np.eye(dim)) for mu in shifts]
@@ -144,25 +155,17 @@ if args.q_dist == "mean":
         clf_class = LinearDiscriminantAnalysis
         clf_kwargs = {"solver": "eigen", "priors": [0.5, 0.5]}
 
-elif args.q_dist == "scale":
-    # variable sample size or distribution shift
-    if args.err_ns:
-        # N_cal (training set size)
-        n_samples_list = [50, 100, 200, 500, 1000, 2000, 3000, 5000]
-        # scale-shift
-        shifts = [1.3]
-    elif args.err_shift or args.t_shift:
-        # N_cal (training set size)
-        n_samples_list = [2000]
-        # scale-shift
-        shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
-    else:
-        raise NotImplementedError
 
+elif args.q_dist == "variance":
     # H_0 label
-    h0_label = r"$\mathcal{H}_0: \mathcal{N}(0, I) = \mathcal{N}(0,s\times I)$"
+    h0_label = r"$\mathcal{H}_0: \mathcal{N}(0, I) = \mathcal{N}(0,\sigma^2I)$"
 
-    # Q - class 1 distrribution: centered Gaussian with shifted scale (variable)
+    # N_cal (training set size)
+    n_samples_list = [2000]
+    # variance-shift
+    shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
+
+    # Q - class 1 distrribution: centered Gaussian with shifted variance (variable)
     Q_dist_list = [mvn(mean=np.zeros(dim), cov=s * np.eye(dim)) for s in shifts]
 
     # classifier
@@ -175,22 +178,13 @@ elif args.q_dist == "scale":
         clf_kwargs = {"priors": [0.5, 0.5]}
 
 elif args.q_dist == "df":
-    # variable sample size or distribution shift
-    if args.err_ns:
-        # N_cal (training set size)
-        n_samples_list = [50, 100, 200, 500, 1000, 2000, 3000, 5000]
-        # df-shift
-        shifts = [3]
-    elif args.err_shift or args.t_shift:
-        # N_cal (training set size)
-        n_samples_list = [2000]
-        # df-shift
-        shifts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35]
-    else:
-        raise NotImplementedError
-
     # H_0 label
     h0_label = r"$\mathcal{H}_0: \mathcal{N}(0, I) = t(df)$"
+
+    # N_cal (training set size)
+    n_samples_list = [2000]
+    # df-shift
+    shifts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35]
 
     # Q - class 1 distrribution: standard Student with shifted degrees of freedom (variable)
     Q_dist_list = [t(df=df, loc=0, scale=1) for df in shifts]
@@ -206,98 +200,87 @@ elif args.q_dist == "df":
 else:
     raise NotImplementedError
 
+# list of test statistics names
+test_stat_names = [item for sublist in list(METRICS.values()) for item in sublist]
+
 # ==== EXP 1: T_STATS UNDER DISTRIBUTION SHIFT ====
-if args.t_shift:
-    test_stats = dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-    for r in tqdm(range(10), desc="Runs"):
-        test_stats_r = dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-        P_eval = P_dist.rvs(size=N_SAMPLES_EVAL)
-        # evaluate test statistics
-        for i, (s, Q_dist) in enumerate(zip(shifts, Q_dist_list)):
-            for b in [True, False]:
-                Q_eval = Q_dist.rvs(size=N_SAMPLES_EVAL)
-                if args.opt_bayes:
-                    scores = opt_bayes_scores(
-                        P=P_eval,
-                        Q=Q_eval,
-                        clf=clf_list[i],
-                        metrics=list(METRICS.keys()),
-                        single_class_eval=b,
-                    )
+if args.t_shift and not args.plot:
+    print()
+    print("=================================================")
+    print("EXP 1: COMPUTE T_STATS UNDER DISTRIBUTION SHIFT")
+    print("       ", h0_label)
+    print("       Classifier: ", clf_name)
+    print("=================================================")
+    print()
+    test_stats = dict(zip(METRICS.keys(), [[] for _ in test_stat_names]))
+    # generate data from P
+    P_eval = P_dist.rvs(size=N_SAMPLES_EVAL)
+    # loop over shifts
+    for i, (s, Q_dist) in enumerate(zip(shifts, Q_dist_list)):
+        # compute test statistics
+        for b in [True, False]:  # for single class eval and not
+            # generate data from Q
+            Q_eval = Q_dist.rvs(size=N_SAMPLES_EVAL)
+            if args.opt_bayes:
+                # evaluate the optimal bayes classifier (no training)
+                scores = opt_bayes_scores(
+                    P=P_eval,
+                    Q=Q_eval,
+                    clf=clf_list[i],
+                    metrics=list(METRICS.keys()),
+                    single_class_eval=b,
+                )
+            else:
+                # for the estimated classifier
+                # generate training data
+                P = P_dist.rvs(size=n_samples_list[0])
+                Q = Q_dist.rvs(size=n_samples_list[0])
+                if dim == 1:
+                    P = P.reshape(-1, 1)
+                    Q = Q.reshape(-1, 1)
+                    P_eval = P_eval.reshape(-1, 1)
+                    Q_eval = Q_eval.reshape(-1, 1)
+                # train and evaluate the classifier
+                scores = t_stats_c2st(
+                    P=P,
+                    Q=Q,
+                    cross_val=False,
+                    P_eval=P_eval,
+                    Q_eval=Q_eval,
+                    clf_class=clf_class,
+                    clf_kwargs=clf_kwargs,
+                    metrics=list(METRICS.keys()),
+                    single_class_eval=b,
+                    null_hypothesis=False,
+                )
+            # append scores to dict
+            for metric, t_names in zip(METRICS.keys(), METRICS.values()):
+                if b:
+                    name = t_names[1]
                 else:
-                    P = P_dist.rvs(size=n_samples_list[0])
-                    Q = Q_dist.rvs(size=n_samples_list[0])
-                    if dim == 1:
-                        P = P.reshape(-1, 1)
-                        Q = Q.reshape(-1, 1)
-                        P_eval = P_eval.reshape(-1, 1)
-                        Q_eval = Q_eval.reshape(-1, 1)
-                    scores = t_stats_c2st(
-                        P=P,
-                        Q=Q,
-                        cross_val=False,
-                        P_eval=P_eval,
-                        Q_eval=Q_eval,
-                        clf_class=clf_class,
-                        clf_kwargs=clf_kwargs,
-                        metrics=list(METRICS.keys()),
-                        single_class_eval=b,
-                        null_hypothesis=False,
-                    )
+                    name = t_names[0]
 
-                for metric, t_names in zip(METRICS.keys(), METRICS.values()):
-                    if b:
-                        name = t_names[0]
-                    else:
-                        name = t_names[1]
+                if metric == "mse":
+                    test_stats[name].append(scores[metric])
+                else:
+                    test_stats[name].append(scores[metric])
 
-                    if metric == "mse":
-                        test_stats_r[name].append(scores[metric] + 0.5)
-                    else:
-                        test_stats_r[name].append(scores[metric])
-        for name in test_stat_names:
-            test_stats[name].append(test_stats_r[name])
-
-    test_stats_mean = {k: np.mean(v, axis=0) for k, v in test_stats.items()}
-    test_stats_std = {k: np.std(v, axis=0) for k, v in test_stats.items()}
-
-    # plot and save results
-    plt.plot(
-        shifts,
-        [0.5] * len(shifts),
-        color="grey",
-        linestyle="--",
-        label=r"$\mathcal{H}_0$",
+    # save computed test statistics
+    torch.save(
+        test_stats,
+        PATH_EXPERIMENT + f"test_stats_{clf_name}_shift_{args.q_dist}_dim_{dim}.pkl",
     )
-    for name, color in zip(test_stat_names, colors):
-        linestyle = "-"
-        if "0" not in name:
-            linestyle = "--"
-        plt.plot(
-            shifts,
-            test_stats_mean[name],
-            label=name,
-            color=color,
-            linestyle=linestyle,
-        )
-        plt.fill_between(
-            x=shifts,
-            y1=test_stats_mean[name] - test_stats_std[name],
-            y2=test_stats_mean[name] + test_stats_std[name],
-            alpha=0.2,
-            color=color,
-        )
-    plt.xlabel(f"{args.q_dist} shift")
-    plt.ylabel(r"$\hat{t}$ (test statistic)")
-    plt.legend(loc="upper right")
-    plt.title(f"{clf_name} classifier for {h0_label}" + f"\n dim={dim}")
-    plt.savefig(
-        PATH_EXPERIMENT + f"t_stats_{args.q_dist}_shift_{clf_name}_dim_{dim}.pdf"
-    )
-    plt.show()
 
-# ==== Prepare for EXPS 2 and 3 ====
-if args.err_shift or args.err_ns:
+# ==== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ====
+if args.power_shift and not args.plot:
+    print()
+    print("========================================================")
+    print("EXP 2: COMPUTE EMPIRICAL POWER UNDER DISTRIBUTION SHIFT")
+    print("       ", h0_label)
+    print("       Classifier: ", clf_name)
+    print("========================================================")
+    print()
+
     # Initialize test statistics function
     t_stats_c2st_custom = partial(
         t_stats_c2st,
@@ -315,14 +298,13 @@ if args.err_shift or args.err_ns:
         print()
         print(f"N_cal = {n}")
         if not USE_PERMUTATION:
-            # Not using the permutation method to simulate the null distribution
-            # Using data from P to compute the scores/test statistics under the true null distribution
             print()
             print(
                 "Pre-computing or loading the test statistics under the null distribution."
                 + "\n They will be reused at every test-run. The permutation method is not needed."
             )
             print()
+
             scores_null = dict(zip([True, False], [[], []]))
 
             filename = f"nt_{N_TRIALS_NULL}_N_{n}_dim_{dim}_{clf_name}.npy"
@@ -334,7 +316,7 @@ if args.err_shift or args.err_ns:
                 ).item()
             else:
                 # otherwise, compute them
-                # generate data from P
+                # generate training and evalaluation data from P for every trial
                 list_P_null = [P_dist.rvs(n) for _ in range(2 * N_TRIALS_NULL)]
                 list_P_eval_null = [
                     P_dist.rvs(N_SAMPLES_EVAL) for _ in range(2 * N_TRIALS_NULL)
@@ -343,7 +325,9 @@ if args.err_shift or args.err_ns:
                     for i in range(2 * N_TRIALS_NULL):
                         list_P_null[i] = list_P_null[i].reshape(-1, 1)
                         list_P_eval_null[i] = list_P_eval_null[i].reshape(-1, 1)
-                for b in [True, False]:
+
+                # compute test statistics under the null
+                for b in [True, False]:  # for single class eval and not
                     t_stats_null = t_stats_c2st_custom(
                         null_hypothesis=True,
                         n_trials_null=N_TRIALS_NULL,
@@ -382,22 +366,38 @@ if args.err_shift or args.err_ns:
         metrics=list(METRICS.keys()),
     )
 
-    # ==== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ====
-    if args.err_shift:
-        n = n_samples_list[0]
-        scores_null = scores_null_list[0]
+    # get the number of samples for training
+    n = n_samples_list[0]
+    # get the null scores
+    scores_null = scores_null_list[0]
 
-        # compute TPR and FPR for each shift
-        TPR_list, p_values_H1_list = (
+    try:
+        # load TPR dicts if they exist ...
+        TPR_list = torch.load(
+            PATH_EXPERIMENT
+            + f"TPR_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
+        )
+        TPR_std_list = torch.load(
+            PATH_EXPERIMENT
+            + f"TPR_std_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
+        )
+    except FileNotFoundError:
+        # ... otherwise, compute them
+        # initialize TPR dicts
+        TPR_list, TPR_std_list = (
             dict(zip(test_stat_names, [[] for _ in test_stat_names])),
             dict(zip(test_stat_names, [[] for _ in test_stat_names])),
         )
+
+        # loop over shifts
         for i, (s, Q_dist) in enumerate(zip(shifts, Q_dist_list)):
             print()
             print(f"{args.q_dist} shift: {np.round(s,2)}")
             print()
-            for b in [True, False]:
-                TPR, _, p_values_H1, _ = c2st_p_values_tfpr(
+
+            # compute empirical power (TPR)
+            for b in [True, False]:  # for single class eval and not
+                TPR, _, TPR_std, _, _, _ = c2st_p_values_tfpr(
                     eval_c2st_fn=partial(
                         eval_c2st, single_class_eval=b, n_trials_null=N_TRIALS_NULL
                     ),
@@ -410,133 +410,61 @@ if args.err_shift or args.err_ns:
                     metrics_cv=[],
                     scores_null={
                         False: scores_null[b],
-                        True: None,
-                    },  # no cross val metrics
+                        True: None,  # no cross val metrics
+                    },
                     compute_FPR=False,
+                    return_std=True,
                 )
+                # append TPR and std to dict
                 for metric, t_names in zip(METRICS.keys(), METRICS.values()):
                     if b:
-                        name = t_names[0]
-                    else:
                         name = t_names[1]
-                    TPR_list[name].append(TPR[metric][0])
-                    p_values_H1_list[name].append(p_values_H1[metric][0])
-
-        # plot TPR for each metric as a function of shift
-        for name, color in zip(test_stat_names, colors):
-            linestyle = "-"
-            if "0" not in name:
-                linestyle = "--"
-            plt.plot(
-                shifts,
-                TPR_list[name],
-                label=name,
-                color=color,
-                linestyle=linestyle,
-                alpha=0.8,
-            )
-        plt.xlabel(f"{args.q_dist} shift")
-        plt.ylabel(r"Power (TPR)")
-        plt.legend()
-        plt.title(
-            f"{clf_name}-C2ST Power for {h0_label}, dim={dim}" + "\n alpha = {ALPHA}"
-        )
-        plt.savefig(
-            PATH_EXPERIMENT
-            + f"power_{args.q_dist}_shifts_{clf_name}_alpha_{ALPHA}_N_{n}_dim_{dim}.pdf"
-        )
-        plt.show()
-
-    # ==== EXP 3: Empirical Power and Type I error as a function of train size (N_cal) ====
-    if args.err_ns:
-        shift = shifts[0]
-        Q_dist = Q_dist_list[0]
-        # For each sample size, compute the test results for each metric:
-        # p-values, TPR and FPR (at given alphas)
-        TPR_list, FPR_list, p_values_H0_list, p_values_H1_list = (
-            dict(zip(test_stat_names, [[] for _ in test_stat_names])),
-            dict(zip(test_stat_names, [[] for _ in test_stat_names])),
-            dict(zip(test_stat_names, [[] for _ in test_stat_names])),
-            dict(zip(test_stat_names, [[] for _ in test_stat_names])),
-        )
-        for i, n in enumerate(n_samples_list):
-            print()
-            print(f"N_cal = {n}")
-            print()
-            for b in [True, False]:
-                TPR, FPR, p_values_H1, p_values_H0 = c2st_p_values_tfpr(
-                    eval_c2st_fn=partial(
-                        eval_c2st, single_class_eval=b, n_trials_null=N_TRIALS_NULL
-                    ),
-                    n_runs=N_RUNS,
-                    n_samples={"train": n, "eval": N_SAMPLES_EVAL},
-                    alpha_list=[ALPHA],
-                    P_dist=P_dist,
-                    Q_dist=Q_dist,
-                    metrics=list(METRICS.keys()),
-                    metrics_cv=[],
-                    scores_null={
-                        False: scores_null_list[i][b],
-                        True: None,
-                    },  # no cross val metrics
-                )
-
-                for metric, t_names in zip(METRICS.keys(), METRICS.values()):
-                    if b:
-                        name = t_names[0]
                     else:
-                        name = t_names[1]
+                        name = t_names[0]
                     TPR_list[name].append(TPR[metric][0])
-                    FPR_list[name].append(FPR[metric][0])
-                    p_values_H1_list[name].append(p_values_H1[metric][0])
-                    p_values_H0_list[name].append(p_values_H0[metric][0])
+                    TPR_std_list[name].append(TPR_std[metric][0])
 
-        # plot TPR and FPR for each metric as a function of N_cal
-        # FPR
-        for name, color in zip(test_stat_names, colors):
-            linestyle = "-"
-            if "0" not in name:
-                linestyle = "--"
-            plt.plot(
-                n_samples_list,
-                FPR_list[name],
-                label=name,
-                color=color,
-                linestyle=linestyle,
-                alpha=0.8,
-            )
-        plt.ylabel(r"Type I error (FPR)")
-        plt.xlabel(r"$N_{cal}$")
-        plt.legend()
-        plt.title(f"{clf_name}-C2ST Type I error, dim={dim}" + f"\n alpha = {ALPHA}")
-        plt.savefig(
-            PATH_EXPERIMENT + f"type_I_error_ns_{clf_name}_alpha_{ALPHA}_dim_{dim}.pdf"
-        )
-        plt.show()
-
-        # TPR
-        for name, color in zip(test_stat_names, colors):
-            linestyle = "-"
-            if "0" not in name:
-                linestyle = "--"
-            plt.plot(
-                n_samples_list,
-                TPR_list[name],
-                label=name,
-                color=color,
-                linestyle=linestyle,
-                alpha=0.8,
-            )
-
-        plt.ylabel(r"Power (TPR)")
-        plt.xlabel(r"$N_{cal}$")
-        plt.legend()
-        plt.title(
-            f"{clf_name}-C2ST Power for {h0_label}, s = {shift}, dim={dim}"
-            + "\n alpha = {ALPHA}"
-        )
-        plt.savefig(
+        # save TPR dicts
+        torch.save(
+            TPR_list,
             PATH_EXPERIMENT
-            + f"power_ns_{clf_name}_alpha_{ALPHA}_{args.q_dist}_shift_s_{shift}_dim_{dim}.pdf"
+            + f"TPR_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
         )
-        plt.show()
+        torch.save(
+            TPR_std_list,
+            PATH_EXPERIMENT
+            + f"TPR_std_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
+        )
+
+
+if args.plot:
+    # t-stats for optimal bayes classifier
+    t_stats_dict = torch.load(
+        PATH_EXPERIMENT + f"test_stats_OptBayes_shift_{args.q_dist}_dim_{dim}.pkl"
+    )
+    # TPR for estimated classifier (e.g. QDA)
+    TPR_dict = torch.load(
+        PATH_EXPERIMENT
+        + f"TPR_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl"
+    )
+    TPR_std_dict = torch.load(
+        PATH_EXPERIMENT
+        + f"TPR_std_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl"
+    )
+
+    # plot the results of both experiments
+    plot_plot_c2st_single_eval_shift(
+        shift_list=shifts,
+        t_stats_dict=t_stats_dict,
+        TPR_dict=TPR_dict,
+        TPR_std_dict=TPR_std_dict,
+        shift_name=args.q_dist,
+        dim=dim,
+        h0_label=h0_label,
+        clf_name=clf_name,
+    )
+    plt.savefig(
+        PATH_EXPERIMENT
+        + f"figures/optbayes_{clf_name}_shift_{args.q_dist}_dim_{dim}.pdf"
+    )
+    plt.show()

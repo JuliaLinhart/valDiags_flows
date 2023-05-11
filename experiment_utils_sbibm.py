@@ -353,48 +353,48 @@ def compute_emp_power_l_c2st(
             ["p_values", "p_values_h0_"],
             [compute_emp_power, compute_type_I_error],
         ):
-            # try:
-            if not compute:
-                raise FileNotFoundError
-            for method in methods:
-                # load result if it exists
-                result_dict[n_cal][method] = torch.load(
-                    result_path
-                    / f"n_runs_{n_run_load_results}"
-                    / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+            try:
+                if not compute:
+                    raise FileNotFoundError
+                for method in methods:
+                    # load result if it exists
+                    result_dict[n_cal][method] = torch.load(
+                        result_path
+                        / f"n_runs_{n_run_load_results}"
+                        / f"{name}_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+                    )
+                    p_values_dict[n_cal][method] = torch.load(
+                        result_path
+                        / f"n_runs_{n_run_load_results}"
+                        / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
+                    )
+                start_run = n_run_load_results + 1
+                print(
+                    f"Loaded {name} results for N_cal = {n_cal} from run {n_run_load_results} ..."
                 )
-                p_values_dict[n_cal][method] = torch.load(
-                    result_path
-                    / f"n_runs_{n_run_load_results}"
-                    / f"{name_p}_obs_per_run_{method}_n_runs_{n_run_load_results}_n_cal_{n_cal}.pkl"
-                )
-            start_run = n_run_load_results + 1
-            print(
-                f"Loaded {name} results for N_cal = {n_cal} from run {n_run_load_results} ..."
-            )
-            # except FileNotFoundError:
-            #     start_run = 1
-            #     for method in methods:
-            #         result_dict[n_cal][method] = dict(
-            #             zip(
-            #                 test_stat_names,
-            #                 [np.zeros(len(observation_dict)) for _ in test_stat_names],
-            #             )
-            #         )
-            #         p_values_dict[n_cal][method] = dict(
-            #             zip(
-            #                 test_stat_names,
-            #                 [
-            #                     dict(
-            #                         zip(
-            #                             observation_dict.keys(),
-            #                             [[] for _ in observation_dict.keys()],
-            #                         )
-            #                     )
-            #                     for _ in test_stat_names
-            #                 ],
-            #             )
-            #         )
+            except FileNotFoundError:
+                start_run = 1
+                for method in methods:
+                    result_dict[n_cal][method] = dict(
+                        zip(
+                            test_stat_names,
+                            [np.zeros(len(observation_dict)) for _ in test_stat_names],
+                        )
+                    )
+                    p_values_dict[n_cal][method] = dict(
+                        zip(
+                            test_stat_names,
+                            [
+                                dict(
+                                    zip(
+                                        observation_dict.keys(),
+                                        [[] for _ in observation_dict.keys()],
+                                    )
+                                )
+                                for _ in test_stat_names
+                            ],
+                        )
+                    )
 
     for n in range(start_run, n_runs + 1):
         print()

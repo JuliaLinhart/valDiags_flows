@@ -30,8 +30,9 @@ from valdiags.vanillaC2ST import sbibm_clf_kwargs
 
 from precompute_test_statistics_null import precompute_t_stats_null
 from experiment_utils_sbibm import (
-    compute_emp_power_l_c2st,
     l_c2st_results_n_train,
+    compute_emp_power_l_c2st,
+    compute_rejection_rates_from_pvalues_over_runs_and_observations,
 )
 
 from plots_neurips2023_new import plot_sbibm_results_n_train
@@ -74,7 +75,7 @@ NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # test parameters
 ALPHA = 0.05
-N_TRIALS_PRECOMPUTE = 1000
+N_TRIALS_PRECOMPUTE = 100
 NB_HPD_LEVELS = 11
 
 # metrics / test statistics
@@ -259,15 +260,19 @@ if args.t_res_ntrain:
     print(f"... for N_cal = {n_cal}")
     print()
 
-    methods = [
-        "c2st",
-        "lc2st",
-        "lc2st_nf",
-        "lc2st_nf_perm",
-        "lhpd",
-    ]  # , "lhpd", "c2st_nf"]
+    # two moons
+    methods_dict = {
+        "c2st": {n: 100 for n in n_train_list},
+        "lc2st": {100: 65, 1000: 69, 10000: 23, 100000: 85},
+        "lc2st_nf": {100: 23, 1000: 23, 10000: 16, 100000: 16},
+        "lc2st_nf_perm": {100: 23, 1000: 23, 10000: 16, 100000: 16},
+        # "lhpd": {100:2, 1000:25, 10000:23, 100000:13},
+    }
 
-    avg_results, train_runtime = l_c2st_results_n_train(
+    n_runs = 16
+
+    # compute test statistics for every n_train
+    results_n_train, train_runtime = l_c2st_results_n_train(
         task,
         n_cal=n_cal,
         n_eval=n_eval,
@@ -283,11 +288,131 @@ if args.t_res_ntrain:
         task_path=task_path,
         t_stats_null_path=task_path / "t_stats_null" / eval_params,
         results_n_train_path=Path(f"results") / test_params / eval_params,
-        methods=methods,
+        methods=list(methods_dict.keys()),
         test_stat_names=ALL_METRICS,
         seed=RANDOM_SEED,
         plot_mode=args.plot,
     )
+
+    # compute TPR for every n_train
+
+    emp_power_dict, type_I_error_dict = {
+        n: {
+            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+            for m in methods_dict.keys()
+        }
+        for n in n_train_list
+    }, {
+        n: {
+            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+            for m in methods_dict.keys()
+        }
+        for n in n_train_list
+    }
+    p_values_dict, p_values_h0_dict = {
+        n: {m: None for m in methods_dict.keys()} for n in n_train_list
+    }, {n: {m: None for m in methods_dict.keys()} for n in n_train_list}
+
+    for m, n_train_run_dict in methods_dict.items():
+        for n_train in n_train_list:
+            (
+                _,
+                _,
+                p_values,
+                _,
+            ) = compute_emp_power_l_c2st(
+                n_runs=n_runs,
+                alpha=ALPHA,
+                task=task,
+                n_train=n_train,
+                observation_dict=observation_dict,
+                n_cal_list=[n_cal],
+                n_eval=n_eval,
+                n_trials_null=args.n_trials_null,
+                kwargs_c2st=kwargs_c2st,
+                kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
+                t_stats_null_c2st_nf=None,
+                n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
+                methods=[m],
+                test_stat_names=ALL_METRICS,
+                compute_emp_power=True,
+                compute_type_I_error=False,
+                task_path=task_path,
+                load_eval_data=True,
+                result_path=task_path
+                / f"npe_{n_train}"
+                / "results"
+                / test_params
+                / eval_params,
+                t_stats_null_path=task_path / "t_stats_null" / eval_params,
+                results_n_train_path=Path(f"results") / test_params / eval_params,
+                n_run_load_results=n_train_run_dict[n_train],
+                # save_every_n_runs=10,
+            )
+            # emp_power_dict[n_train][m] = emp_power[n_train][m]
+            p_values_dict[n_train][m] = p_values[n_cal][m]
+
+            # compute emp power for n_runs
+            for t_stat_name in ALL_METRICS:
+                if m == "lhpd" and t_stat_name != "mse":
+                    continue
+                (
+                    emp_power_dict[n_train][m][t_stat_name],
+                    _,
+                ) = compute_rejection_rates_from_pvalues_over_runs_and_observations(
+                    p_values_dict=p_values_dict[n_train][m][t_stat_name],
+                    alpha=ALPHA,
+                    n_runs=n_runs,
+                    num_observation_list=NUM_OBSERVATION_LIST,
+                    compute_tpr=True,
+                    compute_fpr=False,
+                    p_values_h0_dict=None,
+                )
+
+    for i, n_train in enumerate(n_train_list):
+        for m in methods_dict.keys():
+            if i == 0:
+                results_n_train[m]["TPR_mean"] = {
+                    t_stat_name: [] for t_stat_name in ALL_METRICS
+                }
+                results_n_train[m]["TPR_std"] = {
+                    t_stat_name: [] for t_stat_name in ALL_METRICS
+                }
+            for t_stat_name in ALL_METRICS:
+                results_n_train[m]["TPR_mean"][t_stat_name].append(
+                    np.mean(emp_power_dict[n_train][m][t_stat_name])
+                )
+                results_n_train[m]["TPR_std"][t_stat_name].append(
+                    np.std(emp_power_dict[n_train][m][t_stat_name])
+                )
+
+    # plot empirical power
+    for m in methods_dict.keys():
+        for t_stat_name in ALL_METRICS:
+            if "lc2st" in m and t_stat_name == "accuracy":
+                continue
+            if "lhpd" in m and t_stat_name != "mse":
+                continue
+            if t_stat_name == "div":
+                continue
+            plt.plot(
+                np.arange(len(n_train_list)),
+                results_n_train[m]["TPR_mean"][t_stat_name],
+                label=m + " " + t_stat_name,
+            )
+            err = np.array(results_n_train[m]["TPR_std"][t_stat_name])
+            plt.fill_between(
+                np.arange(len(n_train_list)),
+                np.array(results_n_train[m]["TPR_mean"][t_stat_name]) - err,
+                np.array(results_n_train[m]["TPR_mean"][t_stat_name]) + err,
+                alpha=0.2,
+            )
+    plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
+    plt.xlabel("n_train")
+    plt.ylabel("Empirical Power (TPR)")
+    plt.legend()
+    plt.show()
 
     # path to save figures
     fig_path = (
@@ -300,39 +425,19 @@ if args.t_res_ntrain:
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
-    # plot_sbibm_results_n_train(
-    #     avg_results=avg_results,
+    # fig = plot_sbibm_results_n_train(
+    #     results_n_train=results_n_train,
     #     train_runtime=train_runtime,
     #     fig_path=fig_path,
     #     n_train_list=n_train_list,
     #     n_cal=n_cal,
-    #     methods=METHODS_ACC,
-    #     t_stat_ext="t_acc_max",
+    #     methods_acc=METHODS_ACC,
+    #     methods_reg=METHODS_L2,
+    #     methods_all=METHODS_ALL,
+    #     t_stat_ext="new",
     # )
-
-    # plot_sbibm_results_n_train(
-    #     avg_results=avg_results,
-    #     train_runtime=train_runtime,
-    #     fig_path=fig_path,
-    #     n_train_list=n_train_list,
-    #     n_cal=n_cal,
-    #     methods=METHODS_L2,
-    #     t_stat_ext="t_reg_lhpd",
-    # )
-
-    fig = plot_sbibm_results_n_train(
-        avg_results=avg_results,
-        train_runtime=train_runtime,
-        fig_path=fig_path,
-        n_train_list=n_train_list,
-        n_cal=n_cal,
-        methods_acc=METHODS_ACC,
-        methods_reg=METHODS_L2,
-        methods_all=METHODS_ALL,
-        t_stat_ext="new",
-    )
-    plt.savefig(fig_path / f"results_ntrain_n_cal_{n_cal}.pdf")
-    plt.show()
+    # plt.savefig(fig_path / f"results_ntrain_n_cal_{n_cal}.pdf")
+    # plt.show()
 
 
 if args.power_ncal:
@@ -344,156 +449,195 @@ if args.power_ncal:
     print(f"... for N_train = {n_train}")
     print()
 
-    methods = ["lc2st", "lc2st_nf", "lc2st_nf_perm"]  # , "lhpd"]  # "c2st_nf",
-    n_runs = 100
-
     result_path = task_path / f"npe_{n_train}" / "results" / test_params / eval_params
     if not os.path.exists(result_path):
         os.makedirs(result_path)
 
-    emp_power_dict, type_I_error_dict = {}, {}
-    p_values_dict, p_values_h0_dict = {}, {}
+    # two moons
+    methods_dict = {
+        "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
+        "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
+        "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
+        "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
+        # "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 8, 5000: 4, 10000: 25},
+    }
+    # slcp
+    # methods_dict = {
+    #     # "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
+    #     "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 81, 10000: 29},
+    #     "lc2st_nf": {100: 35, 500: 35, 1000: 35, 2000: 33, 5000: 15, 10000: 11},
+    #     "lc2st_nf_perm": {
+    #         100: 35,
+    #         500: 35,
+    #         1000: 35,
+    #         2000: 33,
+    #         5000: 15,
+    #         10000: 11,
+    #     },
+    #     # "lhpd": {100: 100, 500: 100, 1000: 79, 2000: 53, 5000: 26, 10000: 23},
+    # }
 
-    compute_tpr = True
-    compute_fpr = True
+    n_runs = 23
 
-    try:
+    emp_power_dict, type_I_error_dict = {
+        n: {
+            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+            for m in methods_dict.keys()
+        }
+        for n in n_cal_list
+    }, {
+        n: {
+            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+            for m in methods_dict.keys()
+        }
+        for n in n_cal_list
+    }
+    p_values_dict, p_values_h0_dict = {
+        n: {m: None for m in methods_dict.keys()} for n in n_cal_list
+    }, {n: {m: None for m in methods_dict.keys()} for n in n_cal_list}
+
+    for m, n_cal_run_dict in methods_dict.items():
         for n_cal in n_cal_list:
-            emp_power_dict[n_cal], type_I_error_dict[n_cal] = {}, {}
-            p_values_dict[n_cal], p_values_h0_dict[n_cal] = {}, {}
-            for m in methods:
-                if compute_tpr:
-                    emp_power_dict[n_cal][m] = torch.load(
-                        result_path
-                        / f"n_runs_{n_runs}"
-                        / f"emp_power_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
-                    )
-                    p_values_dict[n_cal][m] = torch.load(
-                        result_path
-                        / f"n_runs_{n_runs}"
-                        / f"p_values_obs_per_run_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
-                    )
-                if compute_fpr:
-                    type_I_error_dict[n_cal][m] = torch.load(
-                        result_path
-                        / f"n_runs_{n_runs}"
-                        / f"type_I_error_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
-                    )
-                    p_values_h0_dict[n_cal][m] = torch.load(
-                        result_path
-                        / f"n_runs_{n_runs}"
-                        / f"p_values_h0__obs_per_run_{m}_n_runs_{n_runs}_n_cal_{n_cal}.pkl",
-                    )
-            print(f"Loaded Empirical Results for n_cal = {n_cal} ...")
-    except FileNotFoundError:
-        (
-            emp_power_dict,
-            type_I_error_dict,
-            p_values_dict,
-            p_values_h0_dict,
-        ) = compute_emp_power_l_c2st(
-            n_runs=n_runs,
-            alpha=ALPHA,
-            task=task,
-            n_train=n_train,
-            observation_dict=observation_dict,
-            n_cal_list=n_cal_list,
-            n_eval=n_eval,
-            n_trials_null=args.n_trials_null,
-            kwargs_c2st=kwargs_c2st,
-            kwargs_lc2st=kwargs_lc2st,
-            kwargs_lhpd=kwargs_lhpd,
-            t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
-            n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
-            methods=methods,
-            test_stat_names=ALL_METRICS,
-            compute_emp_power=compute_tpr,
-            compute_type_I_error=compute_fpr,
-            task_path=task_path,
-            load_eval_data=True,
-            result_path=result_path,
-            t_stats_null_path=task_path / "t_stats_null" / eval_params,
-            results_n_train_path=Path(f"results") / test_params / eval_params,
-            n_run_load_results=0,
-            # save_every_n_runs=10,
-        )
+            (
+                _,
+                _,
+                p_values,
+                p_values_h0,
+            ) = compute_emp_power_l_c2st(
+                n_runs=n_runs,
+                alpha=ALPHA,
+                task=task,
+                n_train=n_train,
+                observation_dict=observation_dict,
+                n_cal_list=[n_cal],
+                n_eval=n_eval,
+                n_trials_null=args.n_trials_null,
+                kwargs_c2st=kwargs_c2st,
+                kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
+                t_stats_null_c2st_nf=None,
+                n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
+                methods=[m],
+                test_stat_names=ALL_METRICS,
+                compute_emp_power=True,
+                compute_type_I_error=True,
+                task_path=task_path,
+                load_eval_data=True,
+                result_path=result_path,
+                t_stats_null_path=task_path / "t_stats_null" / eval_params,
+                results_n_train_path=Path(f"results") / test_params / eval_params,
+                n_run_load_results=n_cal_run_dict[n_cal],
+                # save_every_n_runs=10,
+            )
+            # emp_power_dict[n_cal][m] = emp_power[n_cal][m]
+            p_values_dict[n_cal][m] = p_values[n_cal][m]
+            # type_I_error_dict[n_cal][m] = type_I_error[n_cal][m]
+            p_values_h0_dict[n_cal][m] = p_values_h0[n_cal][m]
 
-    emp_power_mean_dict = {
-        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
-    }
-    emp_power_std_dict = {
-        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
-    }
-    type_I_error_mean_dict = {
-        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
-    }
-    type_I_error_std_dict = {
-        m: {t_stat_name: [] for t_stat_name in ALL_METRICS} for m in methods
-    }
-    for n_cal in n_cal_list:
-        for m in methods:
+            # compute emp power for n_runs
             for t_stat_name in ALL_METRICS:
-                emp_power_mean_dict[m][t_stat_name].append(
-                    np.mean(emp_power_dict[n_cal][m][t_stat_name])
+                if m == "lhpd" and t_stat_name != "mse":
+                    continue
+                (
+                    emp_power_dict[n_cal][m][t_stat_name],
+                    type_I_error_dict[n_cal][m][t_stat_name],
+                ) = compute_rejection_rates_from_pvalues_over_runs_and_observations(
+                    p_values_dict=p_values_dict[n_cal][m][t_stat_name],
+                    p_values_h0_dict=p_values_h0_dict[n_cal][m][t_stat_name],
+                    alpha=ALPHA,
+                    n_runs=n_runs,
+                    num_observation_list=NUM_OBSERVATION_LIST,
+                    compute_tpr=True,
+                    compute_fpr=True,
                 )
-                emp_power_std_dict[m][t_stat_name].append(
-                    np.std(emp_power_dict[n_cal][m][t_stat_name])
-                )
-                type_I_error_mean_dict[m][t_stat_name].append(
-                    np.mean(type_I_error_dict[n_cal][m][t_stat_name])
-                )
-                type_I_error_std_dict[m][t_stat_name].append(
-                    np.std(type_I_error_dict[n_cal][m][t_stat_name])
-                )
+
+    results_n_cal = {
+        "TPR": {
+            "mean": {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            },
+            "std": {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            },
+        },
+        "FPR": {
+            "mean": {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            },
+            "std": {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            },
+        },
+    }
+
+    for n_cal in n_cal_list:
+        for m in methods_dict.keys():
+            for t_stat_name in ALL_METRICS:
+                for result_name, result_dict in zip(
+                    ["TPR", "FPR"], [emp_power_dict, type_I_error_dict]
+                ):
+                    results_n_cal[result_name]["mean"][m][t_stat_name].append(
+                        np.mean(result_dict[n_cal][m][t_stat_name])
+                    )
+                    results_n_cal[result_name]["std"][m][t_stat_name].append(
+                        np.std(result_dict[n_cal][m][t_stat_name])
+                    )
 
     # plot empirical power
-    for m in methods:
+    for m in methods_dict.keys():
         for t_stat_name in ALL_METRICS:
             if "lc2st" in m and t_stat_name == "accuracy":
                 continue
-            if not "lc2st" in m and t_stat_name == "div":
+            if "lhpd" in m and t_stat_name != "mse":
+                continue
+            if t_stat_name == "div":
                 continue
             plt.plot(
                 np.arange(len(n_cal_list)),
-                emp_power_mean_dict[m]["accuracy"],
+                results_n_cal["TPR"]["mean"][m][t_stat_name],
                 label=m + " " + t_stat_name,
             )
+            err = np.array(results_n_cal["TPR"]["std"][m][t_stat_name])
             plt.fill_between(
                 np.arange(len(n_cal_list)),
-                np.array(emp_power_mean_dict[m]["accuracy"])
-                - np.array(emp_power_std_dict[m]["accuracy"]),
-                np.array(emp_power_mean_dict[m]["accuracy"])
-                + np.array(emp_power_std_dict[m]["accuracy"]),
+                np.array(results_n_cal["TPR"]["mean"][m][t_stat_name]) - err,
+                np.array(results_n_cal["TPR"]["mean"][m][t_stat_name]) + err,
                 alpha=0.2,
             )
     plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
     plt.xlabel("n_cal")
-    plt.ylabel("Empirical Power")
+    plt.ylabel("Empirical Power (TPR)")
     plt.legend()
     plt.show()
 
     # plot type I error
-    for m in methods:
+    for m in methods_dict.keys():
         for t_stat_name in ALL_METRICS:
             if "lc2st" in m and t_stat_name == "accuracy":
                 continue
-            if not "lc2st" in m and t_stat_name == "div":
+            if "lhpd" in m and t_stat_name != "mse":
                 continue
+            if t_stat_name == "div":
+                continue
+
             plt.plot(
                 np.arange(len(n_cal_list)),
-                type_I_error_mean_dict[m]["accuracy"],
+                results_n_cal["FPR"]["mean"][m][t_stat_name],
                 label=m + " " + t_stat_name,
             )
+            err = np.array(results_n_cal["FPR"]["std"][m][t_stat_name])
             plt.fill_between(
                 np.arange(len(n_cal_list)),
-                np.array(type_I_error_mean_dict[m]["accuracy"])
-                - np.array(type_I_error_std_dict[m]["accuracy"]),
-                np.array(type_I_error_mean_dict[m]["accuracy"])
-                + np.array(type_I_error_std_dict[m]["accuracy"]),
+                np.array(results_n_cal["FPR"]["mean"][m][t_stat_name]) - err,
+                np.array(results_n_cal["FPR"]["mean"][m][t_stat_name]) + err,
                 alpha=0.2,
             )
     plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
     plt.xlabel("n_cal")
-    plt.ylabel("Type I Error")
+    plt.ylabel("Type I Error (FPR)")
     plt.legend()
     plt.show()

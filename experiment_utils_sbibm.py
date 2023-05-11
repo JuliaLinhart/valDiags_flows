@@ -142,6 +142,7 @@ def l_c2st_results_n_train(
             t_stats_null_c2st_nf=t_stats_null_c2st_nf,
             t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
             t_stats_null_lhpd=t_stats_null_lhpd,
+            t_stats_null_dict_npe=None,
             task_path=task_path,
             results_n_train_path=results_n_train_path,
             methods=methods,
@@ -1321,6 +1322,31 @@ def compute_test_results_npe_one_run(
         return results_dict, train_runtime, t_stats_null_dict
     else:
         return results_dict, train_runtime
+
+
+def compute_rejection_rates_from_pvalues_over_runs_and_observations(
+    n_runs,
+    alpha,
+    num_observation_list,
+    p_values_dict,
+    p_values_h0_dict=None,
+    compute_tpr=True,
+    compute_fpr=False,
+):
+    emp_power_list = []
+    type_I_error_list = []
+    for n_r in range(n_runs):
+        if compute_tpr:
+            p_value_n_r = np.array(
+                [p_values_dict[n_obs][n_r] for n_obs in num_observation_list]
+            )
+            emp_power_list.append((np.array(p_value_n_r) <= alpha) * 1)
+        if compute_fpr:
+            p_value_h0_n_r = np.array(
+                [p_values_h0_dict[n_obs][n_r] for n_obs in num_observation_list]
+            )
+            type_I_error_list.append((np.array(p_value_h0_n_r) <= alpha) * 1)
+    return emp_power_list, type_I_error_list
 
 
 if __name__ == "__main__":

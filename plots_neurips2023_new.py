@@ -227,18 +227,16 @@ avg_result_keys = {
 
 
 def plot_sbibm_results_n_train(
-    avg_results,
-    train_runtime,
-    methods_acc,
+    results_n_train,
+    results_n_cal,
     methods_reg,
     methods_all,
     n_train_list,
-    n_cal,
-    fig_path,
-    t_stat_ext="t_all",
+    n_cal_list,
+    plot_p_value=False,
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
-    plt.rcParams["figure.figsize"] = (24, 10)
+    plt.rcParams["figure.figsize"] = (32, 5)
     plt.rcParams.update(fonts.neurips2022())
     plt.rcParams.update(axes.color(base="black"))
     plt.rcParams["legend.fontsize"] = 15.0
@@ -249,20 +247,12 @@ def plot_sbibm_results_n_train(
     plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
-        nrows=2, ncols=3, sharex=True, sharey=False, constrained_layout=True
+        nrows=1, ncols=3, sharex=True, sharey=False, constrained_layout=True
     )
     # ==== t_stats of L-C2ST(-NF) w.r.t to oracle ====
 
-    # plot theoretical H_0 value for acc/max t-stats
-    axs[0][0].plot(
-        np.arange(len(n_train_list)),
-        np.ones(len(n_train_list)) * 0.5,
-        "--",
-        color="black",
-        label=r"theoretical $t \mid \mathcal{H}_0$",
-    )
     # plot theoretical H_0 value for reg t-stats
-    axs[1][0].plot(
+    axs[0].plot(
         np.arange(len(n_train_list)),
         np.ones(len(n_train_list)) * 0.0,
         "--",
@@ -270,62 +260,19 @@ def plot_sbibm_results_n_train(
         label=r"theoretical $t \mid \mathcal{H}_0$",
     )
     # plot estimated T values
-    for i, methods in enumerate([methods_acc, methods_reg]):
-        for method in methods:
-            if "perm" in method or "L-HPD" in method:
-                continue
-            test_name = METHODS_DICT[method]["test_name"]
-            t_stat_name = METHODS_DICT[method]["t_stat_name"]
-
-            axs[i][0].plot(
-                np.arange(len(n_train_list)),
-                avg_results[test_name]["t_stat_mean"][t_stat_name],
-                label=method,
-                color=METHODS_DICT[method]["color"],
-                linestyle=METHODS_DICT[method]["linestyle"],
-                marker=METHODS_DICT[method]["marker"],
-                markersize=METHODS_DICT[method]["markersize"],
-                alpha=0.8,
-            )
-            err = np.array(avg_results[test_name]["t_stat_std"][t_stat_name])
-            axs[i][0].fill_between(
-                np.arange(len(n_train_list)),
-                np.array(avg_results[test_name]["t_stat_mean"][t_stat_name]) - err,
-                np.array(avg_results[test_name]["t_stat_mean"][t_stat_name]) + err,
-                alpha=0.2,
-                color=METHODS_DICT[method]["color"],
-            )
-    axs[0][0].legend()  # loc="lower left")
-    axs[1][0].legend()  # loc="lower left")
-    axs[1][0].set_xticks(
-        np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
-    )
-    axs[0][0].set_ylabel("test statistic (mean +/- std)")
-    axs[0][0].set_ylim(0.48, 1.02)
-    axs[0][0].set_yticks([0.5, 0.75, 1.0])
-    axs[1][0].set_ylabel("test statistic (mean +/- std)")
-    axs[1][0].set_ylim(-0.01, 0.26)
-    axs[1][0].set_yticks([0.0, 0.12, 0.25])
-    axs[1][0].set_xlabel(r"$N_{train}$")
-
-    # ==== p-value of all methods w.r.t to oracle ===
-
-    # plot alpha-level
-    axs[0][1].plot(
-        np.arange(len(n_train_list)),
-        np.ones(len(n_train_list)) * 0.05,
-        "--",
-        color="black",
-        label="alpha-level: 0.05",
-    )
-
-    # plot estimated p-values
-    for method in methods_all:
+    # for i, methods in enumerate([methods_acc, methods_reg]): # t_Max is not used in the paper
+    for method in methods_reg:
+        if (
+            "perm" in method  # the permuation test is only used for the null hypothesis
+            or "L-HPD" in method  # HPD does not have a comparable t-statistic
+        ):
+            continue
         test_name = METHODS_DICT[method]["test_name"]
         t_stat_name = METHODS_DICT[method]["t_stat_name"]
-        axs[0][1].plot(
+
+        axs[0].plot(
             np.arange(len(n_train_list)),
-            avg_results[test_name]["p_value_mean"][t_stat_name],
+            results_n_train[test_name]["t_stat_mean"][t_stat_name],
             label=method,
             color=METHODS_DICT[method]["color"],
             linestyle=METHODS_DICT[method]["linestyle"],
@@ -333,48 +280,139 @@ def plot_sbibm_results_n_train(
             markersize=METHODS_DICT[method]["markersize"],
             alpha=0.8,
         )
-        low = np.array(avg_results[test_name]["p_value_min"][t_stat_name])
-        high = np.array(avg_results[test_name]["p_value_max"][t_stat_name])
-        axs[0][1].fill_between(
+        err = np.array(results_n_train[test_name]["t_stat_std"][t_stat_name])
+        axs[0].fill_between(
             np.arange(len(n_train_list)),
-            low,
-            high,
+            np.array(results_n_train[test_name]["t_stat_mean"][t_stat_name]) - err,
+            np.array(results_n_train[test_name]["t_stat_mean"][t_stat_name]) + err,
             alpha=0.2,
             color=METHODS_DICT[method]["color"],
         )
-    axs[0][1].legend(loc="upper left")
-    axs[0][1].set_xticks(
+    axs[0].legend()  # loc="lower left")
+    axs[0].legend()  # loc="lower left")
+    axs[0].set_xticks(
         np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
     )
-    # axs[0][1].set_xlabel(r"$N_{train}$")
-    axs[0][1].set_ylabel("p-value (mean / min-max)")
+    axs[0].set_ylabel("test statistic")
+    axs[0].set_ylim(0.48, 1.02)
+    axs[0].set_yticks([0.5, 0.75, 1.0])
+    axs[0].set_ylabel("test statistic")
+    axs[0].set_ylim(-0.01, 0.26)
+    axs[0].set_yticks([0.0, 0.12, 0.25])
+    axs[0].set_xlabel(r"$N_{\mathrm{train}}$")
 
-    # plot rejection rate of all methods w.r.t to oracle
-    for method in methods_all:
-        test_name = METHODS_DICT[method]["test_name"]
-        t_stat_name = METHODS_DICT[method]["t_stat_name"]
+    if plot_p_value:
+        # ==== p-value of all methods w.r.t to oracle ===
 
-        axs[1][1].plot(
+        # plot alpha-level
+        axs[1].plot(
             np.arange(len(n_train_list)),
-            avg_results[test_name]["TPR"][t_stat_name],
-            # label=method,
-            color=METHODS_DICT[method]["color"],
-            linestyle=METHODS_DICT[method]["linestyle"],
-            marker=METHODS_DICT[method]["marker"],
-            markersize=METHODS_DICT[method]["markersize"],
-            alpha=0.8,
+            np.ones(len(n_train_list)) * 0.05,
+            "--",
+            color="black",
+            label="alpha-level: 0.05",
         )
-    # axs[1][1].legend(loc="lower left")
-    axs[1][1].set_xticks(
-        np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
-    )
-    axs[1][1].set_ylim(-0.04, 1.04)
-    axs[1][1].set_yticks([0, 0.5, 1])
-    axs[1][1].set_xlabel(r"$N_{train}$")
-    axs[1][1].set_ylabel("rejection rate")
 
-    axs[0][2].set_xlabel(r"")
-    axs[1][2].set_xlabel(r"")
+        # plot estimated p-values
+        for method in methods_all:
+            if "Max" in method:
+                continue  # t_Max is not used in the paper
+
+            test_name = METHODS_DICT[method]["test_name"]
+            t_stat_name = METHODS_DICT[method]["t_stat_name"]
+            axs[1].plot(
+                np.arange(len(n_train_list)),
+                results_n_train[test_name]["p_value_mean"][t_stat_name],
+                label=method,
+                color=METHODS_DICT[method]["color"],
+                linestyle=METHODS_DICT[method]["linestyle"],
+                marker=METHODS_DICT[method]["marker"],
+                markersize=METHODS_DICT[method]["markersize"],
+                alpha=0.8,
+            )
+            low = np.array(results_n_train[test_name]["p_value_min"][t_stat_name])
+            high = np.array(results_n_train[test_name]["p_value_max"][t_stat_name])
+            axs[1].fill_between(
+                np.arange(len(n_train_list)),
+                low,
+                high,
+                alpha=0.2,
+                color=METHODS_DICT[method]["color"],
+            )
+        axs[1].legend(loc="upper left")
+        axs[1].set_xticks(
+            np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
+        )
+        # axs[1].set_xlabel(r"$N_{\mathrm{train}}$")
+        axs[1].set_ylabel("p-value (min / max)")
+
+    else:
+        # plot rejection rate of all methods w.r.t to oracle
+        for method in methods_all:
+            if "Max" in method:
+                continue  # t_Max is not used in the paper
+
+            test_name = METHODS_DICT[method]["test_name"]
+            t_stat_name = METHODS_DICT[method]["t_stat_name"]
+
+            axs[1].plot(
+                np.arange(len(n_train_list)),
+                results_n_train[test_name]["TPR"][t_stat_name],
+                # label=method,
+                color=METHODS_DICT[method]["color"],
+                linestyle=METHODS_DICT[method]["linestyle"],
+                marker=METHODS_DICT[method]["marker"],
+                markersize=METHODS_DICT[method]["markersize"],
+                alpha=0.8,
+            )
+            # add std over runs
+
+        # axs[1][1].legend(loc="lower left")
+        axs[1].set_xticks(
+            np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
+        )
+        axs[1].set_ylim(-0.04, 1.04)
+        axs[1].set_yticks([0, 0.5, 1])
+        axs[1].set_xlabel(r"$N_{\mathrm{train}}$")
+        axs[1].set_ylabel("rejection rate")
+
+    # plot emp power as function of n_cal
+    for axi, result_name in zip([axs[2], axs[3]], ["TPR", "FPR"]):
+        for method in methods_all:
+            if "Max" in method:
+                continue
+            test_name = METHODS_DICT[method]["test_name"]
+            t_stat_name = METHODS_DICT[method]["t_stat_name"]
+            axi.plot(
+                np.arange(len(n_cal_list)),
+                results_n_cal[result_name]["mean"][method][t_stat_name],
+                # label=method,
+                color=METHODS_DICT[method]["color"],
+                linestyle=METHODS_DICT[method]["linestyle"],
+                marker=METHODS_DICT[method]["marker"],
+                markersize=METHODS_DICT[method]["markersize"],
+                alpha=0.8,
+            )
+            err = np.array(results_n_cal[result_name]["std"][method][t_stat_name])
+            axi.fill_between(
+                np.arange(len(n_cal_list)),
+                np.array(results_n_cal[result_name]["mean"][method][t_stat_name]) - err,
+                np.array(results_n_cal[result_name]["mean"][method][t_stat_name]) + err,
+                alpha=0.2,
+            )
+        # add emp power as function of n_cal
+        axi.set_xlabel(r"N_{\mathrm{cal}}")
+        axi.set_xticks(
+            np.arange(len(n_cal_list)),
+            [r"$100$", r"$500$", r"$1000$", r"$2000$", r"$5000$", r"$10000$"],
+        )
+    axs[2].set_ylabel(r"power (TPR)")
+    axs[2].set_ylim(-0.04, 1.04)
+    axs[2].set_yticks([0, 0.5, 1])
+
+    axs[3].set_ylabel(r"type I error (FPR)")
+    axs[3].set_ylim(-0.04, 0.14)
+    axs[3].set_yticks([0, 0.05, 0.1])
 
     return fig
 

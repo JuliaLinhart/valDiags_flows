@@ -11,7 +11,7 @@ Dependencies:
 
 Make sure to `pip install -e .` within the `valDiags_flows` folder.
 
-## Reporoduce NEURIPS 2023 Figures
+## Generate NEURIPS 2023 Figures
 
 ### Figure 1 
 ```

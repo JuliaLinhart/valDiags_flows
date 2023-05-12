@@ -109,14 +109,20 @@ parser.add_argument(
     "--local_ct_gain",
     "-lct_g",
     action="store_true",
-    help="Exp 1: Local Tests results as a function of varying gain parameter.",
+    help="Exp 2: Local Tests results as a function of varying gain parameter.",
+)
+
+parser.add_argument(
+    "--pp_plots",
+    action="store_true",
+    help="Exp 2: L-C2ST PP-Plots for every observation",
 )
 
 parser.add_argument(
     "--lc2st_interpretability",
     "-lc2st_i",
     action="store_true",
-    help="Exp 1: L-C2ST interpretability plots.",
+    help="EXP 3: L-C2ST interpretability plots.",
 )
 
 # Parse arguments
@@ -257,24 +263,42 @@ if args.local_ct_gain:
     # N.B> L-C2ST is still dependent on the observation space (x)
     # as its trained on the joint samples (theta, x)
 
-    lct_stats_null, probas_null = precompute_t_stats_null(
-        x_cal=x_cal[:, :, 0],
-        n_cal=n_cal,
-        n_eval=n_eval,
-        observation_dict=observation_dict,
-        dim_theta=dim_theta,
-        n_trials_null=args.n_trials_null,
-        t_stats_null_path=PATH_EXPERIMENT / "t_stats_null" / eval_params,
-        methods=["lc2st_nf", "lhpd"],
-        metrics=METRICS_LC2ST,
-        kwargs_lc2st=kwargs_lc2st,
-        kwargs_lhpd=kwargs_lhpd,
-        save_results=True,
-        load_results=True,
-        return_predicted_probas=True,
-        # args for lc2st only
-        kwargs_c2st=None,
-    )
+    try:
+        lct_stats_null = torch.load(
+            PATH_EXPERIMENT / "t_stats_null" / eval_params / "lct_stats_null_dict.pkl"
+        )
+        probas_null = torch.load(
+            PATH_EXPERIMENT / "t_stats_null" / eval_params / "probas_null_dict.pkl"
+        )
+    except FileNotFoundError:
+        lct_stats_null, probas_null = precompute_t_stats_null(
+            x_cal=x_cal[:, :, 0],
+            n_cal=n_cal,
+            n_eval=n_eval,
+            observation_dict=observation_dict,
+            dim_theta=dim_theta,
+            n_trials_null=args.n_trials_null,
+            t_stats_null_path=PATH_EXPERIMENT / "t_stats_null" / eval_params,
+            methods=["lc2st_nf", "lhpd"],
+            metrics=METRICS_LC2ST,
+            kwargs_lc2st=kwargs_lc2st,
+            kwargs_lhpd=kwargs_lhpd,
+            save_results=True,
+            load_results=True,
+            return_predicted_probas=True,
+            # args for lc2st only
+            kwargs_c2st=None,
+        )
+
+        # save results
+        torch.save(
+            lct_stats_null,
+            PATH_EXPERIMENT / "t_stats_null" / eval_params / "lct_stats_null_dict.pkl",
+        )
+        torch.save(
+            probas_null,
+            PATH_EXPERIMENT / "t_stats_null" / eval_params / "probas_null_dict.pkl",
+        )
 
     # local test
     (
@@ -308,17 +332,18 @@ if args.local_ct_gain:
         print()
         print(f"{results_dict[method]['p_value']}")
 
-    # from valdiags.graphical_valdiags import pp_plot_c2st
+    if args.pp_plots:
+        from valdiags.graphical_valdiags import pp_plot_c2st
 
-    # for g in gain_list:
-    #     pp_plot_c2st(
-    #         probas=[probas_obs_dict["lc2st_nf"][g]],
-    #         probas_null=probas_null["lc2st_nf"][g],
-    #         labels=[r"$g_0 = $" + f"{g}"],
-    #         colors=["orange"],
-    #     )
-    #     plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
-    #     plt.show()
+        for g in gain_list:
+            pp_plot_c2st(
+                probas=[probas_obs_dict["lc2st_nf"][g]],
+                probas_null=probas_null["lc2st_nf"][g],
+                labels=[r"$g_0 = $" + f"{g}"],
+                colors=["orange"],
+            )
+            plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
+            plt.show()
 
     if not args.lc2st_interpretability:
         # plot results
@@ -368,84 +393,3 @@ if args.local_ct_gain:
                 PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}.pdf"
             )
             plt.show()
-
-    # # low = np.quantile(probas_null["lc2st_nf"][g], q=0.05 / 2, axis=0)
-    # # high = np.quantile(probas_null["lc2st_nf"][g], q=1 - 0.05 / 2, axis=0)
-    # # uncertain_idx = np.where((probas >= low) & (probas <= high))[0]
-    # # high_proba_idx = np.where(probas > high)[0]
-    # # low_proba_idx = np.where(probas < low)[0]
-
-    # #     bins_dict = {
-    # #     0: np.linspace(10, 250, n_bins),
-    # #     1: np.linspace(50, 500, n_bins),
-    # #     2: np.linspace(100, 5000, n_bins),
-    # #     3: np.linspace(-20, 20, n_bins),
-    # # }
-    # #     # hist_all = np.histogram(
-    # #     samples_theta[:, param_idx].numpy(), bins=bins_dict[param_idx], density=True
-    # # )[0]
-
-    # # uncertain_hist = np.histogram(
-    # #     samples_theta[uncertain_idx][:, param_idx].numpy(),
-    # #     bins=bins_dict[param_idx],
-    # #     density=True,
-    # # )[0]
-
-    # high_proba_hist = np.histogram(
-    #     samples_theta[high_proba_idx][:, param_idx].numpy(),
-    #     bins=bins_dict[param_idx],
-    #     density=True,
-    # )[0]
-
-    # low_proba_hist = np.histogram(
-    #     samples_theta[low_proba_idx][:, param_idx].numpy(),
-    #     bins=bins_dict[param_idx],
-    #     density=True,
-    # )[0]
-    # _, _, patches = plt.hist(
-    #     samples_theta[:, param_idx].numpy(),
-    #     bins=bins_dict[param_idx],
-    #     alpha=0.5,
-    #     density=True,
-    #     color="grey",
-    # )
-
-    # cmap = plt.cm.get_cmap("bwr")
-
-    # df = pd.DataFrame({"theta_i": samples_theta[:, param_idx].numpy()})
-    # df["probas"] = probas
-    # df["bins"] = np.select(
-    #     [df.theta_i <= i for i in bins_dict[param_idx][1:]],
-    #     list(range(n_bins - 1)),
-    #     # n_eval,
-    # )
-
-    # weights_high = [
-    #     high_proba_hist[i] - uncertain_hist[i] for i in range(len(uncertain_hist))
-    # ]
-
-    # weights_low = [
-    #     uncertain_hist[i] - low_proba_hist[i] for i in range(len(uncertain_hist))
-    # ]
-    # weights = np.array(weights_high) + np.array(weights_low)
-
-    # cvals = [min(weights), 0.0, max(weights)]
-    # norm = plt.Normalize(min(cvals), max(cvals))
-    # cmap = plt.cm.get_cmap("bwr")
-
-    # for i in range(len(uncertain_hist)):
-    #     plt.setp(patches[i], "facecolor", cmap(norm(weights[i])), "alpha", 0.8)
-
-    # plt.plot(
-    #     [theta_gt[param_idx]] * 10,
-    #     np.linspace(0, max(hist_all), 10),
-    #     "--",
-    #     color="black",
-    # )
-    # plt.colorbar(
-    #     cm.ScalarMappable(cmap=cmap),
-    #     label=r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$",
-    #     alpha=0.8,
-    # )
-
-    # plt.show()

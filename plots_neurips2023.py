@@ -16,36 +16,48 @@ from valdiags.graphical_valdiags import (
     pp_plot_c2st,
 )
 
+plt.rcParams.update(fonts.neurips2022())
+plt.rcParams.update(axes.color(base="black"))
+plt.rcParams["legend.fontsize"] = 23.0
+plt.rcParams["xtick.labelsize"] = 23.0
+plt.rcParams["ytick.labelsize"] = 23.0
+plt.rcParams["axes.labelsize"] = 23.0
+plt.rcParams["font.size"] = 23.0
+plt.rcParams["axes.titlesize"] = 27.0
+
+alpha_fill_between = 0.2
+linewidth = 2.0
+
 # ======== FIGURE 1 ========== #
 METRICS_DICT = {
     "acc_single_class": {
         "label": r"$\hat{t}_{\mathrm{Acc}_0}$",
-        "color": "red",
+        "color": "orange",
         "linestyle": "--",
     },
     "acc_ref": {
         "label": r"$\hat{t}_{\mathrm{Acc}}$",
-        "color": "red",
+        "color": "orange",
         "linestyle": "-",
     },
     "reg_single_class": {
         "label": r"$\hat{t}_{\mathrm{Reg}_0}$",
-        "color": "orange",
+        "color": "blue",
         "linestyle": "--",
     },
     "reg_ref": {
         "label": r"$\hat{t}_{\mathrm{Reg}}$",
-        "color": "orange",
+        "color": "blue",
         "linestyle": "-",
     },
     "max_single_class": {
         "label": r"$\hat{t}_{\mathrm{Max}_0}$",
-        "color": "blue",
+        "color": "magenta",
         "linestyle": "--",
     },
     "max_ref": {
         "label": r"$\hat{t}_{\mathrm{Max}}$",
-        "color": "blue",
+        "color": "magenta",
         "linestyle": "-",
     },
 }
@@ -95,7 +107,7 @@ def plot_plot_c2st_single_eval_shift(
             label=METRICS_DICT[t_stat_name]["label"],
             color=METRICS_DICT[t_stat_name]["color"],
             linestyle=METRICS_DICT[t_stat_name]["linestyle"],
-            alpha=0.8,
+            # alpha=0.8,
         )
         axs[1].plot(
             shift_list,
@@ -103,7 +115,7 @@ def plot_plot_c2st_single_eval_shift(
             label=METRICS_DICT[t_stat_name]["label"],
             color=METRICS_DICT[t_stat_name]["color"],
             linestyle=METRICS_DICT[t_stat_name]["linestyle"],
-            alpha=0.8,
+            # alpha=0.8,
             zorder=100,
         )
         err = np.array(TPR_std_dict[t_stat_name])
@@ -111,7 +123,7 @@ def plot_plot_c2st_single_eval_shift(
             shift_list,
             np.array(TPR_dict[t_stat_name]) - err,
             np.array(TPR_dict[t_stat_name]) + err,
-            alpha=0.15,
+            alpha=alpha_fill_between,
             color=METRICS_DICT[t_stat_name]["color"],
         )
     if shift_name == "variance":
@@ -153,55 +165,55 @@ METHODS_DICT = {
         "marker": "o",
         "markersize": 6,
     },
-    r"L-C2ST ($\hat{t}_{Reg0}$)": {
+    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)": {
         "test_name": "lc2st",
         "t_stat_name": "mse",
-        "color": "orange",
-        "linestyle": "-",
-        "marker": "o",
-        "markersize": 6,
-    },
-    r"L-C2ST-NF ($\hat{t}_{Reg0}$)": {
-        "test_name": "lc2st_nf",
-        "t_stat_name": "mse",
-        "color": "orange",
-        "linestyle": "-.",
-        "marker": "*",
-        "markersize": 10,
-    },
-    r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)": {
-        "test_name": "lc2st_nf_perm",
-        "t_stat_name": "mse",
-        "color": "darkorange",
-        "linestyle": "-.",
-        "marker": "o",
-        "markersize": 6,
-    },
-    r"L-C2ST ($\hat{t}_{Max0}$)": {
-        "test_name": "lc2st",
-        "t_stat_name": "div",
         "color": "blue",
         "linestyle": "-",
         "marker": "o",
         "markersize": 6,
     },
-    r"L-C2ST-NF ($\hat{t}_{Max0}$)": {
+    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)": {
         "test_name": "lc2st_nf",
-        "t_stat_name": "div",
+        "t_stat_name": "mse",
         "color": "blue",
-        "linestyle": "-.",
+        "linestyle": "--",
         "marker": "*",
         "markersize": 10,
     },
-    r"L-C2ST-NF-perm ($\hat{t}_{Max0}$)": {
+    r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)": {
         "test_name": "lc2st_nf_perm",
-        "t_stat_name": "div",
+        "t_stat_name": "mse",
         "color": "darkblue",
-        "linestyle": "-.",
+        "linestyle": "--",
         "marker": "o",
         "markersize": 6,
     },
-    "L-HPD": {
+    r"$\ell$-C2ST ($\hat{t}_{Max0}$)": {
+        "test_name": "lc2st",
+        "t_stat_name": "div",
+        "color": "magenta",
+        "linestyle": "-",
+        "marker": "o",
+        "markersize": 6,
+    },
+    r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)": {
+        "test_name": "lc2st_nf",
+        "t_stat_name": "div",
+        "color": "magenta",
+        "linestyle": "--",
+        "marker": "*",
+        "markersize": 10,
+    },
+    r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)": {
+        "test_name": "lc2st_nf_perm",
+        "t_stat_name": "div",
+        "color": "red",
+        "linestyle": "--",
+        "marker": "o",
+        "markersize": 6,
+    },
+    "local HPD": {
         "test_name": "lhpd",
         "t_stat_name": "mse",
         "color": "#3BA071",
@@ -265,7 +277,7 @@ def plot_sbibm_results_n_train(
     for method in methods_reg:
         if (
             "perm" in method  # the permuation test is only used for the null hypothesis
-            or "L-HPD" in method  # HPD does not have a comparable t-statistic
+            or "local HPD" in method  # HPD does not have a comparable t-statistic
         ):
             continue
         test_name = METHODS_DICT[method]["test_name"]
@@ -279,7 +291,8 @@ def plot_sbibm_results_n_train(
             linestyle=METHODS_DICT[method]["linestyle"],
             marker=METHODS_DICT[method]["marker"],
             markersize=METHODS_DICT[method]["markersize"],
-            alpha=0.8,
+            # alpha=0.8,
+            linewidth=linewidth,
         )
         err = np.array(results_n_train[test_name]["t_stat_std"][t_stat_name])
         axs[0].fill_between(
@@ -329,7 +342,8 @@ def plot_sbibm_results_n_train(
                 linestyle=METHODS_DICT[method]["linestyle"],
                 marker=METHODS_DICT[method]["marker"],
                 markersize=METHODS_DICT[method]["markersize"],
-                alpha=0.8,
+                # alpha=0.8,
+                linewidth=linewidth,
             )
             low = np.array(results_n_train[test_name]["p_value_min"][t_stat_name])
             high = np.array(results_n_train[test_name]["p_value_max"][t_stat_name])
@@ -337,7 +351,7 @@ def plot_sbibm_results_n_train(
                 np.arange(len(n_train_list)),
                 low,
                 high,
-                alpha=0.2,
+                alpha=alpha_fill_between,
                 color=METHODS_DICT[method]["color"],
             )
         axs[1].legend(loc="upper left")
@@ -364,7 +378,8 @@ def plot_sbibm_results_n_train(
                 linestyle=METHODS_DICT[method]["linestyle"],
                 marker=METHODS_DICT[method]["marker"],
                 markersize=METHODS_DICT[method]["markersize"],
-                alpha=0.8,
+                # alpha=0.8,
+                linewidth=linewidth,
             )
 
             err = np.array(results_n_train[test_name]["TPR_std"][t_stat_name])
@@ -372,7 +387,7 @@ def plot_sbibm_results_n_train(
                 np.arange(len(n_train_list)),
                 np.array(results_n_train[test_name]["TPR_mean"][t_stat_name]) - err,
                 np.array(results_n_train[test_name]["TPR_mean"][t_stat_name]) + err,
-                alpha=0.2,
+                alpha=alpha_fill_between,
                 color=METHODS_DICT[method]["color"],
             )
 
@@ -400,7 +415,8 @@ def plot_sbibm_results_n_train(
                 linestyle=METHODS_DICT[method]["linestyle"],
                 marker=METHODS_DICT[method]["marker"],
                 markersize=METHODS_DICT[method]["markersize"],
-                alpha=0.8,
+                # alpha=0.8,
+                linewidth=linewidth,
             )
             err = np.array(results_n_cal[test_name][result_name + "_std"][t_stat_name])
             axi.fill_between(
@@ -409,7 +425,7 @@ def plot_sbibm_results_n_train(
                 - err,
                 np.array(results_n_cal[test_name][result_name + "_mean"][t_stat_name])
                 + err,
-                alpha=0.2,
+                alpha=alpha_fill_between,
                 color=METHODS_DICT[method]["color"],
             )
         # add emp power as function of n_cal
@@ -444,167 +460,80 @@ def plot_sbibm_results_n_train(
 
 
 def global_coverage_pp_plots(
-    multi_PIT_values,
     alphas,
     sbc_ranks,
-    labels_sbc,
-    colors_sbc=METHODS_DICT["SBC"]["colors"],
-    colors_pit=None,
-    labels_pit=None,
-    ylabel_pit=r"empirical $r_{i,\alpha} = \mathbb{P}(P_{i}\leq \alpha)$",
-    ylabel_sbc=r"empirical CDF",
+    hpd_ranks,
     confidence_int=True,
     conf_alpha=0.05,
     n_trials=1000,
-    hpd_ranks=None,
+    ax=None,
 ):
-    # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
-    plt.rcParams["figure.figsize"] = (10, 5)
-    plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams.update(axes.color(base="black"))
-    plt.rcParams["legend.fontsize"] = 18.0
-    plt.rcParams["legend.title_fontsize"] = 18.0
-    plt.rcParams["xtick.labelsize"] = 23.0
-    plt.rcParams["ytick.labelsize"] = 23.0
-    plt.rcParams["axes.labelsize"] = 23.0
-    plt.rcParams["font.size"] = 23.0
-    plt.rcParams["axes.titlesize"] = 27.0
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(5, 5))
 
-    if multi_PIT_values is None:
-        n_cols = 2
-        ax_sbc = 0
-        ax_hpd = 1
-        plt.rcParams["figure.figsize"] = (10, 5)
-    else:
-        n_cols = 3
-        ax_sbc = 1
-        ax_hpd = 2
-        plt.rcParams["figure.figsize"] = (15, 5)
+    # plot identity function
+    lims = [np.min([0, 0]), np.max([1, 1])]
+    ax.plot(lims, lims, "--", color="black", alpha=0.75)
+    if confidence_int:
+        # conf_alpha = conf_alpha  / len(sbc_ranks[0])  # bonferonni correction
+        # Construct uniform histogram.
+        N = len(sbc_ranks)
+        u_pp_values = {}
+        for t in range(n_trials):
+            u_samples = uniform().rvs(N)
+            u_pp_values[t] = pd.Series(PP_vals(u_samples, alphas))
+        lower_band = pd.DataFrame(u_pp_values).quantile(q=conf_alpha / 2, axis=1)
+        upper_band = pd.DataFrame(u_pp_values).quantile(q=1 - conf_alpha / 2, axis=1)
 
-    fig, axs = plt.subplots(
-        nrows=1, ncols=n_cols, sharex=True, sharey=True, constrained_layout=False
-    )
-
-    for i, ax in enumerate(axs):
-        # plot identity function
-        lims = [np.min([0, 0]), np.max([1, 1])]
-        ax.plot(lims, lims, "--", color="black", alpha=0.75)
-        if confidence_int:
-            if i == 0:
-                conf_alpha = conf_alpha / len(sbc_ranks[0])  # bonferonni correction
-            # Construct uniform histogram.
-            N = len(sbc_ranks)
-            u_pp_values = {}
-            for t in range(n_trials):
-                u_samples = uniform().rvs(N)
-                u_pp_values[t] = pd.Series(PP_vals(u_samples, alphas))
-            lower_band = pd.DataFrame(u_pp_values).quantile(q=conf_alpha / 2, axis=1)
-            upper_band = pd.DataFrame(u_pp_values).quantile(
-                q=1 - conf_alpha / 2, axis=1
-            )
-
-            ax.fill_between(alphas, lower_band, upper_band, color="grey", alpha=0.3)
-
-        ax.set_aspect("equal")
-
-    # global pit
-    if multi_PIT_values is not None:
-        for i, Z in enumerate(multi_PIT_values):
-            # compute quantiles P_{target}(PIT_values <= alpha)
-            pp_vals = PP_vals(Z, alphas)
-            # Plot the quantiles as a function of alpha
-            axs[0].plot(
-                alphas, pp_vals, color=colors_pit[i], label=labels_pit[i], linewidth=2
-            )
-
-        axs[0].set_yticks([0.0, 0.5, 1.0])
-        axs[0].set_ylabel(ylabel_pit)
-        axs[0].set_xlabel(r"$\alpha$")
-        axs[0].set_title("Global PIT")
-        axs[0].legend(loc="upper left")
+        ax.fill_between(
+            alphas, lower_band, upper_band, color="grey", alpha=alpha_fill_between
+        )
 
     # sbc ranks
     for i in range(len(sbc_ranks[0])):
         sbc_cdf = np.histogram(sbc_ranks[:, i], bins=len(alphas))[0].cumsum()
-        axs[ax_sbc].plot(
+        ax.plot(
             alphas,
             sbc_cdf / sbc_cdf.max(),
-            color=colors_sbc[i],
-            label=labels_sbc[i],
-            linewidth=2,
+            color=METHODS_DICT["SBC"]["colors"][i],
+            label=rf"$\mathrm{{SBC}}(\theta_{i+1})$",
+            linewidth=linewidth,
         )
-
-    axs[ax_sbc].set_yticks([0.0, 0.5, 1.0])
-    axs[ax_sbc].set_ylabel(ylabel_sbc)
-    axs[ax_sbc].set_ylim(0, 1)
-    axs[ax_sbc].set_xlim(0, 1)
-    # axs[ax_sbc].set_xlabel(r"posterior rank $\theta_i$")
-    axs[ax_sbc].set_title("SBC")
-    axs[ax_sbc].legend(
-        loc="upper left",
-        title=r"$\mathrm{SBC}(\theta_i,x)$",
-    )
 
     # hpd_values
-    if hpd_ranks is not None:
-        alphas = torch.linspace(0.0, 1.0, len(hpd_ranks))
-        axs[ax_hpd].plot(
-            alphas,
-            hpd_ranks,
-            color=METHODS_DICT["L-HPD"]["color"],
-            label=r"$\mathrm{HPD}(\mathbf{\theta}, x)$",
-        )
-        # axs[ax_hpd].set_ylabel("empirical CDF")  # MC-est. $\mathbb{P}(HPD \leq \alpha)$
-        axs[ax_hpd].set_ylim(0, 1)
-        axs[ax_hpd].set_xlim(0, 1)
-        # axs[ax_hpd].set_xlabel(r"$\alpha$")
-        axs[ax_hpd].set_title("Expected HPD")
-        axs[ax_hpd].legend(loc="upper left")
+    alphas = torch.linspace(0.0, 1.0, len(hpd_ranks))
+    ax.plot(
+        alphas,
+        hpd_ranks,
+        color=METHODS_DICT["local HPD"]["color"],
+        label=r"$\mathrm{HPD}(\theta)$",
+    )
+    ax.set_ylabel("empirical CDF")
+    ax.set_yticks([0.0, 0.5, 1.0])
+    ax.set_ylim(-0.01, 1.01)
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_xticks([0.0, 0.5, 1.0])
+    # ax.set_xlabel("rank")
 
-    return fig
+    ax.legend(loc="upper left")
+    ax.set_aspect("equal", "box")
+    return ax
 
 
-def local_coverage_gain_plots(
+def plot_local_t_stats_gain(
     gain_dict,
     t_stats_obs,
     t_stats_obs_null,
-    gain_list_pp_plots,
-    probas_obs,
-    probas_obs_null,
-    p_values_obs,
-    methods=[r"L-C2ST-NF ($\hat{t}_{Reg0}$)"],
-    colors_g0=["#32327B", "#3838E2", "#52A9F5"],
+    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
+    labels=[r"$\hat{t}_{Reg0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+    ax=None,
 ):
-    # plt.rcParams.update(
-    #     figsizes.neurips2022(nrows=2, ncols=3, height_to_width_ratio=1,)
-    # )
-    plt.rcParams["figure.figsize"] = (10, 10)
-    plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams.update(axes.color(base="black"))
-    plt.rcParams["legend.fontsize"] = 23.0
-    plt.rcParams["xtick.labelsize"] = 23.0
-    plt.rcParams["ytick.labelsize"] = 23.0
-    plt.rcParams["axes.labelsize"] = 23.0
-    plt.rcParams["font.size"] = 23.0
-    plt.rcParams["axes.titlesize"] = 27.0
-
-    fig = plt.figure(figsize=(10, 10), constrained_layout=True)
-    gs = gridspec.GridSpec(2, 3)
-
-    ax = fig.add_subplot(gs[0, :])
-
-    ax0 = fig.add_subplot(gs[1, 0])
-    ax1 = fig.add_subplot(gs[1, 1], sharex=ax0)
-    ax2 = fig.add_subplot(gs[1, 2], sharex=ax0)
-    axes1 = [ax0, ax1, ax2]
-
-    for ax1 in [ax1, ax2]:
-        ax1.set_yticklabels([])
-        ax1.set_xticks([0.0, 0.5, 1.0])
+    if ax is None:
+        ax = plt.gca()
 
     # test statistics
     gain_list_t_stats = list(gain_dict.keys())
-    for method in methods:
+    for i, method in enumerate(methods):
         method_name = METHODS_DICT[method]["test_name"]
         t_stat_name = METHODS_DICT[method]["t_stat_name"]
         t_stats = np.array(
@@ -627,48 +556,115 @@ def local_coverage_gain_plots(
                 for g in gain_list_t_stats
             ]
         )
-        ax.fill_between(
-            gain_list_t_stats,
-            t_stats_null_low,
-            t_stats_null_high,
-            alpha=0.3,
-            color="grey",
-        )
-        # if t_stat_name == "mse":
-        #     t_stats = t_stats + 0.5
+
         ax.plot(
             gain_list_t_stats,
             t_stats,
-            label=method,
+            label=labels[i],
             color=METHODS_DICT[method]["color"],
             linestyle=METHODS_DICT[method]["linestyle"],
             marker=METHODS_DICT[method]["marker"],
             markersize=METHODS_DICT[method]["markersize"],
-            alpha=0.8,
+            # alpha=0.8,
+            linewidth=linewidth,
         )
     ax.plot(
         gain_list_t_stats,
         np.ones(len(gain_list_t_stats)) * 0.0,
         "--",
         color="black",
-        label=r"theoretical $\mathcal{H}_0$",
+        label=r"$t\mid\mathcal{H}_0$",
+    )
+    ax.fill_between(
+        gain_list_t_stats,
+        t_stats_null_low,
+        t_stats_null_high,
+        alpha=alpha_fill_between,
+        color="grey",
+        label=r"95% CR",
     )
 
     ax.yaxis.set_tick_params(which="both", labelleft=True)
     ax.set_xticks(gain_list_t_stats)
-    # ax.set_yticks(
-    #     np.round(
-    #         np.linspace(0, np.max(t_stats_obs["lc2st_nf"].values), 5, endpoint=False), 2
-    #     )
-    # )
 
-    ax.set_xlabel(r"$g_0$")
-    ax.set_ylabel(r"$\hat{t}(x_0)$")
+    ax.set_xlabel(r"gain ($g_0$)")
+    ax.set_ylabel("test statistic")
+    ax.legend()
+    return ax
 
+
+def local_pp_plot(probas_obs, probas_obs_null, method, text="", ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+        pp_plot_c2st(
+            ax=ax,
+            probas=[probas_obs],
+            probas_null=probas_obs_null,
+            colors=[METHODS_DICT[method]["color"]],
+            labels=[""],
+            linewidth=linewidth,
+        )
+        ax.text(
+            0.0,
+            0.9,
+            text,
+            bbox=dict(
+                facecolor="none",
+                edgecolor=METHODS_DICT[method]["color"],
+                boxstyle="round,pad=0.2",
+            ),
+        )
+
+    ax.set_ylabel(r"empirrical CDF")
+    ax.set_yticks([0.0, 0.5, 1.0])
+
+    ax.set_aspect("equal")
+
+    return ax
+
+
+def local_tstats_with_pp_plots(
+    gain_dict,
+    t_stats_obs,
+    t_stats_obs_null,
+    gain_list_pp_plots,
+    probas_obs,
+    probas_obs_null,
+    p_values_obs,
+    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
+    labels=[r"$\hat{t}_{Reg0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+    colors_g0=["#32327B", "#3838E2", "#52A9F5"],
+):
+    plt.rcParams["figure.figsize"] = (10, 10)
+
+    fig = plt.figure(figsize=(10, 10), constrained_layout=True)
+    gs = gridspec.GridSpec(2, 3)
+
+    ax = fig.add_subplot(gs[0, :])
+
+    ax0 = fig.add_subplot(gs[1, 0])
+    ax1 = fig.add_subplot(gs[1, 1], sharex=ax0)
+    ax2 = fig.add_subplot(gs[1, 2], sharex=ax0)
+    axes1 = [ax0, ax1, ax2]
+
+    for ax1 in [ax1, ax2]:
+        ax1.set_yticklabels([])
+        ax1.set_xticks([0.0, 0.5, 1.0])
+
+    # test statistics
+    ax = plot_local_t_stats_gain(
+        gain_dict,
+        t_stats_obs,
+        t_stats_obs_null,
+        methods=methods,
+        labels=labels,
+        ax=ax,
+    )
     ax.set_title("Local Test statistics")
 
     # pp-plots
-    method = r"L-C2ST-NF ($\hat{t}_{Reg0}$)"
+    method = r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"
     method_name = METHODS_DICT[method]["test_name"]
     t_stat_name = METHODS_DICT[method]["t_stat_name"]
     probas_obs = probas_obs[method_name]
@@ -719,6 +715,43 @@ def local_coverage_gain_plots(
     ax.set_xlim(-20.1, 20.1)
     # fig.align_ylabels()
 
+    return fig
+
+
+def global_vs_local_tstats(
+    sbc_alphas,
+    sbc_ranks,
+    hpd_ranks,
+    gain_dict,
+    t_stats_obs,
+    t_stats_obs_null,
+    methods,
+    labels,
+    alpha=0.05,
+    n_trials=1000,
+):
+    fig, axs = plt.subplots(ncols=2, nrows=1, figsize=(11, 5), constrained_layout=True)
+    axs[0] = global_coverage_pp_plots(
+        sbc_alphas,
+        sbc_ranks,
+        hpd_ranks,
+        confidence_int=True,
+        ax=axs[0],
+        n_trials=n_trials,
+        conf_alpha=alpha,
+    )
+
+    axs[1] = plot_local_t_stats_gain(
+        gain_dict,
+        t_stats_obs,
+        t_stats_obs_null,
+        methods=methods,
+        labels=labels,
+        ax=axs[1],
+    )
+    axs[1].set_ylim(-0.01, 0.11)
+    axs[1].set_yticks([0.0, 0.05, 0.1])
+    axs[1].set_xlim(-20.5, 20.5)  # no +/-25 (outside of the prior)
     return fig
 
 
@@ -811,7 +844,7 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
     plt.colorbar(
         cm.ScalarMappable(cmap=cmap),
         cax=cax,
-        label=r"L-C2ST class-0 probability: $1-\hat{d}(Z ; x_0)$",
+        label=r"Predicted Probabaility ($\ell$-C2ST-NF)",
     )
 
     fig.suptitle(

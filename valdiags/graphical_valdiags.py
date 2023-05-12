@@ -466,7 +466,7 @@ def compare_pp_plots_regression(
 # PP-plot of clasifier predicted class probabilities
 
 
-def pp_plot_c2st(probas, probas_null, labels, colors, ax=None):
+def pp_plot_c2st(probas, probas_null, labels, colors, ax=None, **kwargs):
     if ax == None:
         ax = plt.gca()
     alphas = np.linspace(0, 1, 100)
@@ -489,13 +489,13 @@ def pp_plot_c2st(probas, probas_null, labels, colors, ax=None):
         low_null,
         up_null,
         color="grey",
-        alpha=0.3,
-        label="95% confidence region",
+        alpha=0.2,
+        # label="95% confidence region",
     )
 
     for p, l, c in zip(probas, labels, colors):
         pp_vals = pd.Series(PP_vals(p, alphas))
-        ax.plot(alphas, pp_vals, label=l, color=c)
+        ax.plot(alphas, pp_vals, label=l, color=c, **kwargs)
     return ax
 
 

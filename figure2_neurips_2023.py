@@ -10,7 +10,7 @@
 # OUR METHOD: when the true posterior is not known (amortized and single-class-eval)
 #   - L-C2ST / LC2ST-NF (Max) (with permutation / pre-computed)
 #   - L-C2ST / LC2ST-NF (Reg) (with permutation / pre-computed)
-#   - L-HPD [Zhao et al. 2018] (how null?)
+#   - local HPD [Zhao et al. 2018] (how null?)
 # Experiments to evaluate / compare the methods (on average over all observations x_0 from sbibm tasks):
 #   - exp 1: results as a function of N_train
 #   - exp 2: power / type 1 error / runtime as a function of the number of n_cal (at fixed N_train)
@@ -47,27 +47,27 @@ PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_2")
 
 METHODS_ACC = [
     r"oracle C2ST ($\hat{t}_{Acc}$)",
-    r"L-C2ST ($\hat{t}_{Max0}$)",
-    r"L-C2ST-NF ($\hat{t}_{Max0}$)",
-    # r"L-C2ST-NF-perm ($\hat{t}_{Max0}$)",
+    r"$\ell$-C2ST ($\hat{t}_{Max0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
 ]
 METHODS_L2 = [
     r"oracle C2ST ($\hat{t}_{Reg}$)",
-    r"L-C2ST ($\hat{t}_{Reg0}$)",
-    r"L-C2ST-NF ($\hat{t}_{Reg0}$)",
-    # r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
-    "L-HPD",
+    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    "local HPD",
 ]
 METHODS_ALL = [
     r"oracle C2ST ($\hat{t}_{Acc}$)",
     r"oracle C2ST ($\hat{t}_{Reg}$)",
-    r"L-C2ST ($\hat{t}_{Max0}$)",
-    r"L-C2ST-NF ($\hat{t}_{Max0}$)",
-    # r"L-C2ST-NF-perm ($\hat{t}_{Max0}$)",
-    r"L-C2ST ($\hat{t}_{Reg0}$)",
-    r"L-C2ST-NF ($\hat{t}_{Reg0}$)",
-    # r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
-    "L-HPD",
+    r"$\ell$-C2ST ($\hat{t}_{Max0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
+    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    "local HPD",
 ]
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at

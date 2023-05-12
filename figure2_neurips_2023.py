@@ -265,7 +265,7 @@ if args.t_res_ntrain:
         "c2st": {n: 100 for n in n_train_list},
         "lc2st": {100: 65, 1000: 69, 10000: 23, 100000: 85},
         "lc2st_nf": {100: 23, 1000: 23, 10000: 16, 100000: 16},
-        "lc2st_nf_perm": {100: 23, 1000: 23, 10000: 16, 100000: 16},
+        # "lc2st_nf_perm": {100: 23, 1000: 23, 10000: 16, 100000: 16},
         # "lhpd": {100:2, 1000:25, 10000:23, 100000:13},
     }
 
@@ -350,7 +350,6 @@ if args.t_res_ntrain:
                 n_run_load_results=n_train_run_dict[n_train],
                 # save_every_n_runs=10,
             )
-            # emp_power_dict[n_train][m] = emp_power[n_train][m]
             p_values_dict[n_train][m] = p_values[n_cal][m]
 
             # compute emp power for n_runs
@@ -368,6 +367,9 @@ if args.t_res_ntrain:
                     compute_tpr=True,
                     compute_fpr=False,
                     p_values_h0_dict=None,
+                    mean_over_observations=False,
+                    bonferonni_correction=False,
+                    mean_over_runs=False,
                 )
 
     for i, n_train in enumerate(n_train_list):
@@ -458,7 +460,7 @@ if args.power_ncal:
         "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
         "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
         "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
-        "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
+        # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
         # "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 8, 5000: 4, 10000: 25},
     }
     # slcp
@@ -529,9 +531,7 @@ if args.power_ncal:
                 n_run_load_results=n_cal_run_dict[n_cal],
                 # save_every_n_runs=10,
             )
-            # emp_power_dict[n_cal][m] = emp_power[n_cal][m]
             p_values_dict[n_cal][m] = p_values[n_cal][m]
-            # type_I_error_dict[n_cal][m] = type_I_error[n_cal][m]
             p_values_h0_dict[n_cal][m] = p_values_h0[n_cal][m]
 
             # compute emp power for n_runs
@@ -549,6 +549,9 @@ if args.power_ncal:
                     num_observation_list=NUM_OBSERVATION_LIST,
                     compute_tpr=True,
                     compute_fpr=True,
+                    mean_over_observations=False,
+                    bonferonni_correction=False,
+                    mean_over_runs=False,
                 )
 
     results_n_cal = {

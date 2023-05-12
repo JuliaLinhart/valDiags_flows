@@ -1332,20 +1332,34 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
     p_values_h0_dict=None,
     compute_tpr=True,
     compute_fpr=False,
+    mean_over_observations=False,
+    bonferonni_correction=False,
+    mean_over_runs=False,
 ):
     emp_power_list = []
     type_I_error_list = []
     for n_r in range(n_runs):
-        if compute_tpr:
-            p_value_n_r = np.array(
-                [p_values_dict[n_obs][n_r] for n_obs in num_observation_list]
-            )
-            emp_power_list.append((np.array(p_value_n_r) <= alpha) * 1)
-        if compute_fpr:
-            p_value_h0_n_r = np.array(
-                [p_values_h0_dict[n_obs][n_r] for n_obs in num_observation_list]
-            )
-            type_I_error_list.append((np.array(p_value_h0_n_r) <= alpha) * 1)
+        for result_list, p_values, compute in zip(
+            [emp_power_list, type_I_error_list],
+            [p_values_dict, p_values_h0_dict],
+            [compute_tpr, compute_fpr],
+        ):
+            if compute and p_values is not None:
+                p_value_n_r = np.array(
+                    [p_values[n_obs][n_r] for n_obs in num_observation_list]
+                )
+                if mean_over_observations:
+                    result_list.append([np.mean(p_value_n_r <= alpha)])
+                elif bonferonni_correction:
+                    result_list.append(
+                        [np.any(p_value_n_r <= alpha / len(p_value_n_r))]
+                    )
+                else:
+                    result_list.append((np.array(p_value_n_r) <= alpha) * 1)
+    if mean_over_runs:
+        emp_power_list = np.mean(emp_power_list, axis=0)
+        type_I_error_list = np.mean(type_I_error_list, axis=0)
+
     return emp_power_list, type_I_error_list
 
 

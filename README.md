@@ -26,5 +26,5 @@ python figure3_neurips_2023.py --local_ct_gain
 
 3. Interpretability of L-C2ST (pairplots with predicted probability)
 ```
-python figure3_neurips_2023.py --local_ct_gain --lc2st_interpretability
+python figure3_neurips_2023.py -lct_g -lc2st_i
 ```

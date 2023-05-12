@@ -247,7 +247,7 @@ def plot_sbibm_results_n_train(
     plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
-        nrows=1, ncols=3, sharex=True, sharey=False, constrained_layout=True
+        nrows=1, ncols=4, sharex=False, sharey=False, constrained_layout=True
     )
     # ==== t_stats of L-C2ST(-NF) w.r.t to oracle ====
 
@@ -357,7 +357,7 @@ def plot_sbibm_results_n_train(
 
             axs[1].plot(
                 np.arange(len(n_train_list)),
-                results_n_train[test_name]["TPR"][t_stat_name],
+                results_n_train[test_name]["TPR_mean"][t_stat_name],
                 # label=method,
                 color=METHODS_DICT[method]["color"],
                 linestyle=METHODS_DICT[method]["linestyle"],
@@ -365,7 +365,15 @@ def plot_sbibm_results_n_train(
                 markersize=METHODS_DICT[method]["markersize"],
                 alpha=0.8,
             )
-            # add std over runs
+
+            err = np.array(results_n_train[test_name]["TPR_std"][t_stat_name])
+            axs[1].fill_between(
+                np.arange(len(n_train_list)),
+                np.array(results_n_train[test_name]["TPR_mean"][t_stat_name]) - err,
+                np.array(results_n_train[test_name]["TPR_mean"][t_stat_name]) + err,
+                alpha=0.2,
+                color=METHODS_DICT[method]["color"],
+            )
 
         # axs[1][1].legend(loc="lower left")
         axs[1].set_xticks(
@@ -374,7 +382,7 @@ def plot_sbibm_results_n_train(
         axs[1].set_ylim(-0.04, 1.04)
         axs[1].set_yticks([0, 0.5, 1])
         axs[1].set_xlabel(r"$N_{\mathrm{train}}$")
-        axs[1].set_ylabel("rejection rate")
+        axs[1].set_ylabel("power (TPR)")
 
     # plot emp power as function of n_cal
     for axi, result_name in zip([axs[2], axs[3]], ["TPR", "FPR"]):
@@ -385,7 +393,7 @@ def plot_sbibm_results_n_train(
             t_stat_name = METHODS_DICT[method]["t_stat_name"]
             axi.plot(
                 np.arange(len(n_cal_list)),
-                results_n_cal[result_name]["mean"][method][t_stat_name],
+                results_n_cal[test_name][result_name+"_mean"][t_stat_name],
                 # label=method,
                 color=METHODS_DICT[method]["color"],
                 linestyle=METHODS_DICT[method]["linestyle"],
@@ -393,15 +401,18 @@ def plot_sbibm_results_n_train(
                 markersize=METHODS_DICT[method]["markersize"],
                 alpha=0.8,
             )
-            err = np.array(results_n_cal[result_name]["std"][method][t_stat_name])
+            err = np.array(results_n_cal[test_name][result_name+"_std"][t_stat_name])
             axi.fill_between(
                 np.arange(len(n_cal_list)),
-                np.array(results_n_cal[result_name]["mean"][method][t_stat_name]) - err,
-                np.array(results_n_cal[result_name]["mean"][method][t_stat_name]) + err,
+                np.array(results_n_cal[test_name][result_name+"_mean"][t_stat_name])
+                - err,
+                np.array(results_n_cal[test_name][result_name+"_mean"][t_stat_name])
+                + err,
                 alpha=0.2,
+                color=METHODS_DICT[method]["color"],
             )
         # add emp power as function of n_cal
-        axi.set_xlabel(r"N_{\mathrm{cal}}")
+        axi.set_xlabel(r"$N_{\mathrm{cal}}$")
         axi.set_xticks(
             np.arange(len(n_cal_list)),
             [r"$100$", r"$500$", r"$1000$", r"$2000$", r"$5000$", r"$10000$"],

@@ -33,6 +33,7 @@ from experiment_utils_sbibm import (
     l_c2st_results_n_train,
     compute_emp_power_l_c2st,
     compute_rejection_rates_from_pvalues_over_runs_and_observations,
+    compute_average_rejection_rates,
 )
 
 from plots_neurips2023_new import plot_sbibm_results_n_train
@@ -67,7 +68,7 @@ METHODS_ALL = [
     r"L-C2ST ($\hat{t}_{Reg0}$)",
     r"L-C2ST-NF ($\hat{t}_{Reg0}$)",
     # r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
-    "L-HPD",
+    # "L-HPD",
 ]
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at
@@ -78,12 +79,23 @@ ALPHA = 0.05
 N_TRIALS_PRECOMPUTE = 100
 NB_HPD_LEVELS = 11
 
+# how to handle testing for multiple observations in empirical experiments
+# ==> we compute rejection rates over runs for each observation seperately
+# and then plot the mean/std over observations
+BONFERONNI = False  # the goal here is to show how the `local` tests perform for a `fixed` observation ...
+MEAN_RUNS = True  # no std over runs (naturally big for small n_cal or big n_train)
+MEAN_OBS = False  # ... and the test result can be different for different observations
+
 # metrics / test statistics
 ALL_METRICS = ["accuracy", "mse", "div"]
 
 # classifier parameters
 CROSS_VAL = False
 N_ENSEMBLE = 1
+
+# experiment parameters
+N_CAL_EXP1 = 10000
+N_TRAIN_EXP2 = 1000
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -228,29 +240,30 @@ kwargs_lhpd = {
 # N.B> L-C2ST is still dependent on the observation space (x)
 # as its trained on the joint samples (theta, x)
 t_stats_null_c2st_nf = {ncal: None for ncal in n_cal_list}
-# if not args.plot:
-#     t_stats_null_c2st_nf[n_cal] = precompute_t_stats_null(
-#         metrics=ALL_METRICS,
-#         n_cal=n_cal,
-#         n_eval=n_eval,
-#         dim_theta=dim_theta,
-#         n_trials_null=N_TRIALS_PRECOMPUTE,
-#         t_stats_null_path=task_path / "t_stats_null" / eval_params,
-#         methods=["c2st_nf"],
-#         kwargs_c2st=kwargs_c2st,
-#         save_results=True,
-#         load_results=True,
-#         # args for lc2st only
-#         kwargs_lc2st=None,
-#         kwargs_lhpd=None,
-#         x_cal=None,
-#         observation_dict=None,
-#     )["c2st_nf"]
+if not args.plot:
+    for n_cal in n_cal_list:
+        t_stats_null_c2st_nf[n_cal] = precompute_t_stats_null(
+            metrics=ALL_METRICS,
+            n_cal=n_cal,
+            n_eval=n_eval,
+            dim_theta=dim_theta,
+            n_trials_null=N_TRIALS_PRECOMPUTE,
+            t_stats_null_path=task_path / "t_stats_null" / eval_params,
+            methods=["c2st_nf"],
+            kwargs_c2st=kwargs_c2st,
+            save_results=True,
+            load_results=True,
+            # args for lc2st only
+            kwargs_lc2st=None,
+            kwargs_lhpd=None,
+            x_cal=None,
+            observation_dict=None,
+        )["c2st_nf"]
 
 # perform the experiment
 # ==== EXP 1: test stats as a function of N_train (n_cal = max)==== #
 if args.t_res_ntrain:
-    n_cal = n_cal_list[0]
+    n_cal = N_CAL_EXP1
     n_train_list = args.n_train
 
     print()
@@ -352,7 +365,7 @@ if args.t_res_ntrain:
             )
             p_values_dict[n_train][m] = p_values[n_cal][m]
 
-            # compute emp power for n_runs
+            # (1) Compute test result (rejection or not) over runs for each observation seperately
             for t_stat_name in ALL_METRICS:
                 if m == "lhpd" and t_stat_name != "mse":
                     continue
@@ -367,11 +380,10 @@ if args.t_res_ntrain:
                     compute_tpr=True,
                     compute_fpr=False,
                     p_values_h0_dict=None,
-                    mean_over_observations=False,
-                    bonferonni_correction=False,
-                    mean_over_runs=False,
+                    bonferonni_correction=BONFERONNI,
                 )
 
+    # (2) Compute the mean/std ...
     for i, n_train in enumerate(n_train_list):
         for m in methods_dict.keys():
             if i == 0:
@@ -382,12 +394,13 @@ if args.t_res_ntrain:
                     t_stat_name: [] for t_stat_name in ALL_METRICS
                 }
             for t_stat_name in ALL_METRICS:
-                results_n_train[m]["TPR_mean"][t_stat_name].append(
-                    np.mean(emp_power_dict[n_train][m][t_stat_name])
+                result_list = compute_average_rejection_rates(
+                    emp_power_dict[n_train][m][t_stat_name],
+                    mean_over_runs=MEAN_RUNS,
+                    mean_over_observations=MEAN_OBS,
                 )
-                results_n_train[m]["TPR_std"][t_stat_name].append(
-                    np.std(emp_power_dict[n_train][m][t_stat_name])
-                )
+                results_n_train[m]["TPR_mean"][t_stat_name].append(np.mean(result_list))
+                results_n_train[m]["TPR_std"][t_stat_name].append(np.std(result_list))
 
     # plot empirical power
     for m in methods_dict.keys():
@@ -410,40 +423,48 @@ if args.t_res_ntrain:
                 np.array(results_n_train[m]["TPR_mean"][t_stat_name]) + err,
                 alpha=0.2,
             )
-    plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
+    plt.xticks(np.arange(len(n_train_list)), n_train_list)
     plt.xlabel("n_train")
     plt.ylabel("Empirical Power (TPR)")
     plt.legend()
     plt.show()
 
-    # path to save figures
-    fig_path = (
-        task_path
-        / "figures"
-        # / f"nt_precompute_{N_TRIALS_PRECOMPUTE}"
-        / eval_params
-        / test_params
-    )
-    if not os.path.exists(fig_path):
-        os.makedirs(fig_path)
+    # # box plots to show variability over runs for each observation seperately
+    # import seaborn as sns
+    # import pandas as pd
+    # sns.set_theme(style="ticks", palette="pastel")
 
-    # fig = plot_sbibm_results_n_train(
-    #     results_n_train=results_n_train,
-    #     train_runtime=train_runtime,
-    #     fig_path=fig_path,
-    #     n_train_list=n_train_list,
-    #     n_cal=n_cal,
-    #     methods_acc=METHODS_ACC,
-    #     methods_reg=METHODS_L2,
-    #     methods_all=METHODS_ALL,
-    #     t_stat_ext="new",
-    # )
-    # plt.savefig(fig_path / f"results_ntrain_n_cal_{n_cal}.pdf")
-    # plt.show()
+    # for m in methods_dict.keys():
+    #     for t_stat_name in ALL_METRICS:
+    #         if "lc2st" in m and t_stat_name == "accuracy":
+    #                     continue
+    #         if "lhpd" in m and t_stat_name != "mse":
+    #             continue
+    #         if t_stat_name == "div":
+    #             continue
+    #         df = pd.DataFrame()
+    #         list_n_train = []
+    #         list_n_obs = []
+    #         list_tpr = []
+    #         for n_train in n_train_list:
+    #             for n_obs in NUM_OBSERVATION_LIST:
+    #                 for n_r in range(n_runs):
+    #                     list_n_train.append(n_train)
+    #                     list_n_obs.append(n_obs)
+    #                     list_tpr.append(emp_power_dict[n_train][m][t_stat_name][n_r][n_obs-1])
+    #         df["n_train"] = list_n_train
+    #         df["observation"] = list_n_obs
+    #         df["TPR"] = list_tpr
+    #         print(df)
+    #         sns.boxplot(x="n_train", y="TPR", hue="observation", data=df, showmeans=True, meanline=True, meanprops={'linestyle':'--', 'linewidth': 2, 'color':'black'})
+    #         sns.despine(offset=10, trim=True)
+    #         plt.title(m+" "+t_stat_name)
+    #         plt.show()
 
 
 if args.power_ncal:
-    n_train = args.n_train[0]
+    n_train = N_TRAIN_EXP2
+    n_cal_list = args.n_cal
 
     print()
     print(f"Experiment 2: Empirical Power as a function of N_cal in {n_cal_list} ...")
@@ -549,45 +570,34 @@ if args.power_ncal:
                     num_observation_list=NUM_OBSERVATION_LIST,
                     compute_tpr=True,
                     compute_fpr=True,
-                    mean_over_observations=False,
-                    bonferonni_correction=False,
-                    mean_over_runs=False,
+                    bonferonni_correction=BONFERONNI,
                 )
 
-    results_n_cal = {
-        "TPR": {
-            "mean": {
-                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-                for m in methods_dict.keys()
-            },
-            "std": {
-                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-                for m in methods_dict.keys()
-            },
-        },
-        "FPR": {
-            "mean": {
-                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-                for m in methods_dict.keys()
-            },
-            "std": {
-                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-                for m in methods_dict.keys()
-            },
-        },
-    }
-
-    for n_cal in n_cal_list:
+    results_n_cal = {m: {} for m in methods_dict.keys()}
+    # (2) Compute the mean/std ...
+    for i, n_cal in enumerate(n_cal_list):
         for m in methods_dict.keys():
-            for t_stat_name in ALL_METRICS:
-                for result_name, result_dict in zip(
-                    ["TPR", "FPR"], [emp_power_dict, type_I_error_dict]
-                ):
-                    results_n_cal[result_name]["mean"][m][t_stat_name].append(
-                        np.mean(result_dict[n_cal][m][t_stat_name])
+            for result_name, result_dict in zip(
+                ["TPR", "FPR"], [emp_power_dict, type_I_error_dict]
+            ):
+                if i == 0:
+                    results_n_cal[m][result_name + "_mean"] = {
+                        t_stat_name: [] for t_stat_name in ALL_METRICS
+                    }
+                    results_n_cal[m][result_name + "_std"] = {
+                        t_stat_name: [] for t_stat_name in ALL_METRICS
+                    }
+                for t_stat_name in ALL_METRICS:
+                    result_list = compute_average_rejection_rates(
+                        result_dict[n_cal][m][t_stat_name],
+                        mean_over_runs=MEAN_RUNS,
+                        mean_over_observations=MEAN_OBS,
                     )
-                    results_n_cal[result_name]["std"][m][t_stat_name].append(
-                        np.std(result_dict[n_cal][m][t_stat_name])
+                    results_n_cal[m][result_name + "_mean"][t_stat_name].append(
+                        np.mean(result_list)
+                    )
+                    results_n_cal[m][result_name + "_std"][t_stat_name].append(
+                        np.std(result_list)
                     )
 
     # plot empirical power
@@ -601,14 +611,14 @@ if args.power_ncal:
                 continue
             plt.plot(
                 np.arange(len(n_cal_list)),
-                results_n_cal["TPR"]["mean"][m][t_stat_name],
+                results_n_cal[m]["TPR_mean"][t_stat_name],
                 label=m + " " + t_stat_name,
             )
-            err = np.array(results_n_cal["TPR"]["std"][m][t_stat_name])
+            err = np.array(results_n_cal[m]["TPR_std"][t_stat_name])
             plt.fill_between(
                 np.arange(len(n_cal_list)),
-                np.array(results_n_cal["TPR"]["mean"][m][t_stat_name]) - err,
-                np.array(results_n_cal["TPR"]["mean"][m][t_stat_name]) + err,
+                np.array(results_n_cal[m]["TPR_mean"][t_stat_name]) - err,
+                np.array(results_n_cal[m]["TPR_mean"][t_stat_name]) + err,
                 alpha=0.2,
             )
     plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
@@ -629,18 +639,45 @@ if args.power_ncal:
 
             plt.plot(
                 np.arange(len(n_cal_list)),
-                results_n_cal["FPR"]["mean"][m][t_stat_name],
+                results_n_cal[m]["FPR_mean"][t_stat_name],
                 label=m + " " + t_stat_name,
             )
-            err = np.array(results_n_cal["FPR"]["std"][m][t_stat_name])
+            err = np.array(results_n_cal[m]["FPR_std"][t_stat_name])
             plt.fill_between(
                 np.arange(len(n_cal_list)),
-                np.array(results_n_cal["FPR"]["mean"][m][t_stat_name]) - err,
-                np.array(results_n_cal["FPR"]["mean"][m][t_stat_name]) + err,
+                np.array(results_n_cal[m]["FPR_mean"][t_stat_name]) - err,
+                np.array(results_n_cal[m]["FPR_mean"][t_stat_name]) + err,
                 alpha=0.2,
             )
     plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
     plt.xlabel("n_cal")
     plt.ylabel("Type I Error (FPR)")
     plt.legend()
+    plt.show()
+
+if args.plot:
+    # path to save figures
+    fig_path = (
+        task_path
+        / "figures"
+        # / f"nt_precompute_{N_TRIALS_PRECOMPUTE}"
+        / eval_params
+        / test_params
+        / f"bonferonni_{BONFERONNI}_mean_obs_{MEAN_OBS}_mean_runs_{MEAN_RUNS}"
+    )
+    if not os.path.exists(fig_path):
+        os.makedirs(fig_path)
+
+    fig = plot_sbibm_results_n_train(
+        results_n_train=results_n_train,
+        results_n_cal=results_n_cal,
+        n_train_list=args.n_train,
+        n_cal_list=args.n_cal,
+        methods_reg=METHODS_L2,
+        methods_all=METHODS_ALL,
+    )
+    plt.savefig(
+        fig_path
+        / f"results_ntrain_1000_n_cal_10000_bonferonni_{BONFERONNI}_mean_over_obs_{MEAN_OBS}_mean_over_runs_{MEAN_RUNS}.pdf"
+    )
     plt.show()

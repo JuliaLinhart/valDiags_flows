@@ -1332,9 +1332,7 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
     p_values_h0_dict=None,
     compute_tpr=True,
     compute_fpr=False,
-    mean_over_observations=False,
     bonferonni_correction=False,
-    mean_over_runs=False,
 ):
     emp_power_list = []
     type_I_error_list = []
@@ -1348,19 +1346,26 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
                 p_value_n_r = np.array(
                     [p_values[n_obs][n_r] for n_obs in num_observation_list]
                 )
-                if mean_over_observations:
-                    result_list.append([np.mean(p_value_n_r <= alpha)])
-                elif bonferonni_correction:
+                if bonferonni_correction:
                     result_list.append(
                         [np.any(p_value_n_r <= alpha / len(p_value_n_r))]
                     )
                 else:
                     result_list.append((np.array(p_value_n_r) <= alpha) * 1)
-    if mean_over_runs:
-        emp_power_list = np.mean(emp_power_list, axis=0)
-        type_I_error_list = np.mean(type_I_error_list, axis=0)
 
     return emp_power_list, type_I_error_list
+
+def compute_average_rejection_rates(result_dict, mean_over_runs, mean_over_observations):
+    
+    # ... over observations (for the mean rejection rate over runs)
+    if mean_over_runs:
+        result_list = np.mean(result_dict, axis=0)
+    # ... over runs (for the mean rejection rate over observations)
+    elif mean_over_observations:
+        result_list = np.mean(result_dict, axis=1)
+    else:
+        result_list = result_dict
+    return result_list
 
 
 if __name__ == "__main__":

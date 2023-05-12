@@ -2,17 +2,17 @@
 
 ## Reporoduce NEURIPS 2023 Figures
 
-### Figure 1. 
+### Figure 1 
 ```
 python figure1_neurips_2023.py --plot
 ```
 
-### Figure 2.
+### Figure 2
 ```
 python figure2_neurips_2023.py --task {task_name} --plot
 ```
 
-### Figure 3.
+### Figure 3
 
 1. Global Coverage Test
 ```

@@ -202,14 +202,15 @@ def global_coverage_tests(
     global_rank_stats = {}
     # 1. SBC
     if "sbc" in methods:
-        print("     Simulation Based Calibration (SBC):")
-        print()
         try:
             global_rank_stats["sbc"] = np.array(
                 torch.load(save_path_global / f"sbc_ranks_n_cal_{x_cal.shape[0]}.pkl")
             )
         except FileNotFoundError:
             from sbi.inference.posteriors.direct_posterior import DirectPosterior
+
+            print("     Simulation Based Calibration (SBC):")
+            print()
 
             posterior_sbc = DirectPosterior(
                 posterior_estimator=npe,
@@ -225,14 +226,15 @@ def global_coverage_tests(
 
     # 2. HPD
     if "hpd" in methods:
-        print("     HPD:")
-        print()
         try:
             global_rank_stats["hpd"] = torch.load(
                 save_path_global / f"hpd_ranks_n_cal_{x_cal.shape[0]}.pkl"
             )
         except FileNotFoundError:
             from sbi.utils import match_theta_and_x_batch_shapes
+
+            print("     HPD:")
+            print()
 
             def posterior_log_prob_fn(theta, x):
                 theta, x = match_theta_and_x_batch_shapes(theta, x)

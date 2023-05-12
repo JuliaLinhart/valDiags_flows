@@ -202,33 +202,14 @@ if args.global_ct:
     )
     colors_sbc = ["#B9D6AF", "#B2C695", "#81B598", "#519D7A"]
 
-    # # SBC
-    # sbc_plot(
-    #     global_rank_stats["sbc"],
-    #     colors=colors_sbc,
-    #     labels=SIM_PARAMETER_NAMES,
-    #     conf_alpha=ALPHA / dim_theta,
-    # )  # bonferonni correction
-    # plt.savefig(PATH_EXPERIMENT / "global_tests/sbc_plot.pdf")
-    # plt.show()
-
-    # # HPD
-    # confidence_region_null(np.linspace(0, 1, 100), N=n_cal, conf_alpha=ALPHA)
-    # alphas = np.linspace(0.0, 1.0, len(global_rank_stats["hpd"]))
-    # plt.plot(alphas, global_rank_stats["hpd"].numpy())
-    # plt.title("Expected HPD")
-    # plt.savefig(PATH_EXPERIMENT / "global_tests/hpd_plot.pdf")
-    # plt.show()
-
     from plots_neurips2023 import global_coverage_pp_plots
 
     fig = global_coverage_pp_plots(
-        multi_PIT_values=None,
         alphas=np.linspace(0, 1, 100),
-        # colors_sbc=colors_sbc,
-        labels_sbc=SIM_PARAMETER_NAMES,
         sbc_ranks=global_rank_stats["sbc"],
         hpd_ranks=global_rank_stats["hpd"],
+        conf_alpha=ALPHA,
+        n_trials=args.n_trials_null,
     )
     plt.savefig(PATH_EXPERIMENT / "global_tests/global_consistency.pdf")
     plt.show()

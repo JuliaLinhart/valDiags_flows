@@ -1,5 +1,16 @@
 # Validation Diagnostics for (conditional) Flows
 
+Dependencies: 
+- python 3.10 conda environment
+- sbi
+- lampe
+- zuko
+- sbibm
+- tueplots
+- seaborn
+
+Make sure to `pip install -e .` within the `valDiags_flows` folder.
+
 ## Reporoduce NEURIPS 2023 Figures
 
 ### Figure 1 

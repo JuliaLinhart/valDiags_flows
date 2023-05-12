@@ -33,7 +33,7 @@ from valdiags.graphical_valdiags import sbc_plot, confidence_region_null
 
 from valdiags.localC2ST import sbibm_clf_kwargs
 
-from plots_neurips2023_new import (
+from plots_neurips2023 import (
     plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st,
 )
 
@@ -214,7 +214,7 @@ if args.global_ct:
     # plt.savefig(PATH_EXPERIMENT / "global_tests/hpd_plot.pdf")
     # plt.show()
 
-    from plots_neurips2023_new import global_coverage_pp_plots
+    from plots_neurips2023 import global_coverage_pp_plots
 
     fig = global_coverage_pp_plots(
         multi_PIT_values=None,
@@ -322,7 +322,7 @@ if args.local_ct_gain:
 
     if not args.lc2st_interpretability:
         # plot results
-        from plots_neurips2023_new import local_coverage_gain_plots
+        from plots_neurips2023 import local_coverage_gain_plots
 
         fig = local_coverage_gain_plots(
             gain_dict={g: i for i, g in enumerate(gain_list)},
@@ -348,7 +348,7 @@ if args.local_ct_gain:
             observation = x_obs_list[dict_obs_g[g]][None, :, :]
             theta_gt = np.array([c, mu, sigma, g])
 
-            from plots_neurips2023_new import (
+            from plots_neurips2023 import (
                 plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st,
             )
             from functools import partial

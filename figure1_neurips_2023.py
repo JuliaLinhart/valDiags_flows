@@ -33,7 +33,7 @@ from classifiers.optimal_bayes import (
 from c2st_p_values_roc import c2st_p_values_tfpr
 from valdiags.test_utils import eval_htest
 
-from plots_neurips2023_new import plot_plot_c2st_single_eval_shift
+from plots_neurips2023 import plot_plot_c2st_single_eval_shift
 
 # GLOBAL PARAMETERS
 

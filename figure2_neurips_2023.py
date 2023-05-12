@@ -1,13 +1,12 @@
 # ==== Compare different validation methods (2 sample tests - 2ST) on SBIBM tasks (toy-examples) ==== #
 ## Toy Examples:
-# - two moons (D=2)
-# - gaussian linear uniform (D=10)
+# - two moons
+# - slcp
 #
 # Validation methods to compare:
 # REFERENCE for toy-examples when the true posterior is known (not amortized)
 #   - Oracle C2ST (vanilla) - permutation method (not analytic because depends on classifier)
 #   - Oracle C2ST (Reg) - permutation method (not analytic because depends on classifier)
-#   - Oracle HPD (Highest Posterior Density Regions) (analytically known)
 # OUR METHOD: when the true posterior is not known (amortized and single-class-eval)
 #   - L-C2ST / LC2ST-NF (Max) (with permutation / pre-computed)
 #   - L-C2ST / LC2ST-NF (Reg) (with permutation / pre-computed)
@@ -36,7 +35,7 @@ from experiment_utils_sbibm import (
     compute_average_rejection_rates,
 )
 
-from plots_neurips2023_new import plot_sbibm_results_n_train
+from plots_neurips2023 import plot_sbibm_results_n_train
 
 # set seed for reproducibility
 RANDOM_SEED = 42
@@ -68,7 +67,7 @@ METHODS_ALL = [
     r"L-C2ST ($\hat{t}_{Reg0}$)",
     r"L-C2ST-NF ($\hat{t}_{Reg0}$)",
     # r"L-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
-    # "L-HPD",
+    "L-HPD",
 ]
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at
@@ -167,6 +166,13 @@ parser.add_argument(
     help="Plot results only.",
 )
 
+parser.add_argument(
+    "--box_plots",
+    "-b",
+    action="store_true",
+    help="Plot Box-plots for every observation.",
+)
+
 # Parse arguments
 args = parser.parse_args()
 
@@ -205,12 +211,21 @@ n_eval = args.n_eval
 
 dim_theta = prior(num_samples=1).shape[-1]
 
-# classifier parameters
-sbibm_kwargs = sbibm_clf_kwargs(ndim=dim_theta)
-
 # set-up path-params to save results for given test params
 test_params = f"alpha_{ALPHA}_n_trials_null_{args.n_trials_null}"
 eval_params = f"n_eval_{n_eval}_n_ensemble_{N_ENSEMBLE}_cross_val_{CROSS_VAL}"
+results_path = (
+    task_path
+    / "results"
+    / test_params
+    / eval_params
+    / f"bonferonni_{BONFERONNI}_mean_obs_{MEAN_OBS}_mean_runs_{MEAN_RUNS}"
+)
+if not os.path.exists(results_path):
+    os.makedirs(results_path)
+
+# classifier parameters
+sbibm_kwargs = sbibm_clf_kwargs(ndim=dim_theta)
 
 # kwargs for c2st_scores function
 kwargs_c2st = {
@@ -240,29 +255,29 @@ kwargs_lhpd = {
 # N.B> L-C2ST is still dependent on the observation space (x)
 # as its trained on the joint samples (theta, x)
 t_stats_null_c2st_nf = {ncal: None for ncal in n_cal_list}
-if not args.plot:
-    for n_cal in n_cal_list:
-        t_stats_null_c2st_nf[n_cal] = precompute_t_stats_null(
-            metrics=ALL_METRICS,
-            n_cal=n_cal,
-            n_eval=n_eval,
-            dim_theta=dim_theta,
-            n_trials_null=N_TRIALS_PRECOMPUTE,
-            t_stats_null_path=task_path / "t_stats_null" / eval_params,
-            methods=["c2st_nf"],
-            kwargs_c2st=kwargs_c2st,
-            save_results=True,
-            load_results=True,
-            # args for lc2st only
-            kwargs_lc2st=None,
-            kwargs_lhpd=None,
-            x_cal=None,
-            observation_dict=None,
-        )["c2st_nf"]
+# if not args.plot:
+#     for n_cal in n_cal_list:
+#         t_stats_null_c2st_nf[n_cal] = precompute_t_stats_null(
+#             metrics=ALL_METRICS,
+#             n_cal=n_cal,
+#             n_eval=n_eval,
+#             dim_theta=dim_theta,
+#             n_trials_null=N_TRIALS_PRECOMPUTE,
+#             t_stats_null_path=task_path / "t_stats_null" / eval_params,
+#             methods=["c2st_nf"],
+#             kwargs_c2st=kwargs_c2st,
+#             save_results=True,
+#             load_results=True,
+#             # args for lc2st only
+#             kwargs_lc2st=None,
+#             kwargs_lhpd=None,
+#             x_cal=None,
+#             observation_dict=None,
+#         )["c2st_nf"]
 
 # perform the experiment
 # ==== EXP 1: test stats as a function of N_train (n_cal = max)==== #
-if args.t_res_ntrain:
+if args.t_res_ntrain and not args.plot:
     n_cal = N_CAL_EXP1
     n_train_list = args.n_train
 
@@ -274,15 +289,28 @@ if args.t_res_ntrain:
     print()
 
     # two moons
-    methods_dict = {
-        "c2st": {n: 100 for n in n_train_list},
-        "lc2st": {100: 65, 1000: 69, 10000: 23, 100000: 85},
-        "lc2st_nf": {100: 23, 1000: 23, 10000: 16, 100000: 16},
-        # "lc2st_nf_perm": {100: 23, 1000: 23, 10000: 16, 100000: 16},
-        # "lhpd": {100:2, 1000:25, 10000:23, 100000:13},
-    }
+    if args.task == "two_moons":
+        methods_dict = {
+            "c2st": {n: 100 for n in n_train_list},
+            "lc2st": {100: 65, 1000: 69, 10000: 56, 100000: 85},
+            "lc2st_nf": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+            # "lc2st_nf_perm": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+            "lhpd": {100: 5, 1000: 54, 10000: 53, 100000: 30},
+        }
 
-    n_runs = 16
+    # slcp
+    elif args.task == "slcp":
+        methods_dict = {
+            "c2st": {100: 10, 1000: 14, 10000: 7, 100000: 13},
+            "lc2st": {100: 52, 1000: 50, 10000: 43, 100000: 94},
+            "lc2st_nf": {100: 27, 1000: 16, 10000: 28, 100000: 37},
+            # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
+            "lhpd": {100: 18, 1000: 7, 10000: 11, 100000: 16},
+        }
+    else:
+        raise NotImplementedError("Only two_moons and slcp are supported for now.")
+
+    n_runs = min(m[n] for m in methods_dict.values() for n in n_train_list)
 
     # compute test statistics for every n_train
     results_n_train, train_runtime = l_c2st_results_n_train(
@@ -304,7 +332,6 @@ if args.t_res_ntrain:
         methods=list(methods_dict.keys()),
         test_stat_names=ALL_METRICS,
         seed=RANDOM_SEED,
-        plot_mode=args.plot,
     )
 
     # compute TPR for every n_train
@@ -402,6 +429,10 @@ if args.t_res_ntrain:
                 results_n_train[m]["TPR_mean"][t_stat_name].append(np.mean(result_list))
                 results_n_train[m]["TPR_std"][t_stat_name].append(np.std(result_list))
 
+    # save results
+    torch.save(emp_power_dict, results_path / f"emp_power_dict_n_train.pkl")
+    torch.save(results_n_train, results_path / f"avg_results_n_train.pkl")
+
     # plot empirical power
     for m in methods_dict.keys():
         for t_stat_name in ALL_METRICS:
@@ -429,40 +460,8 @@ if args.t_res_ntrain:
     plt.legend()
     plt.show()
 
-    # # box plots to show variability over runs for each observation seperately
-    # import seaborn as sns
-    # import pandas as pd
-    # sns.set_theme(style="ticks", palette="pastel")
 
-    # for m in methods_dict.keys():
-    #     for t_stat_name in ALL_METRICS:
-    #         if "lc2st" in m and t_stat_name == "accuracy":
-    #                     continue
-    #         if "lhpd" in m and t_stat_name != "mse":
-    #             continue
-    #         if t_stat_name == "div":
-    #             continue
-    #         df = pd.DataFrame()
-    #         list_n_train = []
-    #         list_n_obs = []
-    #         list_tpr = []
-    #         for n_train in n_train_list:
-    #             for n_obs in NUM_OBSERVATION_LIST:
-    #                 for n_r in range(n_runs):
-    #                     list_n_train.append(n_train)
-    #                     list_n_obs.append(n_obs)
-    #                     list_tpr.append(emp_power_dict[n_train][m][t_stat_name][n_r][n_obs-1])
-    #         df["n_train"] = list_n_train
-    #         df["observation"] = list_n_obs
-    #         df["TPR"] = list_tpr
-    #         print(df)
-    #         sns.boxplot(x="n_train", y="TPR", hue="observation", data=df, showmeans=True, meanline=True, meanprops={'linestyle':'--', 'linewidth': 2, 'color':'black'})
-    #         sns.despine(offset=10, trim=True)
-    #         plt.title(m+" "+t_stat_name)
-    #         plt.show()
-
-
-if args.power_ncal:
+if args.power_ncal and not args.plot:
     n_train = N_TRAIN_EXP2
     n_cal_list = args.n_cal
 
@@ -472,35 +471,42 @@ if args.power_ncal:
     print(f"... for N_train = {n_train}")
     print()
 
-    result_path = task_path / f"npe_{n_train}" / "results" / test_params / eval_params
-    if not os.path.exists(result_path):
-        os.makedirs(result_path)
+    npe_result_path = (
+        task_path / f"npe_{n_train}" / "results" / test_params / eval_params
+    )
+    if not os.path.exists(npe_result_path):
+        os.makedirs(npe_result_path)
 
     # two moons
-    methods_dict = {
-        "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
-        "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
-        "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
-        # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 30, 10000: 23},
-        # "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 8, 5000: 4, 10000: 25},
-    }
-    # slcp
-    # methods_dict = {
-    #     # "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
-    #     "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 81, 10000: 29},
-    #     "lc2st_nf": {100: 35, 500: 35, 1000: 35, 2000: 33, 5000: 15, 10000: 11},
-    #     "lc2st_nf_perm": {
-    #         100: 35,
-    #         500: 35,
-    #         1000: 35,
-    #         2000: 33,
-    #         5000: 15,
-    #         10000: 11,
-    #     },
-    #     # "lhpd": {100: 100, 500: 100, 1000: 79, 2000: 53, 5000: 26, 10000: 23},
-    # }
+    if args.task == "two_moons":
+        methods_dict = {
+            "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
+            "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
+            "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
+            # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
+            "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 14, 5000: 11, 10000: 54},
+        }
 
-    n_runs = 23
+    # slcp
+    elif args.task == "slcp":
+        methods_dict = {
+            "c2st": {100: 77, 500: 77, 1000: 77, 2000: 30, 5000: 14, 10000: 14},
+            "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 50},
+            "lc2st_nf": {100: 64, 500: 64, 1000: 64, 2000: 100, 5000: 45, 10000: 16},
+            # "lc2st_nf_perm": {
+            #     100: 64,
+            #     500: 64,
+            #     1000: 64,
+            #     2000: 100,
+            #     5000: 45,
+            #     10000: 16,
+            # },
+            "lhpd": {100: 88, 500: 21, 1000: 16, 2000: 18, 5000: 20, 10000: 7},
+        }
+    else:
+        raise NotImplementedError("Only two_moons and slcp are supported for now.")
+
+    n_runs = min(m[n] for m in methods_dict.values() for n in n_cal_list)
 
     emp_power_dict, type_I_error_dict = {
         n: {
@@ -546,7 +552,7 @@ if args.power_ncal:
                 compute_type_I_error=True,
                 task_path=task_path,
                 load_eval_data=True,
-                result_path=result_path,
+                result_path=npe_result_path,
                 t_stats_null_path=task_path / "t_stats_null" / eval_params,
                 results_n_train_path=Path(f"results") / test_params / eval_params,
                 n_run_load_results=n_cal_run_dict[n_cal],
@@ -599,6 +605,11 @@ if args.power_ncal:
                     results_n_cal[m][result_name + "_std"][t_stat_name].append(
                         np.std(result_list)
                     )
+
+    # save results
+    torch.save(emp_power_dict, results_path / f"emp_power_dict_n_cal.pkl")
+    torch.save(type_I_error_dict, results_path / f"type_I_error_dict_n_cal.pkl")
+    torch.save(results_n_cal, results_path / f"avg_results_n_cal.pkl")
 
     # plot empirical power
     for m in methods_dict.keys():
@@ -660,7 +671,6 @@ if args.plot:
     fig_path = (
         task_path
         / "figures"
-        # / f"nt_precompute_{N_TRIALS_PRECOMPUTE}"
         / eval_params
         / test_params
         / f"bonferonni_{BONFERONNI}_mean_obs_{MEAN_OBS}_mean_runs_{MEAN_RUNS}"
@@ -668,11 +678,18 @@ if args.plot:
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
+    # load results
+    results_n_train = torch.load(results_path / f"avg_results_n_train.pkl")
+    results_n_cal = torch.load(results_path / f"avg_results_n_cal.pkl")
+
+    n_train_list = [100, 1000, 10000, 100000]
+    n_cal_list = [100, 500, 1000, 2000, 5000, 10000]
+
     fig = plot_sbibm_results_n_train(
         results_n_train=results_n_train,
         results_n_cal=results_n_cal,
-        n_train_list=args.n_train,
-        n_cal_list=args.n_cal,
+        n_train_list=n_train_list,
+        n_cal_list=n_cal_list,
         methods_reg=METHODS_L2,
         methods_all=METHODS_ALL,
     )
@@ -681,3 +698,110 @@ if args.plot:
         / f"results_ntrain_1000_n_cal_10000_bonferonni_{BONFERONNI}_mean_over_obs_{MEAN_OBS}_mean_over_runs_{MEAN_RUNS}.pdf"
     )
     plt.show()
+
+    if args.box_plots:
+        # box plots to show variability over runs for each observation seperately
+        import seaborn as sns
+        import pandas as pd
+
+        # two moons
+        if args.task == "two_moons":
+            methods_dict = {
+                "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
+                "lc2st": {
+                    100: 100,
+                    500: 100,
+                    1000: 100,
+                    2000: 100,
+                    5000: 100,
+                    10000: 69,
+                },
+                "lc2st_nf": {
+                    100: 67,
+                    500: 67,
+                    1000: 67,
+                    2000: 100,
+                    5000: 65,
+                    10000: 50,
+                },
+                # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
+                "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 14, 5000: 11, 10000: 54},
+            }
+
+        # slcp
+        elif args.task == "slcp":
+            methods_dict = {
+                "c2st": {100: 77, 500: 77, 1000: 77, 2000: 30, 5000: 14, 10000: 14},
+                "lc2st": {
+                    100: 100,
+                    500: 100,
+                    1000: 100,
+                    2000: 100,
+                    5000: 100,
+                    10000: 50,
+                },
+                "lc2st_nf": {
+                    100: 64,
+                    500: 64,
+                    1000: 64,
+                    2000: 100,
+                    5000: 45,
+                    10000: 16,
+                },
+                # "lc2st_nf_perm": {
+                #     100: 64,
+                #     500: 64,
+                #     1000: 64,
+                #     2000: 100,
+                #     5000: 45,
+                #     10000: 16,
+                # },
+                "lhpd": {100: 88, 500: 21, 1000: 16, 2000: 18, 5000: 20, 10000: 7},
+            }
+        else:
+            raise NotImplementedError("Only two_moons and slcp are supported for now.")
+
+        n_runs = min(m[n] for m in methods_dict.values() for n in n_cal_list)
+
+        emp_power_dict = torch.load(results_path / f"emp_power_dict_n_train.pkl")
+
+        sns.set_theme(style="ticks", palette="pastel")
+
+        for m in methods_dict.keys():
+            for t_stat_name in ALL_METRICS:
+                if "lc2st" in m and t_stat_name == "accuracy":
+                    continue
+                if "lhpd" in m and t_stat_name != "mse":
+                    continue
+                if t_stat_name == "div":
+                    continue
+                df = pd.DataFrame()
+                list_n_train = []
+                list_n_obs = []
+                list_tpr = []
+                for n_train in n_train_list:
+                    for n_obs in NUM_OBSERVATION_LIST:
+                        for n_r in range(n_runs):
+                            list_n_train.append(n_train)
+                            list_n_obs.append(n_obs)
+                            list_tpr.append(
+                                emp_power_dict[n_train][m][t_stat_name][n_r][n_obs - 1]
+                            )
+                df["n_train"] = list_n_train
+                df["observation"] = list_n_obs
+                df["TPR"] = list_tpr
+
+                sns.boxplot(
+                    x="n_train",
+                    y="TPR",
+                    hue="observation",
+                    data=df,
+                    showmeans=True,
+                    meanline=True,
+                    meanprops={"linestyle": "--", "linewidth": 2, "color": "black"},
+                )
+                sns.despine(offset=10, trim=True)
+                plt.title(m + " " + t_stat_name)
+                plt.ylim(0, 1)
+                plt.savefig(task_path / "figures" / f"boxplot_{m}_{t_stat_name}.png")
+                plt.show()

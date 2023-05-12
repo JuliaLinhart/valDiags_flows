@@ -41,7 +41,6 @@ def l_c2st_results_n_train(
     methods=["c2st", "lc2st", "lc2st_nf"],
     test_stat_names=["accuracy", "mse", "div"],
     seed=42,
-    plot_mode=False,
 ):
     # GENERATE DATA
     data_samples = generate_data_one_run(
@@ -60,50 +59,49 @@ def l_c2st_results_n_train(
     t_stats_null_lc2st_nf = None
     t_stats_null_lhpd = None
 
-    if not plot_mode:
-        # precompute test statistics under null hypothesis for lc2st_nf
-        # same for every estimator (no need to recompute for every n_train)
-        if "lc2st_nf" in methods:
-            x_cal = data_samples["joint_cal"]["x"]
-            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-            t_stats_null_lc2st_nf = precompute_t_stats_null(
-                n_cal=n_cal,
-                n_eval=n_eval,
-                dim_theta=dim_theta,
-                n_trials_null=n_trials_null_precompute,
-                kwargs_lc2st=kwargs_lc2st,
-                x_cal=x_cal,
-                observation_dict=observation_dict,
-                methods=["lc2st_nf"],
-                metrics=test_stat_names,
-                t_stats_null_path=t_stats_null_path,
-                save_results=True,
-                load_results=True,
-                # args only for c2st
-                kwargs_c2st=None,
-                kwargs_lhpd=None,
-            )["lc2st_nf"]
+    # precompute test statistics under null hypothesis for lc2st_nf
+    # same for every estimator (no need to recompute for every n_train)
+    if "lc2st_nf" in methods:
+        x_cal = data_samples["joint_cal"]["x"]
+        dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+        t_stats_null_lc2st_nf = precompute_t_stats_null(
+            n_cal=n_cal,
+            n_eval=n_eval,
+            dim_theta=dim_theta,
+            n_trials_null=n_trials_null_precompute,
+            kwargs_lc2st=kwargs_lc2st,
+            x_cal=x_cal,
+            observation_dict=observation_dict,
+            methods=["lc2st_nf"],
+            metrics=test_stat_names,
+            t_stats_null_path=t_stats_null_path,
+            save_results=True,
+            load_results=True,
+            # args only for c2st
+            kwargs_c2st=None,
+            kwargs_lhpd=None,
+        )["lc2st_nf"]
 
-        if "lhpd" in methods:
-            x_cal = data_samples["joint_cal"]["x"]
-            dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
-            t_stats_null_lhpd = precompute_t_stats_null(
-                n_cal=n_cal,
-                n_eval=n_eval,
-                dim_theta=dim_theta,
-                n_trials_null=n_trials_null_precompute,
-                kwargs_lhpd=kwargs_lhpd,
-                x_cal=x_cal,
-                observation_dict=observation_dict,
-                methods=["lhpd"],
-                metrics=["mse"],
-                t_stats_null_path=t_stats_null_path,
-                save_results=True,
-                load_results=True,
-                # args only for c2st and lc2st
-                kwargs_c2st=None,
-                kwargs_lc2st=None,
-            )["lhpd"]
+    if "lhpd" in methods:
+        x_cal = data_samples["joint_cal"]["x"]
+        dim_theta = data_samples["joint_cal"]["theta"].shape[-1]
+        t_stats_null_lhpd = precompute_t_stats_null(
+            n_cal=n_cal,
+            n_eval=n_eval,
+            dim_theta=dim_theta,
+            n_trials_null=n_trials_null_precompute,
+            kwargs_lhpd=kwargs_lhpd,
+            x_cal=x_cal,
+            observation_dict=observation_dict,
+            methods=["lhpd"],
+            metrics=["mse"],
+            t_stats_null_path=t_stats_null_path,
+            save_results=True,
+            load_results=True,
+            # args only for c2st and lc2st
+            kwargs_c2st=None,
+            kwargs_lc2st=None,
+        )["lhpd"]
 
     avg_result_keys = {
         "TPR": "reject",
@@ -113,6 +111,8 @@ def l_c2st_results_n_train(
         "p_value_max": "p_value",
         "t_stat_mean": "t_stat",
         "t_stat_std": "t_stat",
+        "t_stat_min": "t_stat",
+        "t_stat_max": "t_stat",
         "run_time_mean": "run_time",
         "run_time_std": "run_time",
     }
@@ -267,75 +267,89 @@ def compute_emp_power_l_c2st(
     # pre-compute test statistics under null hypothesis for c2st:
     # independent of x_cal so it's possible to compute them once and use them for all test runs
     if "c2st" in methods:
-        # generate data for 10000 samples
-        data_samples = generate_data_one_run(
-            n_cal=max(n_cal_list),
-            n_eval=n_eval,
-            task=task,
-            observation_dict=observation_dict,
-            n_train_list=[n_train],
-            task_path=task_path,
-            save_data=True,
-            load_cal_data=True,
-            load_eval_data=True,
-        )
-        for n_cal in n_cal_list:
-            # reduce number of calibration samples to n_cal
-            data_samples_n = copy.deepcopy(data_samples)
-            data_samples_n["base_dist"]["cal"] = data_samples_n["base_dist"]["cal"][
-                :n_cal
-            ]
-            data_samples_n["ref_posterior"]["cal"] = {
-                k: v[:n_cal] for k, v in data_samples_n["ref_posterior"]["cal"].items()
-            }
-            data_samples_n["npe_obs"]["cal"][n_train] = {
-                k: v[:n_cal]
-                for k, v in data_samples_n["npe_obs"]["cal"][n_train].items()
-            }
-            data_samples_n["ref_inv_transform"]["cal"][n_train] = {
-                k: v[:n_cal]
-                for k, v in data_samples_n["ref_inv_transform"]["cal"][n_train].items()
-            }
-            data_samples_n["joint_cal"]["x"] = data_samples_n["joint_cal"]["x"][:n_cal]
-            data_samples_n["joint_cal"]["theta"] = data_samples_n["joint_cal"]["theta"][
-                :n_cal
-            ]
-            data_samples_n["npe_x_cal"][n_train] = data_samples_n["npe_x_cal"][n_train][
-                :n_cal
-            ]
-            data_samples_n["inv_transform_theta_cal"][n_train] = data_samples_n[
-                "inv_transform_theta_cal"
-            ][n_train][:n_cal]
-
-            # compute test statistics for c2st-H_0
-            print()
-            print(
-                f"Pre-compute test statistics for c2st-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
-            )
-            print()
-            _, _, t_stats_null = compute_test_results_npe_one_run(
-                alpha=alpha,
-                data_samples=data_samples_n,
-                n_train=n_train,
+        try:
+            for n_cal in n_cal_list:
+                t_stats_null_dict[n_cal]["c2st"] = torch.load(
+                    task_path
+                    / f"npe_{n_train}"
+                    / "t_stats_null"
+                    / f"t_stats_null_c2st_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
+                )
+        except FileNotFoundError:
+            # generate data for 10000 samples
+            data_samples = generate_data_one_run(
+                n_cal=max(n_cal_list),
+                n_eval=n_eval,
+                task=task,
                 observation_dict=observation_dict,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
-                kwargs_lhpd=kwargs_lhpd,
-                n_trials_null=n_trials_null,  # low number of trials as they need to be recomputed for every estimator
-                t_stats_null_lc2st_nf=None,
-                t_stats_null_c2st_nf=t_stats_null_c2st_nf,
-                t_stats_null_lhpd=None,
-                t_stats_null_dict_npe=t_stats_null_dict[n_cal],
-                test_stat_names=test_stat_names,
-                methods=["c2st"],
-                compute_under_null=False,
+                n_train_list=[n_train],
                 task_path=task_path,
-                results_n_train_path=results_n_train_path,
-                save_results=True,
-                load_results=False,
-                return_t_stats_null=True,
+                save_data=True,
+                load_cal_data=True,
+                load_eval_data=True,
             )
-            t_stats_null_dict[n_cal]["c2st"] = t_stats_null["c2st"]
+            for n_cal in n_cal_list:
+                # reduce number of calibration samples to n_cal
+                data_samples_n = copy.deepcopy(data_samples)
+                data_samples_n["base_dist"]["cal"] = data_samples_n["base_dist"]["cal"][
+                    :n_cal
+                ]
+                data_samples_n["ref_posterior"]["cal"] = {
+                    k: v[:n_cal]
+                    for k, v in data_samples_n["ref_posterior"]["cal"].items()
+                }
+                data_samples_n["npe_obs"]["cal"][n_train] = {
+                    k: v[:n_cal]
+                    for k, v in data_samples_n["npe_obs"]["cal"][n_train].items()
+                }
+                data_samples_n["ref_inv_transform"]["cal"][n_train] = {
+                    k: v[:n_cal]
+                    for k, v in data_samples_n["ref_inv_transform"]["cal"][
+                        n_train
+                    ].items()
+                }
+                data_samples_n["joint_cal"]["x"] = data_samples_n["joint_cal"]["x"][
+                    :n_cal
+                ]
+                data_samples_n["joint_cal"]["theta"] = data_samples_n["joint_cal"][
+                    "theta"
+                ][:n_cal]
+                data_samples_n["npe_x_cal"][n_train] = data_samples_n["npe_x_cal"][
+                    n_train
+                ][:n_cal]
+                data_samples_n["inv_transform_theta_cal"][n_train] = data_samples_n[
+                    "inv_transform_theta_cal"
+                ][n_train][:n_cal]
+
+                # compute test statistics for c2st-H_0
+                print()
+                print(
+                    f"Pre-compute test statistics for c2st-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
+                )
+                print()
+                _, _, t_stats_null = compute_test_results_npe_one_run(
+                    alpha=alpha,
+                    data_samples=data_samples_n,
+                    n_train=n_train,
+                    observation_dict=observation_dict,
+                    kwargs_c2st=kwargs_c2st,
+                    kwargs_lc2st=kwargs_lc2st,
+                    kwargs_lhpd=kwargs_lhpd,
+                    n_trials_null=n_trials_null,  # low number of trials as they need to be recomputed for every estimator
+                    t_stats_null_lc2st_nf=None,
+                    t_stats_null_c2st_nf=t_stats_null_c2st_nf,
+                    t_stats_null_lhpd=None,
+                    t_stats_null_dict_npe=t_stats_null_dict[n_cal],
+                    test_stat_names=test_stat_names,
+                    methods=["c2st"],
+                    compute_under_null=False,
+                    task_path=task_path,
+                    results_n_train_path=results_n_train_path,
+                    save_results=True,
+                    load_results=False,
+                    return_t_stats_null=True,
+                )
+                t_stats_null_dict[n_cal]["c2st"] = t_stats_null["c2st"]
 
     # initialize dict of p-values
     emp_power = {}
@@ -1355,8 +1369,10 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
 
     return emp_power_list, type_I_error_list
 
-def compute_average_rejection_rates(result_dict, mean_over_runs, mean_over_observations):
-    
+
+def compute_average_rejection_rates(
+    result_dict, mean_over_runs, mean_over_observations
+):
     # ... over observations (for the mean rejection rate over runs)
     if mean_over_runs:
         result_list = np.mean(result_dict, axis=0)

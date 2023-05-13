@@ -411,21 +411,6 @@ if args.plot:
     plt.savefig(fig_path / "global_vs_local_tstats.pdf")
     plt.show()
 
-    if args.pp_plots:
-        from plots_neurips2023 import local_pp_plot
-
-        for g in gain_list:
-            fig, ax = plt.subplots(1, 1, figsize=(5, 5), constrained_layout=True)
-            ax = local_pp_plot(
-                probas_obs=[probas_obs_dict[g]],
-                probas_obs_null=probas_null[g],
-                method=r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
-                text=rf"$g_0 = {g}$",
-            )
-            plt.title("Local PP-Plot")
-            plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
-            plt.show()
-
     if args.lc2st_interpretability:
         print("L-C2ST Interpretability")
         dict_obs_g = {g: i for i, g in enumerate(gain_list)}
@@ -442,7 +427,7 @@ if args.plot:
                 observation=observation,
                 trained_clfs_lc2st=trained_clfs_dict,
                 scores_fn_lc2st=partial(lc2st_scores, **kwargs_lc2st),
-                probas_null_obs_lc2st=probas_null[g],
+                probas_null_obs_lc2st=None,
                 n_samples=n_eval,
                 n_bins=20,
             )

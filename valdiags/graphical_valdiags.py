@@ -518,9 +518,10 @@ def eval_space_with_proba_intensity(
         ax = plt.gca()
     df = pd.DataFrame({"probas": probas})
 
-    # define low and high thresholds w.r.t to null (95% confidence region)
-    low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
-    high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
+    if probas_null is not None:
+        # define low and high thresholds w.r.t to null (95% confidence region)
+        low = np.quantile(np.mean(probas_null, axis=0), q=0.05)
+        high = np.quantile(np.mean(probas_null, axis=0), q=0.95)
 
     if thresholding:
         # high/low proba regions

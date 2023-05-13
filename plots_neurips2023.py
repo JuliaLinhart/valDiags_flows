@@ -73,16 +73,7 @@ def plot_plot_c2st_single_eval_shift(
     h0_label,
     clf_name,
 ):
-    # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
     plt.rcParams["figure.figsize"] = (10, 5)
-    # plt.rcParams.update(fonts.neurips2022())
-    # plt.rcParams.update(axes.color(base="black"))
-    # plt.rcParams["legend.fontsize"] = 23.0
-    # plt.rcParams["xtick.labelsize"] = 23.0
-    # plt.rcParams["ytick.labelsize"] = 23.0
-    # plt.rcParams["axes.labelsize"] = 23.0
-    # plt.rcParams["font.size"] = 23.0
-    # plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
         nrows=1, ncols=2, sharex=True, sharey=False, constrained_layout=True
@@ -156,16 +147,16 @@ METHODS_DICT = {
         "t_stat_name": "accuracy",
         "color": "grey",
         "linestyle": "-",
-        "marker": "o",
-        "markersize": 6,
+        "marker": "d",
+        "markersize": 10,
     },
     r"oracle C2ST ($\hat{t}_{Reg}$)": {
         "test_name": "c2st",
         "t_stat_name": "mse",
-        "color": "darkgrey",
+        "color": "grey",
         "linestyle": "-",
         "marker": "o",
-        "markersize": 6,
+        "markersize": 10,
     },
     r"$\ell$-C2ST ($\hat{t}_{Reg0}$)": {
         "test_name": "lc2st",
@@ -173,7 +164,7 @@ METHODS_DICT = {
         "color": "blue",
         "linestyle": "-",
         "marker": "o",
-        "markersize": 6,
+        "markersize": 10,
     },
     r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)": {
         "test_name": "lc2st_nf",
@@ -181,7 +172,7 @@ METHODS_DICT = {
         "color": "blue",
         "linestyle": "--",
         "marker": "*",
-        "markersize": 10,
+        "markersize": 16,
     },
     r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)": {
         "test_name": "lc2st_nf_perm",
@@ -189,7 +180,7 @@ METHODS_DICT = {
         "color": "darkblue",
         "linestyle": "--",
         "marker": "o",
-        "markersize": 6,
+        "markersize": 10,
     },
     r"$\ell$-C2ST ($\hat{t}_{Max0}$)": {
         "test_name": "lc2st",
@@ -197,7 +188,7 @@ METHODS_DICT = {
         "color": "magenta",
         "linestyle": "-",
         "marker": "o",
-        "markersize": 6,
+        "markersize": 10,
     },
     r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)": {
         "test_name": "lc2st_nf",
@@ -205,7 +196,7 @@ METHODS_DICT = {
         "color": "magenta",
         "linestyle": "--",
         "marker": "*",
-        "markersize": 10,
+        "markersize": 16,
     },
     r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)": {
         "test_name": "lc2st_nf_perm",
@@ -213,15 +204,15 @@ METHODS_DICT = {
         "color": "red",
         "linestyle": "--",
         "marker": "o",
-        "markersize": 6,
+        "markersize": 10,
     },
     "local HPD": {
         "test_name": "lhpd",
         "t_stat_name": "mse",
         "color": "orange",
         "linestyle": "-",
-        "marker": "x",
-        "markersize": 6,
+        "marker": "^",
+        "markersize": 10,
     },
     "SBC": {
         "test_name": "sbc",
@@ -248,17 +239,15 @@ def plot_sbibm_results_n_train_n_cal(
     n_train_list,
     n_cal_list,
     plot_p_value=False,
+    title=None,
 ):
-    # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
-    plt.rcParams["figure.figsize"] = (32, 5)
-    # plt.rcParams.update(fonts.neurips2022())
-    # plt.rcParams.update(axes.color(base="black"))
-    # plt.rcParams["legend.fontsize"] = 15.0
-    # plt.rcParams["xtick.labelsize"] = 23.0
-    # plt.rcParams["ytick.labelsize"] = 23.0
-    # plt.rcParams["axes.labelsize"] = 23.0
-    # plt.rcParams["font.size"] = 23.0
-    # plt.rcParams["axes.titlesize"] = 27.0
+    plt.rcParams["figure.figsize"] = (28, 5)
+    plt.rcParams["legend.fontsize"] = 25.0
+    plt.rcParams["xtick.labelsize"] = 32.0
+    plt.rcParams["ytick.labelsize"] = 32.0
+    plt.rcParams["axes.labelsize"] = 32.0
+    plt.rcParams["font.size"] = 32.0
+    plt.rcParams["axes.titlesize"] = 40.0
 
     fig, axs = plt.subplots(
         nrows=1, ncols=4, sharex=False, sharey=False, constrained_layout=True
@@ -271,7 +260,7 @@ def plot_sbibm_results_n_train_n_cal(
         np.ones(len(n_train_list)) * 0.0,
         "--",
         color="black",
-        label=r"theoretical $t \mid \mathcal{H}_0$",
+        label=r"$t \mid \mathcal{H}_0$",
     )
     axs[0].legend()
     # plot estimated T values
@@ -305,7 +294,6 @@ def plot_sbibm_results_n_train_n_cal(
             color=METHODS_DICT[method]["color"],
         )
     axs[0].legend()  # loc="lower left")
-    axs[0].legend()  # loc="lower left")
     axs[0].set_xticks(
         np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
     )
@@ -315,7 +303,7 @@ def plot_sbibm_results_n_train_n_cal(
     axs[0].set_ylabel("test statistic")
     axs[0].set_ylim(-0.01, 0.26)
     axs[0].set_yticks([0.0, 0.12, 0.25])
-    axs[0].set_xlabel(r"$N_{\mathrm{train}}$")
+    axs[0].set_xlabel(r"$N_{\mathrm{train}}$ ($N_{\mathrm{cal}}=10^4$)")
 
     if plot_p_value:
         # ==== p-value of all methods w.r.t to oracle ===
@@ -326,7 +314,7 @@ def plot_sbibm_results_n_train_n_cal(
             np.ones(len(n_train_list)) * 0.05,
             "--",
             color="black",
-            label="alpha-level: 0.05",
+            label=r"$\alpha$-level: 0.05",
         )
 
         # plot estimated p-values
@@ -339,7 +327,7 @@ def plot_sbibm_results_n_train_n_cal(
             axs[1].plot(
                 np.arange(len(n_train_list)),
                 results_n_train[test_name]["p_value_mean"][t_stat_name],
-                label=method,
+                # label=method,
                 color=METHODS_DICT[method]["color"],
                 linestyle=METHODS_DICT[method]["linestyle"],
                 marker=METHODS_DICT[method]["marker"],
@@ -356,11 +344,11 @@ def plot_sbibm_results_n_train_n_cal(
                 alpha=alpha_fill_between,
                 color=METHODS_DICT[method]["color"],
             )
-        axs[1].legend(loc="upper left")
+        # axs[1].legend(loc="upper left")
         axs[1].set_xticks(
             np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
         )
-        # axs[1].set_xlabel(r"$N_{\mathrm{train}}$")
+        # axs[1].set_xlabel(r"$N_{\mathrm{train}}$ ($N_{\mathrm{cal}}=10^4$)")
         axs[1].set_ylabel("p-value (min / max)")
 
     else:
@@ -393,13 +381,13 @@ def plot_sbibm_results_n_train_n_cal(
                 color=METHODS_DICT[method]["color"],
             )
 
-        axs[1].legend(loc="lower left")
+        # axs[1].legend(loc="lower left")
         axs[1].set_xticks(
             np.arange(len(n_train_list)), [r"$10^2$", r"$10^3$", r"$10^4$", r"$10^5$"]
         )
         axs[1].set_ylim(-0.04, 1.04)
         axs[1].set_yticks([0, 0.5, 1])
-        axs[1].set_xlabel(r"$N_{\mathrm{train}}$")
+        axs[1].set_xlabel(r"$N_{\mathrm{train}}$ ($N_{\mathrm{cal}}=10^4$)")
         axs[1].set_ylabel("power (TPR)")
 
     # plot emp power as function of n_cal
@@ -412,7 +400,7 @@ def plot_sbibm_results_n_train_n_cal(
             axi.plot(
                 np.arange(len(n_cal_list)),
                 results_n_cal[test_name][result_name + "_mean"][t_stat_name],
-                # label=method,
+                label=method,
                 color=METHODS_DICT[method]["color"],
                 linestyle=METHODS_DICT[method]["linestyle"],
                 marker=METHODS_DICT[method]["marker"],
@@ -431,10 +419,10 @@ def plot_sbibm_results_n_train_n_cal(
                 color=METHODS_DICT[method]["color"],
             )
         # add emp power as function of n_cal
-        axi.set_xlabel(r"$N_{\mathrm{cal}}$")
+        axi.set_xlabel(r"$N_{\mathrm{cal}}$ ($N_{\mathrm{train}}=10^3$)")
         axi.set_xticks(
             np.arange(len(n_cal_list)),
-            [r"$100$", r"$500$", r"$1000$", r"$2000$", r"$5000$", r"$10000$"],
+            [r"$100$", r"$500$", r"$1000$", r"$2000$", r"$5000$", r"$10^{4}$"],
         )
 
     # plot significance level
@@ -443,7 +431,7 @@ def plot_sbibm_results_n_train_n_cal(
         np.ones(len(n_cal_list)) * 0.05,
         "--",
         color="black",
-        label="alpha-level: 0.05",
+        label=r"$\alpha$-level: $0.05$",
     )
     axs[3].legend()
 
@@ -454,6 +442,9 @@ def plot_sbibm_results_n_train_n_cal(
     axs[3].set_ylabel(r"type I error (FPR)")
     axs[3].set_ylim(-0.04, 1.04)
     axs[3].set_yticks([0, 0.5, 1])
+
+    if title is not None:
+        plt.suptitle(title)
 
     return fig
 
@@ -777,14 +768,6 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
     n_bins=20,
 ):
     plt.rcParams["figure.figsize"] = (9, 9)
-    # plt.rcParams.update(fonts.neurips2022())
-    # plt.rcParams.update(axes.color(base="black"))
-    # plt.rcParams["legend.fontsize"] = 23.0
-    # plt.rcParams["xtick.labelsize"] = 23.0
-    # plt.rcParams["ytick.labelsize"] = 23.0
-    # plt.rcParams["axes.labelsize"] = 23.0
-    # plt.rcParams["font.size"] = 23.0
-    # plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
         nrows=4, ncols=4, sharex=False, sharey=False, constrained_layout=False

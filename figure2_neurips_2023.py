@@ -685,6 +685,13 @@ if args.plot:
     n_train_list = [100, 1000, 10000, 100000]
     n_cal_list = [100, 500, 1000, 2000, 5000, 10000]
 
+    if args.task == "two_moons":
+        title = "Two Moons"
+    elif args.task == "slcp":
+        title = "SLCP"
+    else:
+        raise NotImplementedError("Only two_moons and slcp are supported for now.")
+
     fig = plot_sbibm_results_n_train_n_cal(
         results_n_train=results_n_train,
         results_n_cal=results_n_cal,
@@ -692,6 +699,7 @@ if args.plot:
         n_cal_list=n_cal_list,
         methods_reg=METHODS_L2,
         methods_all=METHODS_ALL,
+        title=title,
     )
     plt.savefig(
         fig_path

@@ -35,7 +35,7 @@ from experiment_utils_sbibm import (
     compute_average_rejection_rates,
 )
 
-from plots_neurips2023 import plot_sbibm_results_n_train
+from plots_neurips2023 import plot_sbibm_results_n_train_n_cal
 
 # set seed for reproducibility
 RANDOM_SEED = 42
@@ -685,7 +685,7 @@ if args.plot:
     n_train_list = [100, 1000, 10000, 100000]
     n_cal_list = [100, 500, 1000, 2000, 5000, 10000]
 
-    fig = plot_sbibm_results_n_train(
+    fig = plot_sbibm_results_n_train_n_cal(
         results_n_train=results_n_train,
         results_n_cal=results_n_cal,
         n_train_list=n_train_list,
@@ -707,61 +707,26 @@ if args.plot:
         # two moons
         if args.task == "two_moons":
             methods_dict = {
-                "c2st": {n: 100 for n in [100, 500, 1000, 2000, 5000, 10000]},
-                "lc2st": {
-                    100: 100,
-                    500: 100,
-                    1000: 100,
-                    2000: 100,
-                    5000: 100,
-                    10000: 69,
-                },
-                "lc2st_nf": {
-                    100: 67,
-                    500: 67,
-                    1000: 67,
-                    2000: 100,
-                    5000: 65,
-                    10000: 50,
-                },
-                # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
-                "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 14, 5000: 11, 10000: 54},
+                "c2st": {n: 100 for n in n_train_list},
+                "lc2st": {100: 65, 1000: 69, 10000: 56, 100000: 85},
+                "lc2st_nf": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+                # "lc2st_nf_perm": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+                "lhpd": {100: 5, 1000: 54, 10000: 53, 100000: 30},
             }
 
         # slcp
         elif args.task == "slcp":
             methods_dict = {
-                "c2st": {100: 77, 500: 77, 1000: 77, 2000: 30, 5000: 14, 10000: 14},
-                "lc2st": {
-                    100: 100,
-                    500: 100,
-                    1000: 100,
-                    2000: 100,
-                    5000: 100,
-                    10000: 50,
-                },
-                "lc2st_nf": {
-                    100: 64,
-                    500: 64,
-                    1000: 64,
-                    2000: 100,
-                    5000: 45,
-                    10000: 16,
-                },
-                # "lc2st_nf_perm": {
-                #     100: 64,
-                #     500: 64,
-                #     1000: 64,
-                #     2000: 100,
-                #     5000: 45,
-                #     10000: 16,
-                # },
-                "lhpd": {100: 88, 500: 21, 1000: 16, 2000: 18, 5000: 20, 10000: 7},
+                "c2st": {100: 10, 1000: 14, 10000: 7, 100000: 13},
+                "lc2st": {100: 52, 1000: 50, 10000: 43, 100000: 94},
+                "lc2st_nf": {100: 27, 1000: 16, 10000: 28, 100000: 37},
+                # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
+                "lhpd": {100: 18, 1000: 7, 10000: 11, 100000: 16},
             }
         else:
             raise NotImplementedError("Only two_moons and slcp are supported for now.")
 
-        n_runs = min(m[n] for m in methods_dict.values() for n in n_cal_list)
+        n_runs = min(m[n] for m in methods_dict.values() for n in n_train_list)
 
         emp_power_dict = torch.load(results_path / f"emp_power_dict_n_train.pkl")
 
@@ -782,6 +747,7 @@ if args.plot:
                 for n_train in n_train_list:
                     for n_obs in NUM_OBSERVATION_LIST:
                         for n_r in range(n_runs):
+                            print(emp_power_dict[n_train][m][t_stat_name][n_r])
                             list_n_train.append(n_train)
                             list_n_obs.append(n_obs)
                             list_tpr.append(

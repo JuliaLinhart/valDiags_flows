@@ -75,14 +75,14 @@ def plot_plot_c2st_single_eval_shift(
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
     plt.rcParams["figure.figsize"] = (10, 5)
-    plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams.update(axes.color(base="black"))
-    plt.rcParams["legend.fontsize"] = 23.0
-    plt.rcParams["xtick.labelsize"] = 23.0
-    plt.rcParams["ytick.labelsize"] = 23.0
-    plt.rcParams["axes.labelsize"] = 23.0
-    plt.rcParams["font.size"] = 23.0
-    plt.rcParams["axes.titlesize"] = 27.0
+    # plt.rcParams.update(fonts.neurips2022())
+    # plt.rcParams.update(axes.color(base="black"))
+    # plt.rcParams["legend.fontsize"] = 23.0
+    # plt.rcParams["xtick.labelsize"] = 23.0
+    # plt.rcParams["ytick.labelsize"] = 23.0
+    # plt.rcParams["axes.labelsize"] = 23.0
+    # plt.rcParams["font.size"] = 23.0
+    # plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
         nrows=1, ncols=2, sharex=True, sharey=False, constrained_layout=True
@@ -108,6 +108,7 @@ def plot_plot_c2st_single_eval_shift(
             color=METRICS_DICT[t_stat_name]["color"],
             linestyle=METRICS_DICT[t_stat_name]["linestyle"],
             # alpha=0.8,
+            linewidth=linewidth,
         )
         axs[1].plot(
             shift_list,
@@ -117,6 +118,7 @@ def plot_plot_c2st_single_eval_shift(
             linestyle=METRICS_DICT[t_stat_name]["linestyle"],
             # alpha=0.8,
             zorder=100,
+            linewidth=linewidth,
         )
         err = np.array(TPR_std_dict[t_stat_name])
         axs[1].fill_between(
@@ -216,7 +218,7 @@ METHODS_DICT = {
     "local HPD": {
         "test_name": "lhpd",
         "t_stat_name": "mse",
-        "color": "#3BA071",
+        "color": "orange",
         "linestyle": "-",
         "marker": "x",
         "markersize": 6,
@@ -238,7 +240,7 @@ avg_result_keys = {
 }
 
 
-def plot_sbibm_results_n_train(
+def plot_sbibm_results_n_train_n_cal(
     results_n_train,
     results_n_cal,
     methods_reg,
@@ -249,14 +251,14 @@ def plot_sbibm_results_n_train(
 ):
     # plt.rcParams.update(figsizes.neurips2022(nrows=1, ncols=3, height_to_width_ratio=1))
     plt.rcParams["figure.figsize"] = (32, 5)
-    plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams.update(axes.color(base="black"))
-    plt.rcParams["legend.fontsize"] = 15.0
-    plt.rcParams["xtick.labelsize"] = 23.0
-    plt.rcParams["ytick.labelsize"] = 23.0
-    plt.rcParams["axes.labelsize"] = 23.0
-    plt.rcParams["font.size"] = 23.0
-    plt.rcParams["axes.titlesize"] = 27.0
+    # plt.rcParams.update(fonts.neurips2022())
+    # plt.rcParams.update(axes.color(base="black"))
+    # plt.rcParams["legend.fontsize"] = 15.0
+    # plt.rcParams["xtick.labelsize"] = 23.0
+    # plt.rcParams["ytick.labelsize"] = 23.0
+    # plt.rcParams["axes.labelsize"] = 23.0
+    # plt.rcParams["font.size"] = 23.0
+    # plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
         nrows=1, ncols=4, sharex=False, sharey=False, constrained_layout=True
@@ -450,8 +452,8 @@ def plot_sbibm_results_n_train(
     axs[2].set_yticks([0, 0.5, 1])
 
     axs[3].set_ylabel(r"type I error (FPR)")
-    axs[3].set_ylim(-0.04, 0.14)
-    axs[3].set_yticks([0, 0.05, 0.1])
+    axs[3].set_ylim(-0.04, 1.04)
+    axs[3].set_yticks([0, 0.5, 1])
 
     return fig
 
@@ -775,14 +777,14 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
     n_bins=20,
 ):
     plt.rcParams["figure.figsize"] = (9, 9)
-    plt.rcParams.update(fonts.neurips2022())
-    plt.rcParams.update(axes.color(base="black"))
-    plt.rcParams["legend.fontsize"] = 23.0
-    plt.rcParams["xtick.labelsize"] = 23.0
-    plt.rcParams["ytick.labelsize"] = 23.0
-    plt.rcParams["axes.labelsize"] = 23.0
-    plt.rcParams["font.size"] = 23.0
-    plt.rcParams["axes.titlesize"] = 27.0
+    # plt.rcParams.update(fonts.neurips2022())
+    # plt.rcParams.update(axes.color(base="black"))
+    # plt.rcParams["legend.fontsize"] = 23.0
+    # plt.rcParams["xtick.labelsize"] = 23.0
+    # plt.rcParams["ytick.labelsize"] = 23.0
+    # plt.rcParams["axes.labelsize"] = 23.0
+    # plt.rcParams["font.size"] = 23.0
+    # plt.rcParams["axes.titlesize"] = 27.0
 
     fig, axs = plt.subplots(
         nrows=4, ncols=4, sharex=False, sharey=False, constrained_layout=False

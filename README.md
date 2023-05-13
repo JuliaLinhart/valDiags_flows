@@ -36,9 +36,15 @@ python figure3_neurips_2023.py --global_ct
 ```
 python figure3_neurips_2023.py --local_ct_gain
 ```
-Option to add  `--pp_plots` to generate local pp-plots for every observation. 
+Option to add  `--pp_plots` to generate local pp-plots for every observation. In that case, the null hypothesis will be computed.
 
-3. Interpretability of L-C2ST (pairplots with predicted probability)
+3. Final Figures: 
+- Global vs Local 
 ```
-python figure3_neurips_2023.py -lct_g -lc2st_i
+python figure3_neurips_2023.py --plot 
 ```
+- Interpretability of L-C2ST (pairplots with predicted probability)
+```
+python figure3_neurips_2023.py --plot --lc2st_interpretability
+```
+

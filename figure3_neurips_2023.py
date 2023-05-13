@@ -404,7 +404,7 @@ if args.plot:
         t_stats_obs={method: results_dict["t_stat"]},
         t_stats_obs_null=lct_stats_null,
         methods=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
-        labels=[r"$\ell$-C2ST-NF / $\hat{t}_{Reg0}$"],
+        labels=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
         alpha=ALPHA,
         n_trials=args.n_trials_null,
     )

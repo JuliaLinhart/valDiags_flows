@@ -489,7 +489,7 @@ def global_coverage_pp_plots(
             alphas,
             sbc_cdf / sbc_cdf.max(),
             color=METHODS_DICT["SBC"]["colors"][i],
-            label=rf"$\mathrm{{SBC}}(\theta_{i+1})$",
+            label=rf"$\mathrm{{SBC}} - \theta_{i+1}$",
             linewidth=linewidth,
         )
 
@@ -500,13 +500,14 @@ def global_coverage_pp_plots(
         hpd_ranks,
         color=METHODS_DICT["local HPD"]["color"],
         label=r"$\mathrm{HPD}(\theta)$",
+        linewidth=linewidth,
     )
     ax.set_ylabel("empirical CDF")
     ax.set_yticks([0.0, 0.5, 1.0])
     ax.set_ylim(-0.01, 1.01)
     ax.set_xlim(-0.01, 1.01)
     ax.set_xticks([0.0, 0.5, 1.0])
-    # ax.set_xlabel("rank")
+    ax.set_xlabel("rank")
 
     ax.legend(loc="upper left")
     ax.set_aspect("equal", "box")
@@ -580,7 +581,7 @@ def plot_local_t_stats_gain(
     ax.yaxis.set_tick_params(which="both", labelleft=True)
     ax.set_xticks(gain_list_t_stats)
 
-    ax.set_xlabel(r"gain ($g_0$)")
+    ax.set_xlabel(r"gain ($g_\mathrm{o}$)")
     ax.set_ylabel("test statistic")
     ax.legend()
     return ax
@@ -674,7 +675,8 @@ def local_tstats_with_pp_plots(
         axs1.text(
             0.0,
             0.9,
-            r"$g_0=$" + f"{g}",  # + "\n" + r"$p-value=$" + f"{p_values_obs[num_g]}",
+            r"$g_\mathrm{o}=$"
+            + f"{g}",  # + "\n" + r"$p-value=$" + f"{p_values_obs[num_g]}",
             fontsize=23,
         )
         plt.setp(axs1.spines.values(), color=colors_g0[n])
@@ -802,7 +804,7 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
         )
 
         # plot ground truth dirac
-        axs[i][i].axvline(x=theta_gt[i], ls="--", c="black", linewidth=1)
+        axs[i][i].axvline(x=theta_gt[i], ls="--", c="black", linewidth=linewidth)
 
         for j in range(i + 1, 4):
             eval_space_with_proba_intensity(
@@ -817,7 +819,7 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
                 scatter=False,
             )
             # plot points
-            axs[j][i].scatter(theta_gt[i], theta_gt[j], color="black", s=8)
+            axs[j][i].scatter(theta_gt[i], theta_gt[j], color="black", s=15)
 
             axs[i][j].set_visible(False)
 
@@ -833,9 +835,9 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
     )
 
     fig.suptitle(
-        r"Pair-plots of $q_{\phi}(\theta \mid x_0)$: "
+        r"Pair-plots of $q_{\phi}(\theta \mid x_\mathrm{o})$: "
         + "\n"
-        + r"$\Theta = T_{\phi}(Z ; x_0), \quad Z\sim \mathcal{N}(0,\mathbf{1}_4)$",
+        + r"$\Theta = T_{\phi}(Z ; x_\mathrm{o}), \quad Z\sim \mathcal{N}(0,\mathbf{1}_4)$",
         y=1.0,
     )
 

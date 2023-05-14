@@ -41,12 +41,12 @@ METRICS_DICT = {
         "linestyle": "-",
     },
     "reg_single_class": {
-        "label": r"$\hat{t}_{\mathrm{Reg}_0}$",
+        "label": r"$\hat{t}_{\mathrm{MSE}_0}$",
         "color": "blue",
         "linestyle": "--",
     },
     "reg_ref": {
-        "label": r"$\hat{t}_{\mathrm{Reg}}$",
+        "label": r"$\hat{t}_{\mathrm{MSE}}$",
         "color": "blue",
         "linestyle": "-",
     },
@@ -150,7 +150,7 @@ METHODS_DICT = {
         "marker": "d",
         "markersize": 10,
     },
-    r"oracle C2ST ($\hat{t}_{Reg}$)": {
+    r"oracle C2ST ($\hat{t}_{MSE}$)": {
         "test_name": "c2st",
         "t_stat_name": "mse",
         "color": "grey",
@@ -158,7 +158,7 @@ METHODS_DICT = {
         "marker": "o",
         "markersize": 10,
     },
-    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)": {
+    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)": {
         "test_name": "lc2st",
         "t_stat_name": "mse",
         "color": "blue",
@@ -166,7 +166,7 @@ METHODS_DICT = {
         "marker": "o",
         "markersize": 10,
     },
-    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)": {
+    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)": {
         "test_name": "lc2st_nf",
         "t_stat_name": "mse",
         "color": "blue",
@@ -174,7 +174,7 @@ METHODS_DICT = {
         "marker": "*",
         "markersize": 16,
     },
-    r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)": {
+    r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)": {
         "test_name": "lc2st_nf_perm",
         "t_stat_name": "mse",
         "color": "darkblue",
@@ -518,8 +518,8 @@ def plot_local_t_stats_gain(
     gain_dict,
     t_stats_obs,
     t_stats_obs_null,
-    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
-    labels=[r"$\hat{t}_{Reg0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"],
+    labels=[r"$\hat{t}_{MSE_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
     ax=None,
 ):
     if ax is None:
@@ -626,8 +626,8 @@ def local_tstats_with_pp_plots(
     probas_obs,
     probas_obs_null,
     p_values_obs,
-    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
-    labels=[r"$\hat{t}_{Reg0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"],
+    labels=[r"$\hat{t}_{MSE_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
     colors_g0=["#32327B", "#3838E2", "#52A9F5"],
 ):
     plt.rcParams["figure.figsize"] = (10, 10)
@@ -658,7 +658,7 @@ def local_tstats_with_pp_plots(
     ax.set_title("Local Test statistics")
 
     # pp-plots
-    method = r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"
+    method = r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"
     method_name = METHODS_DICT[method]["test_name"]
     t_stat_name = METHODS_DICT[method]["t_stat_name"]
     probas_obs = probas_obs[method_name]

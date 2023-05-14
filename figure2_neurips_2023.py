@@ -6,10 +6,10 @@
 # Validation methods to compare:
 # REFERENCE for toy-examples when the true posterior is known (not amortized)
 #   - Oracle C2ST (vanilla) - permutation method (not analytic because depends on classifier)
-#   - Oracle C2ST (Reg) - permutation method (not analytic because depends on classifier)
+#   - Oracle C2ST (MSE) - permutation method (not analytic because depends on classifier)
 # OUR METHOD: when the true posterior is not known (amortized and single-class-eval)
 #   - L-C2ST / LC2ST-NF (Max) (with permutation / pre-computed)
-#   - L-C2ST / LC2ST-NF (Reg) (with permutation / pre-computed)
+#   - L-C2ST / LC2ST-NF (MSE) (with permutation / pre-computed)
 #   - local HPD [Zhao et al. 2018] (how null?)
 # Experiments to evaluate / compare the methods (on average over all observations x_0 from sbibm tasks):
 #   - exp 1: results as a function of N_train
@@ -52,21 +52,21 @@ METHODS_ACC = [
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
 ]
 METHODS_L2 = [
-    r"oracle C2ST ($\hat{t}_{Reg}$)",
-    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)",
-    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
-    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    r"oracle C2ST ($\hat{t}_{MSE}$)",
+    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)",
     "local HPD",
 ]
 METHODS_ALL = [
     r"oracle C2ST ($\hat{t}_{Acc}$)",
-    r"oracle C2ST ($\hat{t}_{Reg}$)",
+    r"oracle C2ST ($\hat{t}_{MSE}$)",
     r"$\ell$-C2ST ($\hat{t}_{Max0}$)",
     r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
-    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)",
-    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
-    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)",
     "local HPD",
 ]
 

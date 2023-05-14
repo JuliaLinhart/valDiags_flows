@@ -142,7 +142,7 @@ def l_c2st_results_n_train(
             t_stats_null_c2st_nf=t_stats_null_c2st_nf,
             t_stats_null_lc2st_nf=t_stats_null_lc2st_nf,
             t_stats_null_lhpd=t_stats_null_lhpd,
-            t_stats_null_dict_npe=None,
+            t_stats_null_dict_npe={m: None for m in methods},
             task_path=task_path,
             results_n_train_path=results_n_train_path,
             methods=methods,
@@ -167,7 +167,7 @@ def l_c2st_results_n_train(
                                 avg_results[method][k][t_stat_name].append(
                                     np.std(
                                         np.array(results[v][t_stat_name])
-                                        / n_trials_null
+                                        # / n_trials_null
                                     )
                                 )
                             else:
@@ -192,7 +192,7 @@ def l_c2st_results_n_train(
                                 avg_results[method][k][t_stat_name].append(
                                     np.mean(
                                         np.array(results[v][t_stat_name])
-                                        / n_trials_null
+                                        # / n_trials_null
                                     )
                                 )
                             else:
@@ -1211,7 +1211,7 @@ def compute_test_results_npe_one_run(
                         # kwargs for lc2st_scores
                         **kwargs_lc2st,
                     )
-                    runtime = (time.time() - t0) / n_trials_null
+                    runtime = time.time() - t0  # / n_trials_null
 
                     for i, result_name in enumerate(result_keys):
                         for t_stat_name in test_stat_names:
@@ -1296,7 +1296,7 @@ def compute_test_results_npe_one_run(
                         est_sample_fn=None,
                         **kwargs_lhpd,
                     )
-                    runtime = (time.time() - t0) / n_trials_null
+                    runtime = time.time() - t0  # / n_trials_null
 
                     for i, result_name in enumerate(result_keys):
                         if result_name == "run_time":

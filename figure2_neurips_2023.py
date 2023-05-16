@@ -6,10 +6,10 @@
 # Validation methods to compare:
 # REFERENCE for toy-examples when the true posterior is known (not amortized)
 #   - Oracle C2ST (vanilla) - permutation method (not analytic because depends on classifier)
-#   - Oracle C2ST (Reg) - permutation method (not analytic because depends on classifier)
+#   - Oracle C2ST (MSE) - permutation method (not analytic because depends on classifier)
 # OUR METHOD: when the true posterior is not known (amortized and single-class-eval)
 #   - L-C2ST / LC2ST-NF (Max) (with permutation / pre-computed)
-#   - L-C2ST / LC2ST-NF (Reg) (with permutation / pre-computed)
+#   - L-C2ST / LC2ST-NF (MSE) (with permutation / pre-computed)
 #   - local HPD [Zhao et al. 2018] (how null?)
 # Experiments to evaluate / compare the methods (on average over all observations x_0 from sbibm tasks):
 #   - exp 1: results as a function of N_train
@@ -52,21 +52,21 @@ METHODS_ACC = [
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
 ]
 METHODS_L2 = [
-    r"oracle C2ST ($\hat{t}_{Reg}$)",
-    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)",
-    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
-    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    r"oracle C2ST ($\hat{t}_{MSE}$)",
+    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)",
     "local HPD",
 ]
 METHODS_ALL = [
     r"oracle C2ST ($\hat{t}_{Acc}$)",
-    r"oracle C2ST ($\hat{t}_{Reg}$)",
+    r"oracle C2ST ($\hat{t}_{MSE}$)",
     r"$\ell$-C2ST ($\hat{t}_{Max0}$)",
     r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
-    r"$\ell$-C2ST ($\hat{t}_{Reg0}$)",
-    r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
-    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Reg0}$)",
+    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)",
     "local HPD",
 ]
 
@@ -150,7 +150,13 @@ parser.add_argument(
 parser.add_argument(
     "--t_res_ntrain",
     action="store_true",
-    help="Exp 1: Results as a function of N_train (at fixed N_cal=10_000).",
+    help="Exp 1a: Results as a function of N_train (at fixed N_cal=10_000).",
+)
+
+parser.add_argument(
+    "--power_ntrain",
+    action="store_true",
+    help="Exp 1b: Plot the the empirical power / type 1 error as a function N_trian (at fixed N_cal=10_000).",
 )
 
 parser.add_argument(
@@ -171,6 +177,13 @@ parser.add_argument(
     "-b",
     action="store_true",
     help="Plot Box-plots for every observation.",
+)
+
+parser.add_argument(
+    "--runtime",
+    "-r",
+    action="store_true",
+    help="Runtime for every method to compute the test statistic for one observation.",
 )
 
 # Parse arguments
@@ -288,29 +301,7 @@ if args.t_res_ntrain and not args.plot:
     print(f"... for N_cal = {n_cal}")
     print()
 
-    # two moons
-    if args.task == "two_moons":
-        methods_dict = {
-            "c2st": {n: 100 for n in n_train_list},
-            "lc2st": {100: 65, 1000: 69, 10000: 56, 100000: 85},
-            "lc2st_nf": {100: 56, 1000: 50, 10000: 35, 100000: 35},
-            # "lc2st_nf_perm": {100: 56, 1000: 50, 10000: 35, 100000: 35},
-            "lhpd": {100: 5, 1000: 54, 10000: 53, 100000: 30},
-        }
-
-    # slcp
-    elif args.task == "slcp":
-        methods_dict = {
-            "c2st": {100: 10, 1000: 14, 10000: 7, 100000: 13},
-            "lc2st": {100: 52, 1000: 50, 10000: 43, 100000: 94},
-            "lc2st_nf": {100: 27, 1000: 16, 10000: 28, 100000: 37},
-            # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
-            "lhpd": {100: 18, 1000: 7, 10000: 11, 100000: 16},
-        }
-    else:
-        raise NotImplementedError("Only two_moons and slcp are supported for now.")
-
-    n_runs = min(m[n] for m in methods_dict.values() for n in n_train_list)
+    methods = ["c2st", "lc2st", "lc2st_nf", "lhpd"]
 
     # compute test statistics for every n_train
     results_n_train, train_runtime = l_c2st_results_n_train(
@@ -329,136 +320,137 @@ if args.t_res_ntrain and not args.plot:
         task_path=task_path,
         t_stats_null_path=task_path / "t_stats_null" / eval_params,
         results_n_train_path=Path(f"results") / test_params / eval_params,
-        methods=list(methods_dict.keys()),
+        methods=methods,
         test_stat_names=ALL_METRICS,
         seed=RANDOM_SEED,
     )
 
     # compute TPR for every n_train
+    if args.power_ntrain:
+        # two moons
+        if args.task == "two_moons":
+            methods_dict = {
+                "c2st": {n: 100 for n in n_train_list},
+                "lc2st": {100: 65, 1000: 69, 10000: 56, 100000: 85},
+                "lc2st_nf": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+                # "lc2st_nf_perm": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+                "lhpd": {100: 5, 1000: 54, 10000: 53, 100000: 30},
+            }
 
-    emp_power_dict, type_I_error_dict = {
-        n: {
-            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-            for m in methods_dict.keys()
+        # slcp
+        elif args.task == "slcp":
+            methods_dict = {
+                "c2st": {100: 10, 1000: 14, 10000: 7, 100000: 13},
+                "lc2st": {100: 52, 1000: 50, 10000: 43, 100000: 94},
+                "lc2st_nf": {100: 27, 1000: 16, 10000: 28, 100000: 37},
+                # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
+                "lhpd": {100: 18, 1000: 7, 10000: 11, 100000: 16},
+            }
+        else:
+            raise NotImplementedError("Only two_moons and slcp are supported for now.")
+
+        n_runs = min(m[n] for m in methods_dict.values() for n in n_train_list)
+
+        emp_power_dict, type_I_error_dict = {
+            n: {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            }
+            for n in n_train_list
+        }, {
+            n: {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            }
+            for n in n_train_list
         }
-        for n in n_train_list
-    }, {
-        n: {
-            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-            for m in methods_dict.keys()
-        }
-        for n in n_train_list
-    }
-    p_values_dict, p_values_h0_dict = {
-        n: {m: None for m in methods_dict.keys()} for n in n_train_list
-    }, {n: {m: None for m in methods_dict.keys()} for n in n_train_list}
+        p_values_dict, p_values_h0_dict = {
+            n: {m: None for m in methods_dict.keys()} for n in n_train_list
+        }, {n: {m: None for m in methods_dict.keys()} for n in n_train_list}
 
-    for m, n_train_run_dict in methods_dict.items():
-        for n_train in n_train_list:
-            (
-                _,
-                _,
-                p_values,
-                _,
-            ) = compute_emp_power_l_c2st(
-                n_runs=n_runs,
-                alpha=ALPHA,
-                task=task,
-                n_train=n_train,
-                observation_dict=observation_dict,
-                n_cal_list=[n_cal],
-                n_eval=n_eval,
-                n_trials_null=args.n_trials_null,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
-                kwargs_lhpd=kwargs_lhpd,
-                t_stats_null_c2st_nf=None,
-                n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
-                methods=[m],
-                test_stat_names=ALL_METRICS,
-                compute_emp_power=True,
-                compute_type_I_error=False,
-                task_path=task_path,
-                load_eval_data=True,
-                result_path=task_path
-                / f"npe_{n_train}"
-                / "results"
-                / test_params
-                / eval_params,
-                t_stats_null_path=task_path / "t_stats_null" / eval_params,
-                results_n_train_path=Path(f"results") / test_params / eval_params,
-                n_run_load_results=n_train_run_dict[n_train],
-                # save_every_n_runs=10,
-            )
-            p_values_dict[n_train][m] = p_values[n_cal][m]
-
-            # (1) Compute test result (rejection or not) over runs for each observation seperately
-            for t_stat_name in ALL_METRICS:
-                if m == "lhpd" and t_stat_name != "mse":
-                    continue
+        for m, n_train_run_dict in methods_dict.items():
+            for n_train in n_train_list:
                 (
-                    emp_power_dict[n_train][m][t_stat_name],
                     _,
-                ) = compute_rejection_rates_from_pvalues_over_runs_and_observations(
-                    p_values_dict=p_values_dict[n_train][m][t_stat_name],
-                    alpha=ALPHA,
+                    _,
+                    p_values,
+                    _,
+                ) = compute_emp_power_l_c2st(
                     n_runs=n_runs,
-                    num_observation_list=NUM_OBSERVATION_LIST,
-                    compute_tpr=True,
-                    compute_fpr=False,
-                    p_values_h0_dict=None,
-                    bonferonni_correction=BONFERONNI,
+                    alpha=ALPHA,
+                    task=task,
+                    n_train=n_train,
+                    observation_dict=observation_dict,
+                    n_cal_list=[n_cal],
+                    n_eval=n_eval,
+                    n_trials_null=args.n_trials_null,
+                    kwargs_c2st=kwargs_c2st,
+                    kwargs_lc2st=kwargs_lc2st,
+                    kwargs_lhpd=kwargs_lhpd,
+                    t_stats_null_c2st_nf=None,
+                    n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
+                    methods=[m],
+                    test_stat_names=ALL_METRICS,
+                    compute_emp_power=True,
+                    compute_type_I_error=False,
+                    task_path=task_path,
+                    load_eval_data=True,
+                    result_path=task_path
+                    / f"npe_{n_train}"
+                    / "results"
+                    / test_params
+                    / eval_params,
+                    t_stats_null_path=task_path / "t_stats_null" / eval_params,
+                    results_n_train_path=Path(f"results") / test_params / eval_params,
+                    n_run_load_results=n_train_run_dict[n_train],
+                    # save_every_n_runs=10,
                 )
+                p_values_dict[n_train][m] = p_values[n_cal][m]
 
-    # (2) Compute the mean/std ...
-    for i, n_train in enumerate(n_train_list):
-        for m in methods_dict.keys():
-            if i == 0:
-                results_n_train[m]["TPR_mean"] = {
-                    t_stat_name: [] for t_stat_name in ALL_METRICS
-                }
-                results_n_train[m]["TPR_std"] = {
-                    t_stat_name: [] for t_stat_name in ALL_METRICS
-                }
-            for t_stat_name in ALL_METRICS:
-                result_list = compute_average_rejection_rates(
-                    emp_power_dict[n_train][m][t_stat_name],
-                    mean_over_runs=MEAN_RUNS,
-                    mean_over_observations=MEAN_OBS,
-                )
-                results_n_train[m]["TPR_mean"][t_stat_name].append(np.mean(result_list))
-                results_n_train[m]["TPR_std"][t_stat_name].append(np.std(result_list))
+                # (1) Compute test result (rejection or not) over runs for each observation seperately
+                for t_stat_name in ALL_METRICS:
+                    if m == "lhpd" and t_stat_name != "mse":
+                        continue
+                    (
+                        emp_power_dict[n_train][m][t_stat_name],
+                        _,
+                    ) = compute_rejection_rates_from_pvalues_over_runs_and_observations(
+                        p_values_dict=p_values_dict[n_train][m][t_stat_name],
+                        alpha=ALPHA,
+                        n_runs=n_runs,
+                        num_observation_list=NUM_OBSERVATION_LIST,
+                        compute_tpr=True,
+                        compute_fpr=False,
+                        p_values_h0_dict=None,
+                        bonferonni_correction=BONFERONNI,
+                    )
 
-    # save results
-    torch.save(emp_power_dict, results_path / f"emp_power_dict_n_train.pkl")
-    torch.save(results_n_train, results_path / f"avg_results_n_train.pkl")
+        # (2) Compute the mean/std ...
+        for i, n_train in enumerate(n_train_list):
+            for m in methods_dict.keys():
+                if i == 0:
+                    results_n_train[m]["TPR_mean"] = {
+                        t_stat_name: [] for t_stat_name in ALL_METRICS
+                    }
+                    results_n_train[m]["TPR_std"] = {
+                        t_stat_name: [] for t_stat_name in ALL_METRICS
+                    }
+                for t_stat_name in ALL_METRICS:
+                    result_list = compute_average_rejection_rates(
+                        emp_power_dict[n_train][m][t_stat_name],
+                        mean_over_runs=MEAN_RUNS,
+                        mean_over_observations=MEAN_OBS,
+                    )
+                    results_n_train[m]["TPR_mean"][t_stat_name].append(
+                        np.mean(result_list)
+                    )
+                    results_n_train[m]["TPR_std"][t_stat_name].append(
+                        np.std(result_list)
+                    )
 
-    # plot empirical power
-    for m in methods_dict.keys():
-        for t_stat_name in ALL_METRICS:
-            if "lc2st" in m and t_stat_name == "accuracy":
-                continue
-            if "lhpd" in m and t_stat_name != "mse":
-                continue
-            if t_stat_name == "div":
-                continue
-            plt.plot(
-                np.arange(len(n_train_list)),
-                results_n_train[m]["TPR_mean"][t_stat_name],
-                label=m + " " + t_stat_name,
-            )
-            err = np.array(results_n_train[m]["TPR_std"][t_stat_name])
-            plt.fill_between(
-                np.arange(len(n_train_list)),
-                np.array(results_n_train[m]["TPR_mean"][t_stat_name]) - err,
-                np.array(results_n_train[m]["TPR_mean"][t_stat_name]) + err,
-                alpha=0.2,
-            )
-    plt.xticks(np.arange(len(n_train_list)), n_train_list)
-    plt.xlabel("n_train")
-    plt.ylabel("Empirical Power (TPR)")
-    plt.legend()
-    plt.show()
+        # save results
+        torch.save(emp_power_dict, results_path / f"emp_power_dict_n_train.pkl")
+        torch.save(results_n_train, results_path / f"avg_results_n_train.pkl")
 
 
 if args.power_ncal and not args.plot:
@@ -611,61 +603,6 @@ if args.power_ncal and not args.plot:
     torch.save(type_I_error_dict, results_path / f"type_I_error_dict_n_cal.pkl")
     torch.save(results_n_cal, results_path / f"avg_results_n_cal.pkl")
 
-    # plot empirical power
-    for m in methods_dict.keys():
-        for t_stat_name in ALL_METRICS:
-            if "lc2st" in m and t_stat_name == "accuracy":
-                continue
-            if "lhpd" in m and t_stat_name != "mse":
-                continue
-            if t_stat_name == "div":
-                continue
-            plt.plot(
-                np.arange(len(n_cal_list)),
-                results_n_cal[m]["TPR_mean"][t_stat_name],
-                label=m + " " + t_stat_name,
-            )
-            err = np.array(results_n_cal[m]["TPR_std"][t_stat_name])
-            plt.fill_between(
-                np.arange(len(n_cal_list)),
-                np.array(results_n_cal[m]["TPR_mean"][t_stat_name]) - err,
-                np.array(results_n_cal[m]["TPR_mean"][t_stat_name]) + err,
-                alpha=0.2,
-            )
-    plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
-    plt.xlabel("n_cal")
-    plt.ylabel("Empirical Power (TPR)")
-    plt.legend()
-    plt.show()
-
-    # plot type I error
-    for m in methods_dict.keys():
-        for t_stat_name in ALL_METRICS:
-            if "lc2st" in m and t_stat_name == "accuracy":
-                continue
-            if "lhpd" in m and t_stat_name != "mse":
-                continue
-            if t_stat_name == "div":
-                continue
-
-            plt.plot(
-                np.arange(len(n_cal_list)),
-                results_n_cal[m]["FPR_mean"][t_stat_name],
-                label=m + " " + t_stat_name,
-            )
-            err = np.array(results_n_cal[m]["FPR_std"][t_stat_name])
-            plt.fill_between(
-                np.arange(len(n_cal_list)),
-                np.array(results_n_cal[m]["FPR_mean"][t_stat_name]) - err,
-                np.array(results_n_cal[m]["FPR_mean"][t_stat_name]) + err,
-                alpha=0.2,
-            )
-    plt.xticks(np.arange(len(n_cal_list)), n_cal_list)
-    plt.xlabel("n_cal")
-    plt.ylabel("Type I Error (FPR)")
-    plt.legend()
-    plt.show()
-
 if args.plot:
     # path to save figures
     fig_path = (
@@ -685,6 +622,13 @@ if args.plot:
     n_train_list = [100, 1000, 10000, 100000]
     n_cal_list = [100, 500, 1000, 2000, 5000, 10000]
 
+    if args.task == "two_moons":
+        title = "Two Moons"
+    elif args.task == "slcp":
+        title = "SLCP"
+    else:
+        raise NotImplementedError("Only two_moons and slcp are supported for now.")
+
     fig = plot_sbibm_results_n_train_n_cal(
         results_n_train=results_n_train,
         results_n_cal=results_n_cal,
@@ -692,6 +636,7 @@ if args.plot:
         n_cal_list=n_cal_list,
         methods_reg=METHODS_L2,
         methods_all=METHODS_ALL,
+        title=title,
     )
     plt.savefig(
         fig_path
@@ -771,3 +716,40 @@ if args.plot:
                 plt.ylim(0, 1)
                 plt.savefig(task_path / "figures" / f"boxplot_{m}_{t_stat_name}.png")
                 plt.show()
+
+if args.runtime:
+    methods_dict = {
+        "c2st": "accuracy",
+        "lc2st": "mse",
+        "lc2st_nf": "mse",
+        "lhpd": "mse",
+    }
+    n_train_list = [100, 1000, 10000, 100000]
+    for n_cal in args.n_cal:
+        # compute test statistics for every n_train
+        results_n_train, train_runtime = l_c2st_results_n_train(
+            task,
+            n_cal=n_cal,
+            n_eval=n_eval,
+            observation_dict=observation_dict,
+            n_train_list=n_train_list,
+            alpha=ALPHA,
+            n_trials_null=0,  # just look at runtime to compute test statistics (no null hypothesis)
+            t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
+            n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
+            kwargs_c2st=kwargs_c2st,
+            kwargs_lc2st=kwargs_lc2st,
+            kwargs_lhpd=kwargs_lhpd,
+            task_path=task_path,
+            t_stats_null_path=task_path / "t_stats_null" / eval_params,
+            results_n_train_path=Path(f"results") / test_params / eval_params,
+            methods=methods_dict.keys(),
+            test_stat_names=ALL_METRICS,
+            seed=RANDOM_SEED,
+        )
+        for m, t in methods_dict.items():
+            print(f"Method: {m}")
+            if "l" in m:
+                print(np.array(train_runtime[m]).round(2))
+            else:
+                print(np.array(results_n_train[m]["run_time_mean"][t]).round(2))

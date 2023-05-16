@@ -310,11 +310,11 @@ if args.local_ct_gain:
         t_stats_obs={k: v["t_stat"] for k, v in results_dict.items()},
         t_stats_obs_null=lct_stats_null,
         methods=[
-            r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
+            r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
             # r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
             # "local HPD",
         ],  # , "lhpd"],
-        labels=[r"$\hat{t}_{Reg0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+        labels=[r"$\hat{t}_{MSE_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
         ax=ax,
     )
     plt.savefig(PATH_EXPERIMENT / "local_tests/local_t_stats_gain.pdf")
@@ -335,7 +335,7 @@ if args.local_ct_gain:
             ax = local_pp_plot(
                 probas_obs=[probas_obs_dict["lc2st_nf"][g]],
                 probas_obs_null=probas_null["lc2st_nf"][g],
-                method=r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)",
+                method=r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
                 text=rf"$g_0 = {g}$",
             )
             plt.title("Local PP-Plot")
@@ -403,8 +403,8 @@ if args.plot:
         },  # no -25 and 25 (outside of the prior)
         t_stats_obs={method: results_dict["t_stat"]},
         t_stats_obs_null=lct_stats_null,
-        methods=[r"$\ell$-C2ST-NF ($\hat{t}_{Reg0}$)"],
-        labels=[r"$\ell$-C2ST-NF / $\hat{t}_{Reg0}$"],
+        methods=[r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"],
+        labels=[r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"],
         alpha=ALPHA,
         n_trials=args.n_trials_null,
     )

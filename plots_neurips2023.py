@@ -150,7 +150,7 @@ METHODS_DICT = {
         "marker": "d",
         "markersize": 10,
     },
-    r"oracle C2ST ($\hat{t}_{MSE}$)": {
+    r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)": {
         "test_name": "c2st",
         "t_stat_name": "mse",
         "color": "grey",
@@ -158,7 +158,7 @@ METHODS_DICT = {
         "marker": "o",
         "markersize": 10,
     },
-    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)": {
+    r"$\ell$-C2ST ($\hat{t}_{\mathrm{MSE}_0}$)": {
         "test_name": "lc2st",
         "t_stat_name": "mse",
         "color": "blue",
@@ -166,7 +166,7 @@ METHODS_DICT = {
         "marker": "o",
         "markersize": 10,
     },
-    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)": {
+    r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)": {
         "test_name": "lc2st_nf",
         "t_stat_name": "mse",
         "color": "blue",
@@ -174,7 +174,7 @@ METHODS_DICT = {
         "marker": "*",
         "markersize": 16,
     },
-    r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)": {
+    r"$\ell$-C2ST-NF-perm ($\hat{t}_{\mathrm{MSE}_0}$)": {
         "test_name": "lc2st_nf_perm",
         "t_stat_name": "mse",
         "color": "darkblue",
@@ -206,7 +206,7 @@ METHODS_DICT = {
         "marker": "o",
         "markersize": 10,
     },
-    "local HPD": {
+    r"$local$-HPD": {
         "test_name": "lhpd",
         "t_stat_name": "mse",
         "color": "orange",
@@ -268,7 +268,7 @@ def plot_sbibm_results_n_train_n_cal(
     for method in methods_reg:
         if (
             "perm" in method  # the permuation test is only used for the null hypothesis
-            or "local HPD" in method  # HPD does not have a comparable t-statistic
+            or "HPD" in method  # HPD does not have a comparable t-statistic
         ):
             continue
         test_name = METHODS_DICT[method]["test_name"]
@@ -498,7 +498,7 @@ def global_coverage_pp_plots(
     ax.plot(
         alphas,
         hpd_ranks,
-        color=METHODS_DICT["local HPD"]["color"],
+        color=METHODS_DICT[r"$local$-HPD"]["color"],
         label=r"$\mathrm{HPD}(\theta)$",
         linewidth=linewidth,
     )
@@ -518,8 +518,8 @@ def plot_local_t_stats_gain(
     gain_dict,
     t_stats_obs,
     t_stats_obs_null,
-    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"],
-    labels=[r"$\hat{t}_{MSE_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)"],
+    labels=[r"$\hat{t}_{\mathrm{MSE}_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
     ax=None,
 ):
     if ax is None:
@@ -626,8 +626,8 @@ def local_tstats_with_pp_plots(
     probas_obs,
     probas_obs_null,
     p_values_obs,
-    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"],
-    labels=[r"$\hat{t}_{MSE_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
+    methods=[r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)"],
+    labels=[r"$\hat{t}_{\mathrm{MSE}_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
     colors_g0=["#32327B", "#3838E2", "#52A9F5"],
 ):
     plt.rcParams["figure.figsize"] = (10, 10)
@@ -658,7 +658,7 @@ def local_tstats_with_pp_plots(
     ax.set_title("Local Test statistics")
 
     # pp-plots
-    method = r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)"
+    method = r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)"
     method_name = METHODS_DICT[method]["test_name"]
     t_stat_name = METHODS_DICT[method]["t_stat_name"]
     probas_obs = probas_obs[method_name]

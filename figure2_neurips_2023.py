@@ -10,7 +10,7 @@
 # OUR METHOD: when the true posterior is not known (amortized and single-class-eval)
 #   - L-C2ST / LC2ST-NF (Max) (with permutation / pre-computed)
 #   - L-C2ST / LC2ST-NF (MSE) (with permutation / pre-computed)
-#   - local HPD [Zhao et al. 2018] (how null?)
+#   - local-HPD [Zhao et al. 2018] (how null?)
 # Experiments to evaluate / compare the methods (on average over all observations x_0 from sbibm tasks):
 #   - exp 1: results as a function of N_train
 #   - exp 2: power / type 1 error / runtime as a function of the number of n_cal (at fixed N_train)
@@ -52,22 +52,22 @@ METHODS_ACC = [
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
 ]
 METHODS_L2 = [
-    r"oracle C2ST ($\hat{t}_{MSE}$)",
-    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)",
-    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
-    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)",
-    "local HPD",
+    r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
+    r"$\ell$-C2ST ($\hat{t}_{\mathrm{MSE}_0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{\mathrm{MSE}_0}$)",
+    r"$local$-HPD",
 ]
 METHODS_ALL = [
     r"oracle C2ST ($\hat{t}_{Acc}$)",
-    r"oracle C2ST ($\hat{t}_{MSE}$)",
+    r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
     r"$\ell$-C2ST ($\hat{t}_{Max0}$)",
     r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
-    r"$\ell$-C2ST ($\hat{t}_{MSE_0}$)",
-    r"$\ell$-C2ST-NF ($\hat{t}_{MSE_0}$)",
-    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{MSE_0}$)",
-    "local HPD",
+    r"$\ell$-C2ST ($\hat{t}_{\mathrm{MSE}_0}$)",
+    r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
+    # r"$\ell$-C2ST-NF-perm ($\hat{t}_{\mathrm{MSE}_0}$)",
+    r"$local$-HPD",
 ]
 
 # numbers of the observations x_0 from sbibm to evaluate the tests at
@@ -76,6 +76,7 @@ NUM_OBSERVATION_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 # test parameters
 ALPHA = 0.05
 N_TRIALS_PRECOMPUTE = 100
+N_RUNS = 50
 NB_HPD_LEVELS = 11
 
 # how to handle testing for multiple observations in empirical experiments
@@ -332,24 +333,29 @@ if args.t_res_ntrain and not args.plot:
             methods_dict = {
                 "c2st": {n: 100 for n in n_train_list},
                 "lc2st": {100: 65, 1000: 69, 10000: 56, 100000: 85},
-                "lc2st_nf": {100: 56, 1000: 50, 10000: 35, 100000: 35},
+                "lc2st_nf": {100: 56, 1000: 50, 10000: 67, 100000: 66},
                 # "lc2st_nf_perm": {100: 56, 1000: 50, 10000: 35, 100000: 35},
-                "lhpd": {100: 5, 1000: 54, 10000: 53, 100000: 30},
+                "lhpd": {100: 52, 1000: 54, 10000: 53, 100000: 65},
             }
 
         # slcp
         elif args.task == "slcp":
             methods_dict = {
-                "c2st": {100: 10, 1000: 14, 10000: 7, 100000: 13},
-                "lc2st": {100: 52, 1000: 50, 10000: 43, 100000: 94},
-                "lc2st_nf": {100: 27, 1000: 16, 10000: 28, 100000: 37},
+                "c2st": {
+                    100: 59,
+                    1000: 55,
+                    10000: 76,
+                    100000: 59,
+                },
+                "lc2st": {100: 52, 1000: 50, 10000: 60, 100000: 94},
+                "lc2st_nf": {100: 52, 1000: 55, 10000: 54, 100000: 62},
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
-                "lhpd": {100: 18, 1000: 7, 10000: 11, 100000: 16},
+                "lhpd": {100: 53, 1000: 50, 10000: 55, 100000: 50},
             }
         else:
             raise NotImplementedError("Only two_moons and slcp are supported for now.")
 
-        n_runs = min(m[n] for m in methods_dict.values() for n in n_train_list)
+        n_runs = N_RUNS
 
         emp_power_dict, type_I_error_dict = {
             n: {
@@ -476,29 +482,50 @@ if args.power_ncal and not args.plot:
             "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
             "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
             # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
-            "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 14, 5000: 11, 10000: 54},
+            "lhpd": {
+                100: 51,
+                500: 100,
+                1000: 61,
+                2000: 71,
+                5000: 53,
+                10000: 54,
+            },
         }
 
     # slcp
     elif args.task == "slcp":
         methods_dict = {
-            "c2st": {100: 77, 500: 77, 1000: 77, 2000: 30, 5000: 14, 10000: 14},
+            "c2st": {
+                100: 77,
+                500: 77,
+                1000: 77,
+                2000: 52,
+                5000: 56,
+                10000: 55,
+            },
             "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 50},
-            "lc2st_nf": {100: 64, 500: 64, 1000: 64, 2000: 100, 5000: 45, 10000: 16},
+            "lc2st_nf": {100: 64, 500: 64, 1000: 64, 2000: 100, 5000: 62, 10000: 55},
             # "lc2st_nf_perm": {
             #     100: 64,
             #     500: 64,
             #     1000: 64,
             #     2000: 100,
-            #     5000: 45,
+            #     5000: 40,
             #     10000: 16,
             # },
-            "lhpd": {100: 88, 500: 21, 1000: 16, 2000: 18, 5000: 20, 10000: 7},
+            "lhpd": {
+                100: 88,
+                500: 52,
+                1000: 50,
+                2000: 50,
+                5000: 50,
+                10000: 50,
+            },
         }
     else:
         raise NotImplementedError("Only two_moons and slcp are supported for now.")
 
-    n_runs = min(m[n] for m in methods_dict.values() for n in n_cal_list)
+    n_runs = N_RUNS
 
     emp_power_dict, type_I_error_dict = {
         n: {

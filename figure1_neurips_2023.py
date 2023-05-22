@@ -4,7 +4,13 @@
 
 # =============================================================================
 
-# Usage:
+# DESCRIPTION: Single class evaluation of the C2ST test statistics under distribution shift.
+# > Tasks: Guassian (mean-shift), Gaussian (variance-shift), Student t (df-shift)
+# > Experiments:
+#   - exp 1: Compute the test statistics under distribution shift for optimal Bayes classifier
+#   - exp 2: Compute the empirical power under distribution shift for estimated classifier
+
+# USAGE:
 # >> python figure1_neurips_2023.py --opt_bayes --t_shift
 # >> python figure1_neurips_2023.py --power_shift
 # >> python figure1_neurips_2023.py --plot

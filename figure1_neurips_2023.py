@@ -4,6 +4,12 @@
 
 # =============================================================================
 
+# Usage:
+# >> python figure1_neurips_2023.py --opt_bayes --t_shift
+# >> python figure1_neurips_2023.py --power_shift
+# >> python figure1_neurips_2023.py --plot
+
+
 # ====== IMPORTS ======
 
 import argparse

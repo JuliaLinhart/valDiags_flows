@@ -1,11 +1,11 @@
 # =============================================================================
 
 #       SCRIPT TO REPRODUCE FIGURE 1 IN NEURIPS 2023 SUBMISSION
-#               (and additional experiments of Annex ...)
 
 # =============================================================================
 
-# IMPORTS
+# ====== IMPORTS ======
+
 import argparse
 import os
 from functools import partial
@@ -35,32 +35,31 @@ from valdiags.test_utils import eval_htest
 
 from plots_neurips2023 import plot_plot_c2st_single_eval_shift
 
-# GLOBAL PARAMETERS
+# ====== GLOBAL PARAMETERS ======
 
-# path to save/load the results
+# Path to save/load the results
 PATH_EXPERIMENT = "saved_experiments/neurips_2023/exp_1/"
 
-# data parameters
+# Data parameters
 N_SAMPLES_EVAL = 10_000  # N_v (validation set size - used to compute the test statistics for a trained classifier)
 
-# test parameters
+# Test parameters
 ALPHA = 0.05  # significance level
 N_RUNS = 100  # number of runs to compute the power
-
 N_TRIALS_NULL = 1000  # number of trials to estimate the null distribution
 USE_PERMUTATION = (
     False  # whether to use the permutation method to estimate the null distribution
 )
 
-# metrics / test statistics
+# Test statistics
 METRICS = {
     "accuracy": [
         "acc_ref",
         "acc_single_class",
     ],
     "mse": [
-        "reg_ref",
-        "reg_single_class",
+        "mse_ref",
+        "mse_single_class",
     ],
     "div": [
         "max_ref",
@@ -68,10 +67,11 @@ METRICS = {
     ],
 }
 
-# Parse arguments
+# ====== Parse arguments ======
+
 parser = argparse.ArgumentParser()
 
-# data parameters
+# Data parameters
 parser.add_argument(
     "--dim",
     type=int,
@@ -88,14 +88,14 @@ parser.add_argument(
     help="Variable / shifted parameter in the distribution of Q.",
 )
 
-# whether to use the optimal bayes classifier or not
+# Whether to use the optimal bayes classifier or not
 parser.add_argument(
     "--opt_bayes",
     action="store_true",
     help="Whether to use the Optimal Bayes Classifier.",
 )
 
-# experiment parameters
+# Experiment parameters
 
 parser.add_argument(
     "--t_shift",
@@ -118,12 +118,13 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-# ==== EXPERIMENT SETUP ====
-# Global experiment parameters
-dim = args.dim  # dimension of the data
+# ====== EXPERIMENT SETUP ======
 
-# P - class 0 distribution: standard Gaussian (fixed)
-P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))  # P is a standard Gaussian
+# Dimension of the data (number of features)
+dim = args.dim
+
+# P - class 0 distribution: Standard Gaussian (fixed)
+P_dist = mvn(mean=np.zeros(dim), cov=np.eye(dim))
 
 # Parameters for different experiments
 if args.q_dist == "mean":
@@ -131,8 +132,9 @@ if args.q_dist == "mean":
     h0_label = r"$\mathcal{H}_0: \mathcal{N}(0, I) = \mathcal{N}(m, I)$"
 
     # N_cal (training set size)
-    n_samples_list = [3000]
-    # mean-shift
+    n_samples_list = [2000]
+
+    # Mean-shift
     shifts = np.concatenate(
         [
             [-1, -0.5, -0.3],
@@ -143,14 +145,15 @@ if args.q_dist == "mean":
         ]
     )
 
-    # Q - class 1 distrribution: reduced Gaussian with shifted mean (variable)
+    # Q - class 1 distrribution: standard Gaussian with shifted mean
     Q_dist_list = [mvn(mean=np.array([mu] * dim), cov=np.eye(dim)) for mu in shifts]
 
-    # classifier
+    # Classifier
     if args.opt_bayes:
         clf_name = "OptBayes"
         clf_list = [AnalyticGaussianLQDA(dim=dim, mu=mu) for mu in shifts]
     else:
+        # estimated classifier
         clf_name = "LDA"
         clf_class = LinearDiscriminantAnalysis
         clf_kwargs = {"solver": "eigen", "priors": [0.5, 0.5]}
@@ -162,17 +165,19 @@ elif args.q_dist == "variance":
 
     # N_cal (training set size)
     n_samples_list = [2000]
-    # variance-shift
+
+    # Variance-shift
     shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
 
-    # Q - class 1 distrribution: centered Gaussian with shifted variance (variable)
+    # Q - class 1 distrribution: centered Gaussian with shifted variance
     Q_dist_list = [mvn(mean=np.zeros(dim), cov=s * np.eye(dim)) for s in shifts]
 
-    # classifier
+    # Classifier
     if args.opt_bayes:
         clf_name = "OptBayes"
         clf_list = [AnalyticGaussianLQDA(dim=dim, sigma=s) for s in shifts]
     else:
+        # estimated classifier
         clf_name = "QDA"
         clf_class = QuadraticDiscriminantAnalysis
         clf_kwargs = {"priors": [0.5, 0.5]}
@@ -183,27 +188,30 @@ elif args.q_dist == "df":
 
     # N_cal (training set size)
     n_samples_list = [2000]
-    # df-shift
+
+    # df-shift (degrees of freedom)
     shifts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35]
 
-    # Q - class 1 distrribution: standard Student with shifted degrees of freedom (variable)
+    # Q - class 1 distrribution: standard Student with shifted degrees of freedom
     Q_dist_list = [t(df=df, loc=0, scale=1) for df in shifts]
 
-    # classifier
+    # Classifier
     if args.opt_bayes:
         clf_name = "OptBayes"
         clf_list = [AnalyticStudentClassifier(df=df) for df in shifts]
     else:
+        # estimated classifier
         clf_name = "MLP"
         clf_class = MLPClassifier
         clf_kwargs = {"alpha": 0, "max_iter": 25000}
 else:
     raise NotImplementedError
 
-# list of test statistics names
+# List of test statistics names
 test_stat_names = [item for sublist in list(METRICS.values()) for item in sublist]
 
-# ==== EXP 1: T_STATS UNDER DISTRIBUTION SHIFT ====
+# ====== EXP 1: T_STATS UNDER DISTRIBUTION SHIFT ======
+
 if args.t_shift and not args.plot:
     print()
     print("=================================================")
@@ -212,17 +220,20 @@ if args.t_shift and not args.plot:
     print("       Classifier: ", clf_name)
     print("=================================================")
     print()
-    test_stats = dict(zip(METRICS.keys(), [[] for _ in test_stat_names]))
-    # generate data from P
+    test_stats = dict(zip(test_stat_names, [[] for _ in test_stat_names]))
+    print(test_stats)
+
+    # Generate data from P
     P_eval = P_dist.rvs(size=N_SAMPLES_EVAL)
-    # loop over shifts
+
+    # Loop over shifts
     for i, (s, Q_dist) in enumerate(zip(shifts, Q_dist_list)):
-        # compute test statistics
-        for b in [True, False]:  # for single class eval and not
-            # generate data from Q
+        # Compute test statistics
+        for b in [True, False]:  # single class eval vs. not
+            # Generate data from Q
             Q_eval = Q_dist.rvs(size=N_SAMPLES_EVAL)
             if args.opt_bayes:
-                # evaluate the optimal bayes classifier (no training)
+                # Evaluate the *optimal Bayes* classifier (no training)
                 scores = opt_bayes_scores(
                     P=P_eval,
                     Q=Q_eval,
@@ -231,8 +242,7 @@ if args.t_shift and not args.plot:
                     single_class_eval=b,
                 )
             else:
-                # for the estimated classifier
-                # generate training data
+                # Generate training data
                 P = P_dist.rvs(size=n_samples_list[0])
                 Q = Q_dist.rvs(size=n_samples_list[0])
                 if dim == 1:
@@ -240,7 +250,7 @@ if args.t_shift and not args.plot:
                     Q = Q.reshape(-1, 1)
                     P_eval = P_eval.reshape(-1, 1)
                     Q_eval = Q_eval.reshape(-1, 1)
-                # train and evaluate the classifier
+                # Train and evaluate the *extimated* classifier
                 scores = t_stats_c2st(
                     P=P,
                     Q=Q,
@@ -253,25 +263,23 @@ if args.t_shift and not args.plot:
                     single_class_eval=b,
                     null_hypothesis=False,
                 )
-            # append scores to dict
+            # Append scores to dict
             for metric, t_names in zip(METRICS.keys(), METRICS.values()):
                 if b:
                     name = t_names[1]
                 else:
                     name = t_names[0]
+                print(name, metric)
+                test_stats[name].append(scores[metric])
 
-                if metric == "mse":
-                    test_stats[name].append(scores[metric])
-                else:
-                    test_stats[name].append(scores[metric])
-
-    # save computed test statistics
+    # Save computed test statistics
     torch.save(
         test_stats,
         PATH_EXPERIMENT + f"test_stats_{clf_name}_shift_{args.q_dist}_dim_{dim}.pkl",
     )
 
-# ==== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ====
+# ====== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ======
+
 if args.power_shift and not args.plot:
     print()
     print("========================================================")
@@ -309,14 +317,14 @@ if args.power_shift and not args.plot:
 
             filename = f"nt_{N_TRIALS_NULL}_N_{n}_dim_{dim}_{clf_name}.npy"
             if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
-                # load null scores if they exist
+                # Load null scores if they exist ...
                 scores_null = np.load(
                     PATH_EXPERIMENT + "t_stats_null/" + filename,
                     allow_pickle=True,
                 ).item()
             else:
-                # otherwise, compute them
-                # generate training and evalaluation data from P for every trial
+                # ... otherwise, compute them
+                # Generate training and evalaluation data from P for every trial
                 list_P_null = [P_dist.rvs(n) for _ in range(2 * N_TRIALS_NULL)]
                 list_P_eval_null = [
                     P_dist.rvs(N_SAMPLES_EVAL) for _ in range(2 * N_TRIALS_NULL)
@@ -326,8 +334,8 @@ if args.power_shift and not args.plot:
                         list_P_null[i] = list_P_null[i].reshape(-1, 1)
                         list_P_eval_null[i] = list_P_eval_null[i].reshape(-1, 1)
 
-                # compute test statistics under the null
-                for b in [True, False]:  # for single class eval and not
+                # Compute test statistics under the null
+                for b in [True, False]:  # single class eval vs. not
                     t_stats_null = t_stats_c2st_custom(
                         null_hypothesis=True,
                         n_trials_null=N_TRIALS_NULL,
@@ -343,6 +351,8 @@ if args.power_shift and not args.plot:
                         Q_eval=list_P_eval_null[1],
                     )
                     scores_null[b] = t_stats_null
+
+                # Save null scores
                 np.save(
                     PATH_EXPERIMENT + "t_stats_null/" + filename,
                     scores_null,
@@ -366,13 +376,13 @@ if args.power_shift and not args.plot:
         metrics=list(METRICS.keys()),
     )
 
-    # get the number of samples for training
+    # Get the number of samples for training
     n = n_samples_list[0]
-    # get the null scores
+    # Get the null scores
     scores_null = scores_null_list[0]
 
     try:
-        # load TPR dicts if they exist ...
+        # Load TPR dicts if they exist ...
         TPR_list = torch.load(
             PATH_EXPERIMENT
             + f"TPR_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
@@ -383,20 +393,20 @@ if args.power_shift and not args.plot:
         )
     except FileNotFoundError:
         # ... otherwise, compute them
-        # initialize TPR dicts
+        # Initialize TPR dicts
         TPR_list, TPR_std_list = (
             dict(zip(test_stat_names, [[] for _ in test_stat_names])),
             dict(zip(test_stat_names, [[] for _ in test_stat_names])),
         )
 
-        # loop over shifts
+        # Loop over shifts
         for i, (s, Q_dist) in enumerate(zip(shifts, Q_dist_list)):
             print()
             print(f"{args.q_dist} shift: {np.round(s,2)}")
             print()
 
-            # compute empirical power (TPR)
-            for b in [True, False]:  # for single class eval and not
+            # Compute empirical power (TPR)
+            for b in [True, False]:  # single class eval vs. not
                 TPR, _, TPR_std, _, _, _ = c2st_p_values_tfpr(
                     eval_c2st_fn=partial(
                         eval_c2st, single_class_eval=b, n_trials_null=N_TRIALS_NULL
@@ -415,7 +425,7 @@ if args.power_shift and not args.plot:
                     compute_FPR=False,
                     return_std=True,
                 )
-                # append TPR and std to dict
+                # Append TPR and std to dict
                 for metric, t_names in zip(METRICS.keys(), METRICS.values()):
                     if b:
                         name = t_names[1]
@@ -424,7 +434,7 @@ if args.power_shift and not args.plot:
                     TPR_list[name].append(TPR[metric][0])
                     TPR_std_list[name].append(TPR_std[metric][0])
 
-        # save TPR dicts
+        # Save TPR dicts
         torch.save(
             TPR_list,
             PATH_EXPERIMENT
@@ -436,13 +446,14 @@ if args.power_shift and not args.plot:
             + f"TPR_std_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
         )
 
+# ====== ONLY PLOT THE RESULTS ======
 
 if args.plot:
-    # t-stats for optimal bayes classifier
+    # Test statistics for *optimal Bayes* classifier
     t_stats_dict = torch.load(
         PATH_EXPERIMENT + f"test_stats_OptBayes_shift_{args.q_dist}_dim_{dim}.pkl"
     )
-    # TPR for estimated classifier (e.g. QDA)
+    # TPR for *estimated* classifier (e.g. QDA)
     TPR_dict = torch.load(
         PATH_EXPERIMENT
         + f"TPR_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl"
@@ -452,15 +463,13 @@ if args.plot:
         + f"TPR_std_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl"
     )
 
-    # plot the results of both experiments
+    # Plot the results of both experiments
     plot_plot_c2st_single_eval_shift(
         shift_list=shifts,
         t_stats_dict=t_stats_dict,
         TPR_dict=TPR_dict,
         TPR_std_dict=TPR_std_dict,
         shift_name=args.q_dist,
-        dim=dim,
-        h0_label=h0_label,
         clf_name=clf_name,
     )
     plt.savefig(

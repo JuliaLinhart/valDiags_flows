@@ -28,7 +28,8 @@ plt.rcParams["axes.titlesize"] = 27.0
 alpha_fill_between = 0.2
 linewidth = 2.0
 
-# ======== FIGURE 1 ========== #
+# ======== FIGURE 1 ==========
+
 METRICS_DICT = {
     "acc_single_class": {
         "label": r"$\hat{t}_{\mathrm{Acc}_0}$",
@@ -40,12 +41,12 @@ METRICS_DICT = {
         "color": "orange",
         "linestyle": "-",
     },
-    "reg_single_class": {
+    "mse_single_class": {
         "label": r"$\hat{t}_{\mathrm{MSE}_0}$",
         "color": "blue",
         "linestyle": "--",
     },
-    "reg_ref": {
+    "mse_ref": {
         "label": r"$\hat{t}_{\mathrm{MSE}}$",
         "color": "blue",
         "linestyle": "-",
@@ -69,8 +70,6 @@ def plot_plot_c2st_single_eval_shift(
     TPR_dict,
     TPR_std_dict,
     shift_name,
-    dim,
-    h0_label,
     clf_name,
 ):
     plt.rcParams["figure.figsize"] = (10, 5)
@@ -89,7 +88,7 @@ def plot_plot_c2st_single_eval_shift(
     for t_stat_name, t_stats in t_stats_dict.items():
         if "max" in t_stat_name:
             continue
-        if "reg" in t_stat_name:
+        if "mse" in t_stat_name:
             t_stats = np.array(t_stats) + 0.5
             METRICS_DICT[t_stat_name]["label"] += r" (+0.5)"
         axs[0].plot(
@@ -136,7 +135,7 @@ def plot_plot_c2st_single_eval_shift(
     axs[1].set_ylim(-0.02, 1.02)
     axs[1].set_title(f"{clf_name}-C2ST (power)")
 
-    # plt.suptitle(f"{h0_label}")
+    return fig
 
 
 # ======== FIGURE 2 ========== #

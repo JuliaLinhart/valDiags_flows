@@ -8,6 +8,7 @@
 # --> using the simulator (in training the flow and generating observations)
 # requires a special R-environment.
 
+# IMPORTS
 import os
 import time
 from functools import partial
@@ -25,41 +26,34 @@ from valdiags.localHPD import hpd_values, lhpd_scores, t_stats_lhpd
 from valdiags.localC2ST import lc2st_scores, t_stats_lc2st
 from valdiags.test_utils import eval_htest
 
+# GLOBAL VARIABLES
 
-# we train for one round : amortized
+# We train for one round : amortized
 NB_ROUNDS = 1
 
-# choose the naive or factorized flow
+# Choose the naive or factorized flow
 NAIVE = True
 N_EXTRA = 0
 
-# list of (trec, nextra)
+# List of (trec, nextra)
 LIST_TREC_NEXTRA = [(8, 0)]  # , (8,9)] #[(2,3), (8,10)]   #(8,3), (2,10) #(8,4) (2,4)
 
-# extra obs have all parameters in common with x_0 or only the global one (gain)
+# Extra obs have all parameters in common with x_0 or only the global one (gain)
 # during inference only
 LIST_SINGLE_REC = [False]
 
 
-# target folder path inside results folder for saving
+# Target folder path inside results folder for saving
 PATH_EXPERIMENT = "saved_experiments/JR-NMM/normal_4d/"
 
-# setup the parameters for the example
+# Setup the parameters for the example
 meta_parameters = {}
-# how many extra observations to consider
-meta_parameters["n_extra"] = N_EXTRA
-# what kind of summary features to use
-meta_parameters["summary"] = "Fourier"
-
-# whether to do naive implementation
-meta_parameters["naive"] = NAIVE
-
-# number of rounds to use in the SNPE procedure
-meta_parameters["n_rd"] = NB_ROUNDS
-# number of summary features to consider
-meta_parameters["n_sf"] = 33
-# how many seconds the simulations should have (fs = 128 Hz)
-meta_parameters["t_recording"] = 8
+meta_parameters["n_extra"] = N_EXTRA  # how many extra observations to consider
+meta_parameters["summary"] = "Fourier"  # what kind of summary features to use
+meta_parameters["naive"] = NAIVE  # whether to do naive implementation
+meta_parameters["n_rd"] = NB_ROUNDS  # number of rounds to use in the SNPE procedure
+meta_parameters["n_sf"] = 33  # number of summary features to consider
+meta_parameters["t_recording"] = 8  # seconds for the simulations (fs = 128 Hz)
 meta_parameters["n_ss"] = int(128 * meta_parameters["t_recording"])
 
 # which example case we are considering here
@@ -73,7 +67,7 @@ meta_parameters["case"] = (
     )
 )
 
-# choose how to get the summary features
+# Choose how to get the summary features
 summary_extractor = summary_JRNMM(
     n_extra=meta_parameters["n_extra"],
     d_embedding=meta_parameters["n_sf"],
@@ -81,14 +75,23 @@ summary_extractor = summary_JRNMM(
     type_embedding=meta_parameters["summary"],
 )
 
-# let's use the log power spectral density instead
+# We use the log power spectral density as summary features
 summary_extractor.embedding.net.logscale = True
 
 
 def train_posterior_jrnmm(n_train):
+    """Train a posterior (NPE) for the JRNMM model.
+
+    Args:
+        n_train (int): number of simulations to use for training
+
+    Returns:
+        npe_jrnmm (DirectPosterior): trained posterior via `sbi`-package
+    """
+    # IMPORTS (require R-environment)
     from tasks.jrnmm.simulator import prior_JRNMM, simulator_JRNMM
 
-    # set prior distribution for the parameters
+    # Set prior distribution for the parameters
     input_parameters = ["C", "mu", "sigma", "gain"]
     prior = prior_JRNMM(
         parameters=[
@@ -99,7 +102,7 @@ def train_posterior_jrnmm(n_train):
         ]
     )
 
-    # choose how to setup the simulator for training
+    # Choose how to setup the simulator for training
     simulator = partial(
         simulator_JRNMM,
         input_parameters=input_parameters,
@@ -108,16 +111,16 @@ def train_posterior_jrnmm(n_train):
         p_gain=prior,
     )
 
-    # number of simulations per round
+    # Number of simulations per training round
     meta_parameters["n_sr"] = n_train
 
-    # label to attach to the SNPE procedure and use for saving files
+    # Label to attach to the SNPE procedure and use for saving files
     meta_parameters["label"] = make_label(meta_parameters)
 
-    # device to use for training
+    # Device to use for training
     device = "cpu"
 
-    # choose a function which creates a neural network density estimator
+    # Define function which creates a neural network density estimator
     build_nn_posterior = partial(
         build_flow,
         embedding_net=IdentityJRNMM(),
@@ -128,7 +131,7 @@ def train_posterior_jrnmm(n_train):
         n_layers=10,
     )
 
-    # run the SNPE procedure over 1 round
+    # Run the SNPE procedure over 1 round
     _ = run_inference(
         simulator=simulator,
         prior=prior,
@@ -142,7 +145,7 @@ def train_posterior_jrnmm(n_train):
         max_num_epochs=100000,
     )
 
-    # get posterior
+    # Get posterior
     npe_jrnmm = get_posterior(
         simulator,
         prior,
@@ -156,10 +159,23 @@ def train_posterior_jrnmm(n_train):
     return npe_jrnmm
 
 
-def generate_observations(c, mu, sigma, gain_list, load_path):
+def generate_observations(c, mu, sigma, gain_list):
+    """Generate observations for the JRNMM model.
+
+    Args:
+        c (float): ground truth parameter 1 (common to all observations)
+        mu (float): ground truth parameter 2 (common to all observations)
+        sigma (float): ground truth parameter 3 (common to all observations)
+        gain_list (list): list of ground truth parameters 4
+
+    Returns:
+        x_obs_list (torch.Tensor): list of observations
+            of shape (len(gain_list), 33, n_extra+1)
+    """
+    # IMPORTS (require R-environment)
     from tasks.jrnmm.simulator import get_ground_truth, prior_JRNMM
 
-    # set prior distribution for the parameters
+    # Set prior distribution for the parameters
     prior = prior_JRNMM(
         parameters=[
             ("C", 10.0, 250.0),
@@ -169,7 +185,7 @@ def generate_observations(c, mu, sigma, gain_list, load_path):
         ]
     )
 
-    # compute observations
+    # Compute observations
     theta_true_list = []
     x_obs_list = []
     for g in gain_list:
@@ -194,6 +210,24 @@ def generate_observations(c, mu, sigma, gain_list, load_path):
 def global_coverage_tests(
     npe, prior, theta_cal, x_cal, save_path, methods=["sbc", "hpd"]
 ):
+    """Compute global coverage tests for the JRNMM model.
+
+    Args:
+        npe (hnpe.posterior.JRNMMFlow_nflows_base): trained posterior estimator
+        prior (Distribution): prior distribution
+        theta_cal (torch.Tensor): calibration parameters from prior
+            of shape (n_cal, dim_theta)
+        x_cal (torch.Tensor): calibration observations simulated from theta_cal
+            of shape (n_cal, dim_x)
+        save_path (str): path to save the results
+        methods (list, optional): list of methods to use for global coverage tests.
+            Defaults to ["sbc", "hpd"].
+
+    Returns:
+        global_rank_stats (dict): dictionary containing the global rank statistics
+            for each method (there are n_cal values per dim).
+            (dim=4 for "sbc", dim=1 for "hpd")
+    """
     # create folder for saving
     save_path_global = save_path / "global_tests"
     if not os.path.exists(save_path_global):
@@ -203,22 +237,27 @@ def global_coverage_tests(
     # 1. SBC
     if "sbc" in methods:
         try:
+            # Load sbc ranks if already computed ...
             global_rank_stats["sbc"] = np.array(
                 torch.load(save_path_global / f"sbc_ranks_n_cal_{x_cal.shape[0]}.pkl")
             )
         except FileNotFoundError:
-            from sbi.inference.posteriors.direct_posterior import DirectPosterior
+            # ... otherwise compute them
 
             print("     Simulation Based Calibration (SBC):")
             print()
+            # Define posterior estimator compatible with sbi implementation of SBC
+            from sbi.inference.posteriors.direct_posterior import DirectPosterior
 
             posterior_sbc = DirectPosterior(
                 posterior_estimator=npe,
                 prior=prior,
                 x_shape=x_cal[0][None, :].shape,
             )
+            # Run SBC
             sbc = run_sbc(theta_cal, x_cal, posterior=posterior_sbc)
             global_rank_stats["sbc"] = sbc[0]
+            # Save SBC ranks
             torch.save(
                 global_rank_stats["sbc"],
                 save_path_global / f"sbc_ranks_n_cal_{x_cal.shape[0]}.pkl",
@@ -227,19 +266,24 @@ def global_coverage_tests(
     # 2. HPD
     if "hpd" in methods:
         try:
+            # Load hpd values if already computed ...
             global_rank_stats["hpd"] = torch.load(
                 save_path_global / f"hpd_ranks_n_cal_{x_cal.shape[0]}.pkl"
             )
         except FileNotFoundError:
-            from sbi.utils import match_theta_and_x_batch_shapes
+            # ... otherwise compute them
 
             print("     HPD:")
             print()
+
+            # Define npe-log-prob function compatible with `hpd_values` function
+            from sbi.utils import match_theta_and_x_batch_shapes
 
             def posterior_log_prob_fn(theta, x):
                 theta, x = match_theta_and_x_batch_shapes(theta, x)
                 return npe.log_prob(theta, x)
 
+            # Compute HPD values
             joint_hpd_values_cal = hpd_values(
                 theta_cal,
                 X=x_cal,
@@ -247,17 +291,18 @@ def global_coverage_tests(
                 est_sample_fn=npe.sample,
             )
 
-            # save hpd values for later use in local method
+            # Save HPD values for later use in local method
             torch.save(
                 joint_hpd_values_cal,
                 save_path / f"joint_hpd_values_n_cal_{x_cal.shape[0]}.pkl",
             )
 
+            # Compute HPD ranks
             joint_hpd_ranks = torch.cat(
                 (joint_hpd_values_cal, torch.tensor([0.0, 1.0]))
             )
-
             global_rank_stats["hpd"] = torch.sort(joint_hpd_ranks).values
+            # Save HPD ranks
             torch.save(
                 global_rank_stats["hpd"],
                 save_path_global / f"hpd_ranks_n_cal_{x_cal.shape[0]}.pkl",
@@ -284,18 +329,21 @@ def local_coverage_tests(
     methods=["lhpd", "lc2st_nf"],
     test_stat_names=["mse", "div"],
 ):
-    # create folder for saving
+    # Create folder for saving
     if not os.path.exists(result_path):
         os.makedirs(result_path)
 
+    # Initialize results dictionaries
     train_runtime = {}
     trained_clfs_dict = {"lc2st_nf": None, "lhpd": None}
     probas_obs_dict = dict(zip(methods, [{} for _ in methods]))
     results_dict = dict(zip(methods, [{} for _ in methods]))
     result_keys = ["reject", "p_value", "t_stat", "t_stats_null"]
 
+    # Loop over methods
     for m in methods:
         try:
+            # Load results if already computed ...
             results_dict[m] = torch.load(
                 result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl"
             )
@@ -316,6 +364,8 @@ def local_coverage_tests(
                 )
 
         except FileNotFoundError:
+            # ... otherwise compute them
+            # Initialize results dictionary
             results_dict[m] = dict(
                 zip(
                     result_keys,
@@ -332,10 +382,12 @@ def local_coverage_tests(
                 print("     Local C2ST-NF:")
                 print()
                 try:
+                    # Load data if available ...
                     inv_transform_samples_cal = torch.load(
                         data_path / f"inv_transform_samples_n_cal_{x_cal.shape[0]}.pkl"
                     )
                 except FileNotFoundError:
+                    # ... otherwise generate it
                     print(
                         "Computing the inverse transformation of the flow on samples of the joint ..."
                     )
@@ -343,11 +395,13 @@ def local_coverage_tests(
                     inv_transform_samples_cal = npe._transform(
                         theta_cal, context=x_cal
                     )[0].detach()
+                    # save data
                     torch.save(
                         inv_transform_samples_cal,
                         data_path / f"inv_transform_samples_n_cal_{x_cal.shape[0]}.pkl",
                     )
                 try:
+                    # Load data if available ...
                     base_dist_samples_cal = torch.load(
                         data_path / f"base_dist_samples_n_cal_{x_cal.shape[0]}.pkl"
                     )
@@ -355,6 +409,7 @@ def local_coverage_tests(
                         data_path / f"base_dist_samples_n_eval_{n_eval}.pkl"
                     )
                 except FileNotFoundError:
+                    # ... otherwise generate it
                     print("Sampling from the base distribution ...")
                     print()
                     base_dist_samples_cal = npe._flow._distribution.sample(
@@ -363,6 +418,7 @@ def local_coverage_tests(
                     base_dist_samples_eval = npe._flow._distribution.sample(
                         n_eval
                     ).detach()
+                    # save data
                     torch.save(
                         base_dist_samples_cal,
                         data_path / f"base_dist_samples_n_cal_{x_cal.shape[0]}.pkl",
@@ -388,12 +444,14 @@ def local_coverage_tests(
                 train_runtime["lc2st_nf"] = time.time() - t0
                 trained_clfs_dict["lc2st_nf"] = trained_clfs_lc2st
 
+                # Compute results for every observation x_0
+                # Loop over observations
                 probas_obs = {}
-
                 for key_obs, observation in tqdm(
                     observation_dict.items(),
                     desc=f"{m}: Computing T for every observation x_0",
                 ):
+                    # Evaluate the test
                     lc2st_results_obs = eval_htest(
                         conf_alpha=alpha,
                         t_stats_estimator=t_stats_lc2st,
@@ -412,6 +470,7 @@ def local_coverage_tests(
                         trained_clfs=trained_clfs_lc2st,
                         **kwargs_lc2st,
                     )
+                    # Get predicted probabilities
                     if return_predicted_probas:
                         _, probas_obs[key_obs] = t_stats_lc2st(
                             P=None,
@@ -425,7 +484,7 @@ def local_coverage_tests(
                             return_probas=True,
                             **kwargs_lc2st,
                         )
-
+                    # Add results to results dictionary
                     for i, result_name in enumerate(result_keys):
                         for test_stat_name in test_stat_names:
                             results_dict[m][result_name][test_stat_name].append(
@@ -440,17 +499,22 @@ def local_coverage_tests(
                 print()
 
                 try:
+                    # Load data if available ...
                     joint_hpd_values_cal = torch.load(
                         data_path / f"joint_hpd_values_n_cal_{x_cal.shape[0]}.pkl"
                     )
                 except FileNotFoundError:
+                    # ... otherwise compute it
                     print("Computing the joint HPD values ...")
+
+                    # Define npe-log-prob function compatible with `hpd_values` function
                     from sbi.utils import match_theta_and_x_batch_shapes
 
                     def posterior_log_prob_fn(theta, x):
                         theta, x = match_theta_and_x_batch_shapes(theta, x)
                         return npe.log_prob(theta, x)
 
+                    # Compute HPD values
                     joint_hpd_values_cal = hpd_values(
                         theta_cal,
                         X=x_cal,
@@ -458,7 +522,7 @@ def local_coverage_tests(
                         est_sample_fn=npe.sample,
                     )
 
-                    # save hpd values for later use in local method
+                    # Save HPD values
                     torch.save(
                         joint_hpd_values_cal,
                         data_path / f"joint_hpd_values_n_cal_{x_cal.shape[0]}.pkl",
@@ -481,8 +545,9 @@ def local_coverage_tests(
                 train_runtime["lhpd"] = time.time() - t0
                 trained_clfs_dict["lhpd"] = trained_clfs_lhpd
 
+                # Compute results for every observation x_0
+                # Loop over observations
                 probas_obs = {}
-
                 for key_obs, observation in tqdm(
                     observation_dict.items(),
                     desc=f"{m}: Computing T for every observation x_0",
@@ -505,7 +570,7 @@ def local_coverage_tests(
                         est_sample_fn=None,
                         **kwargs_lhpd,
                     )
-
+                    # Get predicted probabilities
                     if return_predicted_probas:
                         _, probas_obs[key_obs] = t_stats_lhpd(
                             Y=theta_cal,
@@ -518,13 +583,14 @@ def local_coverage_tests(
                             est_sample_fn=None,
                             **kwargs_lhpd,
                         )
-
+                    # Add results to results dictionary
                     for i, result_name in enumerate(result_keys):
                         results_dict[m][result_name]["mse"].append(
                             lhpd_results_obs[i]["mse"]
                         )
                 probas_obs_dict[m] = probas_obs
 
+            # Save results
             torch.save(
                 results_dict[m],
                 result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl",

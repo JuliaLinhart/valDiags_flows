@@ -1,3 +1,6 @@
+# Functions to run experiments on sbibm tasks with npe-flows
+
+# IMPORTS
 import os
 import copy
 
@@ -42,7 +45,7 @@ def l_c2st_results_n_train(
     test_stat_names=["accuracy", "mse", "div"],
     seed=42,
 ):
-    """Compute the test results (for one run) for a given task and npes
+    """Compute the test results (for one run) for a given task and multiple npes
     (corresponding to n_train_list). All methods use the permutation method,
     except for (l)c2st_nf and lhpd that precomputes the test statistics under the null
     hypothesis and reuses them for every npe.
@@ -81,7 +84,7 @@ def l_c2st_results_n_train(
         train_runtime (dict): dict of average runtime for every method
             whose values are lists of average runtime for every n_train.
     """
-    # GENERATE DATA
+    # Generate data
     data_samples = generate_data_one_run(
         n_cal=n_cal,
         n_eval=n_eval,
@@ -89,9 +92,9 @@ def l_c2st_results_n_train(
         observation_dict=observation_dict,
         n_train_list=n_train_list,
         task_path=task_path,
-        save_data=True,
-        load_cal_data=True,
-        load_eval_data=True,
+        save_data=True,  # save data to disk
+        load_cal_data=True,  # load calibration data from disk
+        load_eval_data=True,  # load evaluation data from disk
         seed=seed,  # fixed seed for reproducibility
     )
 
@@ -142,6 +145,7 @@ def l_c2st_results_n_train(
             kwargs_lc2st=None,
         )["lhpd"]
 
+    # Dictionary of average result keys
     avg_result_keys = {
         "TPR": "reject",
         "p_value_mean": "p_value",
@@ -155,6 +159,7 @@ def l_c2st_results_n_train(
         "run_time_mean": "run_time",
         "run_time_std": "run_time",
     }
+    # Initialize dict of average results
     avg_results = dict(zip(methods, [dict() for _ in methods]))
     for m in methods:
         avg_results[m] = dict(
@@ -168,7 +173,7 @@ def l_c2st_results_n_train(
         )
     train_runtime = dict(zip(methods, [[] for _ in methods]))
 
-    # COMPUTE TEST RESULTS
+    # Compute test results for every n_train (one run)
     # Loop over n_train
     for n_train in n_train_list:
         results_dict, train_runtime_n = compute_test_results_npe_one_run(
@@ -188,8 +193,8 @@ def l_c2st_results_n_train(
             results_n_train_path=results_n_train_path,
             methods=methods,
             test_stat_names=test_stat_names,
-            compute_under_null=False,
-            save_results=True,
+            compute_under_null=False,  # no type I error computation
+            save_results=True,  # save results to disk
             seed=seed,
         )
 
@@ -197,14 +202,14 @@ def l_c2st_results_n_train(
         for method in methods:
             train_runtime[method].append(train_runtime_n[method])
 
-        # Append average /std results
+        # Append average results
         for method, results in results_dict.items():
             if method in methods:
                 for k, v in avg_result_keys.items():
                     for t_stat_name in test_stat_names:
                         if method == "lhpd" and t_stat_name != "mse":
                             continue
-
+                        # compute std
                         if "std" in k:
                             if "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
@@ -217,15 +222,18 @@ def l_c2st_results_n_train(
                                 avg_results[method][k][t_stat_name].append(
                                     np.std(results[v][t_stat_name])
                                 )
+                        # compute min
                         elif "min" in k:
                             avg_results[method][k][t_stat_name].append(
                                 np.min(results[v][t_stat_name])
                             )
+                        # compute max
                         elif "max" in k:
                             avg_results[method][k][t_stat_name].append(
                                 np.max(results[v][t_stat_name])
                             )
                         else:
+                            # compute mean
                             if "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
                                     np.mean(
@@ -418,13 +426,15 @@ def compute_emp_power_l_c2st(
                 )
                 t_stats_null_dict[n_cal]["c2st"] = t_stats_null["c2st"]
 
-    # Initialize dict of p-values
+    # Initialize dicts
     emp_power = {}
     type_I_error = {}
     p_values = {}
     p_values_h0 = {}
 
+    # Loop over n_cal
     for n_cal in n_cal_list:
+        # Initialize dicts at n_cal
         emp_power[n_cal], p_values[n_cal] = {}, {}
         type_I_error[n_cal], p_values_h0[n_cal] = {}, {}
 
@@ -478,11 +488,12 @@ def compute_emp_power_l_c2st(
                             ],
                         )
                     )
+    # Compute results for every run
     # Loop over runs
     for n in range(start_run, n_runs + 1):
         print()
         print("====> RUN: ", n, "/", n_runs, f", N_cal = {n_cal_list} <====")
-        # GENERATE DATA for a maximum n_cal
+        # Generate data for a maximum n_cal
         generate_c2st_data = True
         if "c2st" not in methods:
             generate_c2st_data = False
@@ -544,7 +555,7 @@ def compute_emp_power_l_c2st(
                     ].items()
                 }
 
-            # Compute test statistics for methods dependent of x_cal
+            # Compute test statistics under null for methods dependent of x_cal
             for m, metrics in zip(["lc2st_nf", "lhpd"], [test_stat_names, ["mse"]]):
                 if m in methods:
                     if m == "lc2st_nf":
@@ -601,6 +612,7 @@ def compute_emp_power_l_c2st(
                     save_results=False,
                     seed=n,  # different seed for every run
                 )
+                # Add results to dicts
                 for m in methods:
                     for t_stat_name in test_stat_names:
                         if m == "lhpd" and t_stat_name != "mse":
@@ -695,6 +707,7 @@ def compute_emp_power_l_c2st(
                     save_results=False,
                     seed=n,  # different seed for every run
                 )
+                # Add results to dicts
                 for m in methods:
                     for t_stat_name in test_stat_names:
                         if m == "lhpd" and t_stat_name != "mse":
@@ -814,12 +827,15 @@ def generate_data_one_run(
     try:
         if not load_cal_data:
             raise FileNotFoundError
+        # Base distribution samples for NF methods
         base_dist_samples_cal = torch.load(
             task_path / f"base_dist_samples_n_cal_{n_cal}.pkl"
         )
+        # Joint samples
         joint_samples_cal = torch.load(task_path / f"joint_samples_n_cal_{n_cal}.pkl")
         theta_cal = joint_samples_cal["theta"]
         x_cal = joint_samples_cal["x"]
+        # Only load reference posterior samples if needed
         if generate_c2st_data:
             reference_posterior_samples_cal = torch.load(
                 task_path / f"reference_posterior_samples_n_cal_{n_cal}.pkl"
@@ -827,14 +843,16 @@ def generate_data_one_run(
         else:
             reference_posterior_samples_cal = None
     except FileNotFoundError:
+        # Generate data
         base_dist_samples_cal = base_dist.sample(n_cal).detach()
         reference_posterior_samples_cal, theta_cal, x_cal = generate_task_data(
             n_cal,
             task,
             list(observation_dict.keys()),
-            sample_from_reference=generate_c2st_data,
+            sample_from_reference=generate_c2st_data,  # only sample from reference if needed
         )
         joint_samples_cal = {"theta": theta_cal, "x": x_cal}
+        # Save data
         if save_data:
             torch.save(
                 base_dist_samples_cal,
@@ -850,31 +868,34 @@ def generate_data_one_run(
                 task_path / f"joint_samples_n_cal_{n_cal}.pkl",
             )
 
-    # Eval set for fixed task data
+    # Eval set for fixed task data (no joint samples)
     print()
     print(f"Evaluation set for fixed task data (n_eval={n_eval})")
     try:
         if not load_eval_data:
             raise FileNotFoundError
+        # Base distribution samples for NF methods
+        base_dist_samples_eval = torch.load(
+            task_path / f"base_dist_samples_n_eval_{n_eval}.pkl"
+        )
+        # Only load reference posterior samples if needed
         if generate_c2st_data:
             reference_posterior_samples_eval = torch.load(
                 task_path / f"reference_posterior_samples_n_eval_{n_eval}.pkl"
             )
         else:
             reference_posterior_samples_eval = None
-        base_dist_samples_eval = torch.load(
-            task_path / f"base_dist_samples_n_eval_{n_eval}.pkl"
-        )
     except FileNotFoundError:
+        # Generate data
         reference_posterior_samples_eval, _, _ = generate_task_data(
             n_eval,
             task,
             list(observation_dict.keys()),
             sample_from_joint=False,
-            sample_from_reference=generate_c2st_data,
+            sample_from_reference=generate_c2st_data,  # only sample from reference if needed
         )
-
         base_dist_samples_eval = base_dist.sample(n_eval).detach()
+        # Save data
         if save_data:
             if generate_c2st_data:
                 torch.save(
@@ -886,7 +907,7 @@ def generate_data_one_run(
                 task_path / f"base_dist_samples_n_eval_{n_eval}.pkl",
             )
 
-    # Calibration and eval set for every estimator
+    # Calibration and eval set for every npe
     print()
     print(
         f"Calibration and evaluation sets for every estimator (n_cal={n_cal}, n_eval={n_eval})"
@@ -896,7 +917,7 @@ def generate_data_one_run(
     reference_inv_transform_samples_eval = {}
     npe_samples_x_cal = {}
     inv_transform_samples_theta_cal = {}
-
+    # Loop over n_train
     for N_train in n_train_list:
         print()
         print(f"Data for npe with N_train = {N_train}:")
@@ -906,17 +927,20 @@ def generate_data_one_run(
         npe_path = task_path / f"npe_{N_train}"
         # ==== C2ST calibration dataset ==== #
         print("     1. C2ST: at fixed observation x_0")
-        if generate_c2st_data:
+        if generate_c2st_data:  # only generate if needed
             try:
                 if not load_cal_data:
                     raise FileNotFoundError
+                # NPE samples for at fixed observation x_0
                 npe_samples_obs["cal"][N_train] = torch.load(
                     npe_path / f"npe_samples_obs_n_cal_{n_cal}.pkl"
                 )
+                # Inverse transform samples at fixed observation x_0
                 reference_inv_transform_samples_cal[N_train] = torch.load(
                     npe_path / f"reference_inv_transform_samples_n_cal_{n_cal}.pkl"
                 )
             except FileNotFoundError:
+                # Generate data
                 (
                     npe_samples_obs["cal"][N_train],
                     reference_inv_transform_samples_cal[N_train],
@@ -926,6 +950,7 @@ def generate_data_one_run(
                     reference_posterior_samples_cal,
                     list(observation_dict.values()),
                 )
+                # Save data
                 if save_data:
                     torch.save(
                         npe_samples_obs["cal"][N_train],
@@ -946,10 +971,12 @@ def generate_data_one_run(
         try:
             if not load_eval_data:
                 raise FileNotFoundError
+            # NPE samples for every observation x_0 (used in L-C2ST)
             npe_samples_obs["eval"][N_train] = torch.load(
                 npe_path / f"npe_samples_obs_n_eval_{n_eval}.pkl"
             )
-            if generate_c2st_data:
+            # Inverse transform samples for every observation x_0
+            if generate_c2st_data:  # only generate if needed
                 reference_inv_transform_samples_eval[N_train] = torch.load(
                     npe_path / f"reference_inv_transform_samples_n_eval_{n_eval}.pkl"
                 )
@@ -958,6 +985,7 @@ def generate_data_one_run(
                     num_obs: None for num_obs in observation_dict.keys()
                 }
         except FileNotFoundError:
+            # Generate data
             (
                 npe_samples_obs["eval"][N_train],
                 reference_inv_transform_samples_eval[N_train],
@@ -966,8 +994,9 @@ def generate_data_one_run(
                 base_dist_samples_eval,
                 reference_posterior_samples_eval,
                 list(observation_dict.values()),
-                nf_case=(not generate_c2st_data),
+                nf_case=(not generate_c2st_data),  # only generate if needed
             )
+            # Save data
             if save_data:
                 torch.save(
                     npe_samples_obs["eval"][N_train],
@@ -985,19 +1014,23 @@ def generate_data_one_run(
         try:
             if not load_cal_data:
                 raise FileNotFoundError
+            # NPE samples for every x in x_cal
             npe_samples_x_cal[N_train] = torch.load(
                 npe_path / f"npe_samples_x_cal_{n_cal}.pkl"
             )
+            # Inverse transform samples for every x in x_cal
             inv_transform_samples_theta_cal[N_train] = torch.load(
                 npe_path / f"inv_transform_samples_theta_cal_{n_cal}.pkl"
             )
         except FileNotFoundError:
+            # Generate data
             (
                 npe_samples_x_cal[N_train],
                 inv_transform_samples_theta_cal[N_train],
             ) = generate_npe_data_for_lc2st(
                 npe[N_train], base_dist_samples_cal, joint_samples_cal
             )
+            # Save data
             if save_data:
                 torch.save(
                     npe_samples_x_cal[N_train],
@@ -1008,6 +1041,7 @@ def generate_data_one_run(
                     npe_path / f"inv_transform_samples_theta_cal_{n_cal}.pkl",
                 )
 
+    # Add generated data to dict
     base_dist_samples = {"cal": base_dist_samples_cal, "eval": base_dist_samples_eval}
     reference_posterior_samples = {
         "cal": reference_posterior_samples_cal,
@@ -1118,6 +1152,7 @@ def compute_test_results_npe_one_run(
     npe_samples_x_cal = data_samples["npe_x_cal"][n_train]
     inv_transform_samples_theta_cal = data_samples["inv_transform_theta_cal"][n_train]
 
+    # Get dataset sizes
     n_cal = len(base_dist_samples["cal"])
     n_eval = len(base_dist_samples["eval"])
 
@@ -1128,6 +1163,7 @@ def compute_test_results_npe_one_run(
     print()
     print(f"N_train = {n_train}")
 
+    # Set up paths to save results
     result_path = task_path / f"npe_{n_train}" / results_n_train_path
     if compute_under_null:
         result_path = result_path / "null"
@@ -1136,16 +1172,19 @@ def compute_test_results_npe_one_run(
 
     t_stats_null_path = task_path / f"npe_{n_train}" / "t_stats_null"
 
+    # Initialize dicts
     train_runtime = dict(zip(methods, [0 for _ in methods]))
     results_dict = dict(zip(methods, [{} for _ in methods]))
     t_stats_null_dict = {
         m: {num_obs: {} for num_obs in observation_dict.keys()} for m in methods
     }
-
+    # Define result keys
     result_keys = ["reject", "p_value", "t_stat", "t_stats_null", "run_time"]
     trained_clfs_lc2st_nf = None
     runtime_lc2st_nf = None
+    # Loop over methods
     for m in methods:
+        # Initialize results dict
         results_dict[m] = dict(
             zip(
                 result_keys,
@@ -1156,6 +1195,7 @@ def compute_test_results_npe_one_run(
             )
         )
         try:
+            # Load results if available ...
             if load_results:
                 results_dict[m] = torch.load(
                     result_path / f"{m}_results_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
@@ -1170,6 +1210,7 @@ def compute_test_results_npe_one_run(
                     / f"t_stats_null_{m}_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
                 )
         except FileNotFoundError:
+            # ... otherwise compute results
             if m == "c2st" or m == "c2st_nf":
                 print()
                 print("     C2ST: train for every observation x_0")
@@ -1180,7 +1221,7 @@ def compute_test_results_npe_one_run(
                     desc=f"{m}: Computing T for every observation x_0",
                 ):
                     if m == "c2st":
-                        # Class 0: T ~ p_est(theta | x_0) vs. p_ref(theta | x_0)
+                        # Class 0 vs. class 1: T ~ q(theta | x_0) vs. p(theta | x_0)
                         P, Q = (
                             npe_samples_obs["cal"][n_obs],
                             reference_posterior_samples["cal"][n_obs],
@@ -1189,17 +1230,18 @@ def compute_test_results_npe_one_run(
                             npe_samples_obs["eval"][n_obs],
                             reference_posterior_samples["eval"][n_obs],
                         )
-                        # Permutation method
+                        # If computing under null, permute data
                         if compute_under_null:
                             P, Q = permute_data(P, Q, seed=seed)
                             P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
+                        # Get precomputed test stats under null if available
                         if t_stats_null_dict_npe["c2st"] is None:
                             t_stats_null = None
                         else:
                             t_stats_null = t_stats_null_dict_npe["c2st"][n_obs]
 
                     elif m == "c2st_nf":
-                        # Class 0: Z ~ N(0,I) vs. Z ~ T^{-1}(p_ref(theta | x_0))
+                        # Class 0 vs. class 1: Z ~ N(0,I) vs. Z ~ p(T^{-1}(theta,x_0) | x_0)
                         P, Q = (
                             base_dist_samples["cal"],
                             reference_inv_transform_samples["cal"][n_obs],
@@ -1210,9 +1252,10 @@ def compute_test_results_npe_one_run(
                         )
                         # No permuation method and precomputed test stats under null
                         if compute_under_null:
-                            Q = base_dist_samples_null
+                            Q = base_dist_samples_null  # the null hypothesis is known (P=Q independent of x)
                         t_stats_null = t_stats_null_c2st_nf
 
+                    # Evaluate the test
                     t0 = time.time()
                     c2st_results_obs = eval_htest(
                         conf_alpha=alpha,
@@ -1231,6 +1274,7 @@ def compute_test_results_npe_one_run(
                     )
                     runtime = time.time() - t0
 
+                    # Add results to dict
                     for i, result_name in enumerate(result_keys):
                         for t_stat_name in test_stat_names:
                             if result_name == "run_time":
@@ -1247,13 +1291,15 @@ def compute_test_results_npe_one_run(
                 print("     L-C2ST: amortized")
                 print()
 
-                x_P, x_Q = x_cal, x_cal
+                x_P, x_Q = x_cal, x_cal  # same context datafor both classes
 
                 if m == "lc2st":
+                    # Class 0 vs. class 1: T,X ~ q(theta, x) vs. p(theta, x)
                     P, Q = npe_samples_x_cal, theta_cal
                     P_eval_obs = npe_samples_obs["eval"]
 
                 if m == "lc2st_nf" or m == "lc2st_nf_perm":
+                    # Class 0 vs. class 1: Z,X ~ N(0,I)p(x) vs. p(T^{-1}(theta,x), x)
                     P, Q = base_dist_samples["cal"], inv_transform_samples_theta_cal
                     P_eval_obs = {
                         n_obs: base_dist_samples["eval"]
@@ -1299,6 +1345,8 @@ def compute_test_results_npe_one_run(
                     )
                     runtime = time.time() - t0
                     train_runtime[m] = runtime
+                    # Use same classifier trained on observed data for lc2st_nf and lc2st_nf_perm
+                    # --> they only differ in the computation of the null hypothesis
                     if "lc2st_nf" in m and not compute_under_null:
                         trained_clfs_lc2st_nf = trained_clfs_lc2st
                         runtime_lc2st_nf = runtime
@@ -1333,10 +1381,13 @@ def compute_test_results_npe_one_run(
                 else:
                     trained_clfs_null_lc2st = None
 
+                # Evaluate the test
+                # Loop over observations x_0
                 for num_observation, observation in tqdm(
                     observation_dict.items(),
                     desc=f"{m}: Computing T for every observation x_0",
                 ):
+                    # Evaluate the test
                     t0 = time.time()
                     lc2st_results_obs = eval_htest(
                         conf_alpha=alpha,
@@ -1363,6 +1414,7 @@ def compute_test_results_npe_one_run(
                     )
                     runtime = time.time() - t0  # / n_trials_null
 
+                    # Add results to dict
                     for i, result_name in enumerate(result_keys):
                         for t_stat_name in test_stat_names:
                             if result_name == "run_time":
@@ -1379,10 +1431,12 @@ def compute_test_results_npe_one_run(
                 print("     Local HPD: amortized")
                 print()
 
+                # Get estimator (needed to compute HPD values)
                 npe = torch.load(
                     task_path / f"npe_{n_train}" / "posterior_estimator.pkl"
                 ).flow
 
+                # Define sample and log prob functions for the estimator (needed to compute HPD values)
                 def npe_sample_fn(n_samples, x):
                     npe.set_default_x(x)
                     return sample_from_npe_obs(npe, x, n_samples=n_samples)
@@ -1423,10 +1477,13 @@ def compute_test_results_npe_one_run(
                 runtime = time.time() - t0
                 train_runtime[m] = runtime
 
+                # Evaluate the test
+                # Loop over observations x_0
                 for num_observation, observation in tqdm(
                     observation_dict.items(),
                     desc=f"{m}: Computing T for every observation x_0",
                 ):
+                    # Evaluate the test
                     t0 = time.time()
                     lhpd_results_obs = eval_htest(
                         conf_alpha=alpha,
@@ -1448,6 +1505,7 @@ def compute_test_results_npe_one_run(
                     )
                     runtime = time.time() - t0  # / n_trials_null
 
+                    # Add results to dict
                     for i, result_name in enumerate(result_keys):
                         if result_name == "run_time":
                             results_dict[m][result_name]["mse"].append(runtime)
@@ -1456,6 +1514,7 @@ def compute_test_results_npe_one_run(
                                 lhpd_results_obs[i]["mse"]
                             )
 
+            # Save results for the given method
             if save_results:
                 torch.save(
                     results_dict[m],
@@ -1465,6 +1524,7 @@ def compute_test_results_npe_one_run(
                     train_runtime[m], result_path / f"runtime_{m}_n_cal_{n_cal}.pkl"
                 )
 
+            # Add null test statistics to dict
             for t_stat_name in test_stat_names:
                 if m == "lhpd" and t_stat_name != "mse":
                     continue
@@ -1473,6 +1533,7 @@ def compute_test_results_npe_one_run(
                         "t_stats_null"
                     ][t_stat_name][num_obs - 1]
 
+            # Save null test statistics for the given method
             if save_results:
                 if not os.path.exists(t_stats_null_path):
                     os.makedirs(t_stats_null_path)
@@ -1517,10 +1578,14 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
     Returns:
         emp_power_list (List[List[float]]): list of lists of empirical power values.
             axis 0: runs
-            axis 1: observations
+            axis 1: observations (size 1 if Bonferonni correction is applied)
+        type_I_error_list (List[List[float]]): list of lists of type I error values.
+            axis 0: runs
+            axis 1: observations (size 1 if Bonferonni correction is applied)
     """
     emp_power_list = []
     type_I_error_list = []
+    # Loop over runs
     for n_r in range(n_runs):
         for result_list, p_values, compute in zip(
             [emp_power_list, type_I_error_list],
@@ -1528,13 +1593,16 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
             [compute_tpr, compute_fpr],
         ):
             if compute and p_values is not None:
+                # Get p-values for the considered run
                 p_value_n_r = np.array(
                     [p_values[n_obs][n_r] for n_obs in num_observation_list]
                 )
+                # Apply Bonferonni correction and append result...
                 if bonferonni_correction:
                     result_list.append(
                         [np.any(p_value_n_r <= alpha / len(p_value_n_r))]
                     )
+                # ... or just append the result
                 else:
                     result_list.append((np.array(p_value_n_r) <= alpha) * 1)
 
@@ -1555,10 +1623,10 @@ def compute_average_rejection_rates(
         result_list (np.array): array of average rejection rates.
 
     """
-    # over runs (for each observation)
+    # Over runs (for each observation)
     if mean_over_runs:
         result_list = np.mean(result_dict, axis=0)
-    # over observations (for each run)
+    # Over observations (for each run)
     elif mean_over_observations:
         result_list = np.mean(result_dict, axis=1)
     else:

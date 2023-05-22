@@ -1,7 +1,5 @@
-# ==== C2ST: local version ====
+# L-C2ST: local version
 # Implementation based on the vanilla C2ST method.
-# Author: Julia Linhart
-# Institution: Inria Paris-Saclay (MIND team)
 
 from tqdm import tqdm
 

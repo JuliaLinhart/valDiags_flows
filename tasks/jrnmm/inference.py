@@ -281,9 +281,7 @@ if __name__ == "__main__":
     summary_extractor.embedding.net.logscale = True  # log-PSD
 
     # train data
-    dataset_train = torch.load(
-        "/data/parietal/store/work/jlinhart/git_repos/valDiags_flows/saved_experiments/JR-NMM/fixed_gain_3d/datasets_train.pkl"
-    )
+    dataset_train = torch.load(PATH_EXPERIMENT + "datasets_train.pkl")
 
     # ground truth for rounds > 1
     gt_theta = prior.sample((1,))

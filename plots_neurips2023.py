@@ -233,7 +233,7 @@ avg_result_keys = {
 def plot_sbibm_results_n_train_n_cal(
     results_n_train,
     results_n_cal,
-    methods_reg,
+    methods_mse,
     methods_all,
     n_train_list,
     n_cal_list,
@@ -253,7 +253,7 @@ def plot_sbibm_results_n_train_n_cal(
     )
     # ==== t_stats of L-C2ST(-NF) w.r.t to oracle ====
 
-    # plot theoretical H_0 value for reg t-stats
+    # plot theoretical H_0 value for mse t-stats
     axs[0].plot(
         np.arange(len(n_train_list)),
         np.ones(len(n_train_list)) * 0.0,
@@ -263,8 +263,8 @@ def plot_sbibm_results_n_train_n_cal(
     )
     axs[0].legend()
     # plot estimated T values
-    # for i, methods in enumerate([methods_acc, methods_reg]): # t_Max is not used in the paper
-    for method in methods_reg:
+    # for i, methods in enumerate([methods_acc, methods_mse]): # t_Max is not used in the paper
+    for method in methods_mse:
         if (
             "perm" in method  # the permuation test is only used for the null hypothesis
             or "HPD" in method  # HPD does not have a comparable t-statistic

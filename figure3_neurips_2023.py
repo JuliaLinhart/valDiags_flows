@@ -1,24 +1,41 @@
-# # Inference and validation of the Jansen & Rit Neural Mass Model posterior
+# =============================================================================
 
-# 1. Posterior estimation via `sbi`-library
-# 2. Global validation metrics include
-#     - SBC (`sbi` implementation),
-#     - HPD (`lampe` implementation adapted to `sbi` posterior objects)
-#     - Global L-C2ST (ours) ???
-# 3. Local validation metrics include
-#     - L(ocal)-HPD (code for Zhao et al. 2020 paper)
-#     - L(ocal)-C2ST (ours): cross-val score and hypothesis tests
+#       SCRIPT TO REPRODUCE FIGURE 2 IN NEURIPS 2023 SUBMISSION
 
+# =============================================================================
+
+# DESCRIPTION: Inference and validation of the Jansen & Rit Neural Mass Model posterior.
+# > Model: Jansen & Rit Neural Mass Model as used in [Rodrigues et al. (2021)](https://arxiv.org/abs/2102.06477)
+#
+# > Posterior Estimation via `sbi`-library (NPE)
+#
+# > Global Validation Methods
+#   - SBC (`sbi` implementation),
+#   - HPD (`lampe` implementation adapted to `sbi` posterior objects)
+#
+# > Local Validation
+#   - L-C2ST-NF (ours): local C2ST for normalizing flow-based posterior estimators
+#  (- local-HPD [Zhao et al. (2021)]: implemented but not used in paper)
+
+
+# USAGE:
+# >> python figure3_neurips_2023.py --global_ct
+# >> python figure3_neurips_2023.py --local_ct_gain
+# >> python figure3_neurips_2023.py --plots
+# >> python figure3_neurips_2023.py --plots --lc2st_interpretability
+
+# ====== Imports ======
 
 import argparse
 from pathlib import Path
 import os
+from functools import partial
 
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-from valdiags.localC2ST import sbibm_clf_kwargs
+from valdiags.localC2ST import sbibm_clf_kwargs, lc2st_scores
 
 from tasks.jrnmm.prior import prior_JRNMM
 
@@ -30,38 +47,40 @@ from experiment_utils_jrnmm import (
     local_coverage_tests,
 )
 from plots_neurips2023 import (
-    global_coverage_pp_plots,
-    plot_local_t_stats_gain,
     global_vs_local_tstats,
     plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st,
+    local_pp_plot,
 )
 
-# set seed for reproducibility
+# ====== GLOBAL PARAMETERS ======
+
+# Set seed for reproducibility
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-# GLOBAL PARAMETERS
+# Path to save results
 PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_3")
 
-# number of training samples for the NPE
+# Number of training samples for the NPE
 N_TRAIN = 50000
 
-# test parameters
-ALPHA = 0.05
+# Test parameters
+ALPHA = 0.05  # significance level for the tests
 NB_HPD_LEVELS = 11
 
-# metrics / test statistics for L-C2ST
-METRICS_LC2ST = ["mse", "div"]
+# Test statistics for L-C2ST
+METRICS_LC2ST = ["mse"]  # , "div"]
 
 # classifier parameters
 CROSS_VAL = False
 N_ENSEMBLE = 1
 
-# Parse arguments
+# ====== Parse arguments ======
+
 parser = argparse.ArgumentParser()
 
-# data parameters
+# Data parameters
 parser.add_argument(
     "--n_cal",
     type=int,
@@ -76,9 +95,7 @@ parser.add_argument(
     help="Number of evaluation samples for L-C2ST.",
 )
 
-# test parameters
-
-# null distribution parameters
+# Test parameters
 parser.add_argument(
     "--n_trials_null",
     "-nt",
@@ -87,8 +104,7 @@ parser.add_argument(
     help="Number of trials to estimate the distribution of the test statistic under the null.",
 )
 
-# experiment parameters
-
+# Experiment parameters
 parser.add_argument(
     "--global_ct",
     "-gct",
@@ -101,12 +117,6 @@ parser.add_argument(
     "-lct_g",
     action="store_true",
     help="Exp 2: Local Tests results as a function of varying gain parameter.",
-)
-
-parser.add_argument(
-    "--pp_plots",
-    action="store_true",
-    help="Exp 2: L-C2ST PP-Plots for every observation",
 )
 
 parser.add_argument(
@@ -123,6 +133,8 @@ parser.add_argument(
     help="Plot final figures only.",
 )
 
+# ====== EXPERIMENTS ======
+
 # Parse arguments
 args = parser.parse_args()
 
@@ -132,7 +144,7 @@ print("  L-C2ST: Appplication to the Jansen-Rit model")
 print("=================================================")
 print()
 
-# ==== sbi set-up for given task ==== #
+# SBI set-up for given task: prior
 prior = prior_JRNMM(
     parameters=[
         ("C", 10.0, 250.0),
@@ -142,7 +154,7 @@ prior = prior_JRNMM(
     ]
 )
 
-# infer NPE : loading a pre-trained npe, the same as in Neurips 2022 WS paper
+# Infer NPE : loading a pre-trained npe, the same as in Neurips 2022 WS paper
 # --> if the file is not in the experiment path, it will train a new one
 try:
     npe_jrnmm = torch.load(PATH_EXPERIMENT / "posterior_estimator_jrnmm.pkl")
@@ -150,19 +162,19 @@ except FileNotFoundError:
     npe_jrnmm = train_posterior_jrnmm(N_TRAIN, PATH_EXPERIMENT)
     torch.save(npe_jrnmm, PATH_EXPERIMENT / "posterior_estimator_jrnmm.pkl")
 
-# ground truth parameters used to generate observations x_0
+# Ground truth parameters used to generate observations x_0
 # fixed parameters
 c = 135.0
 mu = 220.0
 sigma = 2000.0
 # varying gain parameter
-gain_list = np.arange(-25, 26, 5)
+gain_list = np.arange(-25, 26, 5)  # [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]
 
-# generate observations
 try:
-    # load observations
+    # Load observations
     x_obs_list = torch.load(PATH_EXPERIMENT / "observations/gain_experiment.pkl")[1]
 except FileNotFoundError:
+    # Generate observations
     x_obs_list = generate_observations(
         c, mu, sigma, gain_list, load_path=PATH_EXPERIMENT / "observations"
     )
@@ -170,21 +182,20 @@ except FileNotFoundError:
 
 observation_dict = {g: x[None, :] for g, x in zip(gain_list, x_obs_list[:, :, 0])}
 
-# ==== test set-up ==== #
-# dataset sizes
-n_cal = args.n_cal
-n_eval = args.n_eval
+# Test set-up
+n_cal = args.n_cal  # number of calibration samples
+n_eval = args.n_eval  # number of evaluation samples
 
 # Load pre-computed simulations - data from the joint distribution
 joint_dataset = torch.load(PATH_EXPERIMENT / "joint_data_jrnmm_cal.pkl")
 theta_cal, x_cal = joint_dataset["theta"][:n_cal], joint_dataset["x"][:n_cal]
 
-dim_theta = theta_cal.shape[-1]
+dim_theta = theta_cal.shape[-1]  # dimension of the parameter space
 
-# classifier parameters
-sbibm_kwargs = sbibm_clf_kwargs(ndim=dim_theta)
+# Classifier parameters
+sbibm_kwargs = sbibm_clf_kwargs(ndim=dim_theta)  # same as from `sbibm`-library
 
-# set-up path-params to save results for given test params
+# Path-params to save results for given test params
 test_params = f"alpha_{ALPHA}_n_trials_null_{args.n_trials_null}"
 eval_params = f"n_eval_{n_eval}_n_ensemble_{N_ENSEMBLE}_cross_val_{CROSS_VAL}"
 
@@ -218,18 +229,6 @@ if args.global_ct:
         save_path=PATH_EXPERIMENT,
         methods=["sbc", "hpd"],
     )
-
-    fig, ax = plt.subplots(1, 1, figsize=(5, 5), constrained_layout=True)
-    ax = global_coverage_pp_plots(
-        alphas=np.linspace(0, 1, 100),
-        sbc_ranks=global_rank_stats["sbc"],
-        hpd_ranks=global_rank_stats["hpd"],
-        conf_alpha=ALPHA,
-        n_trials=args.n_trials_null,
-        ax=ax,
-    )
-    plt.savefig(PATH_EXPERIMENT / "global_tests/global_consistency.pdf")
-    plt.show()
 
 if args.local_ct_gain:
     print()
@@ -303,53 +302,16 @@ if args.local_ct_gain:
         return_trained_clfs=True,
     )
 
-    # plot results
-    fig, ax = plt.subplots(1, 1, figsize=(10, 5), constrained_layout=True)
-    ax = plot_local_t_stats_gain(
-        gain_dict={g: i for i, g in enumerate(gain_list)},
-        t_stats_obs={k: v["t_stat"] for k, v in results_dict.items()},
-        t_stats_obs_null=lct_stats_null,
-        methods=[
-            r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
-            # r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
-            # r"$local$-HPD",
-        ],  # , "lhpd"],
-        labels=[r"$\hat{t}_{\mathrm{MSE}_0}(x_{\mathrm{o}})$ / $\ell$-C2ST-NF"],
-        ax=ax,
-    )
-    plt.savefig(PATH_EXPERIMENT / "local_tests/local_t_stats_gain.pdf")
-    plt.show()
 
-    # print p_values
-    for method in results_dict.keys():
-        print()
-        print("P-VALUES FOR ", method)
-        print()
-        print(f"{results_dict[method]['p_value']}")
-
-    if args.pp_plots:
-        from plots_neurips2023 import local_pp_plot
-
-        for g in gain_list:
-            fig, ax = plt.subplots(1, 1, figsize=(5, 5), constrained_layout=True)
-            ax = local_pp_plot(
-                probas_obs=[probas_obs_dict["lc2st_nf"][g]],
-                probas_obs_null=probas_null["lc2st_nf"][g],
-                method=r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
-                text=rf"$g_0 = {g}$",
-            )
-            plt.title("Local PP-Plot")
-            plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
-            plt.show()
-
+# ====== PLOTS ONLY ======
 
 if args.plot:
+    # Path to save figures
     fig_path = PATH_EXPERIMENT / "figures"
     if not os.path.exists(fig_path):
         os.makedirs(fig_path)
 
-    method = "lc2st_nf"
-
+    # Load Global Results
     global_rank_stats = global_coverage_tests(
         npe=npe_jrnmm,
         prior=prior,
@@ -358,6 +320,10 @@ if args.plot:
         save_path=PATH_EXPERIMENT,
         methods=["sbc", "hpd"],
     )
+
+    # Load Local Results
+    # Method
+    method = "lc2st_nf"
 
     lct_stats_null = torch.load(
         PATH_EXPERIMENT / "t_stats_null" / eval_params / "lct_stats_null_dict.pkl"
@@ -394,6 +360,7 @@ if args.plot:
         / f"trained_clfs_{method}_n_cal_{x_cal.shape[0]}.pkl"
     )
 
+    # Plot Global vs. Local Results
     fig = global_vs_local_tstats(
         sbc_alphas=np.linspace(0, 1, 100),
         sbc_ranks=global_rank_stats["sbc"],
@@ -411,16 +378,17 @@ if args.plot:
     plt.savefig(fig_path / "global_vs_local_tstats.pdf")
     plt.show()
 
+    # Graphical L-C2ST Diagnostics
     if args.lc2st_interpretability:
         print("L-C2ST Interpretability")
+
         dict_obs_g = {g: i for i, g in enumerate(gain_list)}
+
         for g in gain_list:
             observation = x_obs_list[dict_obs_g[g]][None, :, :]
             theta_gt = np.array([c, mu, sigma, g])
 
-            from functools import partial
-            from valdiags.localC2ST import lc2st_scores
-
+            # Pairplot with ground truth and Predicted Probability (PP) intensity
             fig = plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
                 npe_jrnmm,
                 theta_gt=theta_gt,
@@ -434,4 +402,16 @@ if args.plot:
             plt.savefig(
                 PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}.pdf"
             )
+            plt.show()
+
+            # Local PP-Plot
+            fig, ax = plt.subplots(1, 1, figsize=(5, 5), constrained_layout=True)
+            ax = local_pp_plot(
+                probas_obs=[probas_obs_dict[g]],
+                probas_obs_null=probas_null[g],
+                method=r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
+                text=rf"$g_0 = {g}$",
+            )
+            plt.title("Local PP-Plot")
+            plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
             plt.show()

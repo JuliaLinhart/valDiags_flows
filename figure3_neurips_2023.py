@@ -1,6 +1,7 @@
 # =============================================================================
 
-#       SCRIPT TO REPRODUCE FIGURE 2 IN NEURIPS 2023 SUBMISSION
+#       SCRIPT TO REPRODUCE FIGURES 3 and 4 IN NEURIPS 2023 SUBMISSION
+#         (+ additional illustations in appendix A.6)
 
 # =============================================================================
 

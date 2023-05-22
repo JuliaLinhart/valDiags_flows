@@ -22,8 +22,8 @@
 # USAGE:
 # >> python figure3_neurips_2023.py --global_ct
 # >> python figure3_neurips_2023.py --local_ct_gain
-# >> python figure3_neurips_2023.py --plots
-# >> python figure3_neurips_2023.py --plots --lc2st_interpretability
+# >> python figure3_neurips_2023.py --plot
+# >> python figure3_neurips_2023.py --plot --lc2st_interpretability
 
 # ====== Imports ======
 

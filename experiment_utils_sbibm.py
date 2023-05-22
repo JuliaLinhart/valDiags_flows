@@ -42,6 +42,45 @@ def l_c2st_results_n_train(
     test_stat_names=["accuracy", "mse", "div"],
     seed=42,
 ):
+    """Compute the test results (for one run) for a given task and npes
+    (corresponding to n_train_list). All methods use the permutation method,
+    except for (l)c2st_nf and lhpd that precomputes the test statistics under the null
+    hypothesis and reuses them for every npe.
+
+    Args:
+        task (str): sbibm task name
+        n_cal (int): Number of samples to use for calibration (train classifier).
+        n_eval (int): Number of samples to use for evaluation (evaluate classifier).
+        observation_dict (dict): dict of observations over which we average the results.
+            keys are observation numbers
+            values are torch tensors of shape (1, dim_x)
+        n_train_list (List[int]): list of number of training samples for the npe.
+        alpha (float): significance level of the test.
+        n_trials_null (int): number of trials to compute the null distribution of
+            the test statistic.
+        t_stats_null_c2st_nf (dict): dict of precomputed test statistics for c2st_nf.
+        n_trials_null_precompute (int): number of trials to precompute the null distribution
+            of the test statistic.
+        kwargs_c2st (dict): dict of kwargs for c2st.
+        kwargs_lc2st (dict): dict of kwargs for lc2st.
+        kwargs_lhpd (dict): dict of kwargs for lhpd.
+        task_path (str): path to the task folder.
+        t_stats_null_path (str): path to the folder where the precomputed test statistics under
+            the null hypothesis are saved.
+        results_n_train_path (str): path to the folder where the results are saved.
+        methods (List[str]): list of methods to use for the test.
+            Defaults to ['c2st', 'lc2st', 'lc2st-nf'].
+        test_stat_names (List[str]): list of test statistic names to compute empirical power for.
+            Must be compatible with the test_stat_estimator from `valdiags.test_utils.eval_htest`.
+            Defaults to ['accuracy', 'mse', 'div'].
+        seed (int): seed for reproducibility.
+
+    Returns:
+        avg_results (dict): dict of average results for every method and test statistic
+            whose values are lists of average results for every n_train.
+        train_runtime (dict): dict of average runtime for every method
+            whose values are lists of average runtime for every n_train.
+    """
     # GENERATE DATA
     data_samples = generate_data_one_run(
         n_cal=n_cal,
@@ -59,7 +98,7 @@ def l_c2st_results_n_train(
     t_stats_null_lc2st_nf = None
     t_stats_null_lhpd = None
 
-    # precompute test statistics under null hypothesis for lc2st_nf
+    # Precompute test statistics under null hypothesis for lc2st_nf
     # same for every estimator (no need to recompute for every n_train)
     if "lc2st_nf" in methods:
         x_cal = data_samples["joint_cal"]["x"]
@@ -129,6 +168,8 @@ def l_c2st_results_n_train(
         )
     train_runtime = dict(zip(methods, [[] for _ in methods]))
 
+    # COMPUTE TEST RESULTS
+    # Loop over n_train
     for n_train in n_train_list:
         results_dict, train_runtime_n = compute_test_results_npe_one_run(
             alpha=alpha,
@@ -152,9 +193,11 @@ def l_c2st_results_n_train(
             seed=seed,
         )
 
+        # Append train runtime
         for method in methods:
             train_runtime[method].append(train_runtime_n[method])
 
+        # Append average /std results
         for method, results in results_dict.items():
             if method in methods:
                 for k, v in avg_result_keys.items():
@@ -183,11 +226,6 @@ def l_c2st_results_n_train(
                                 np.max(results[v][t_stat_name])
                             )
                         else:
-                            # if "t_stat" in k and t_stat_name == "mse":
-                            #     avg_results[method][k][t_stat_name].append(
-                            #         np.mean(results[v][t_stat_name])
-                            #         + 0.5  # for comparison with other t_stats
-                            #     )
                             if "run_time" in k:
                                 avg_results[method][k][t_stat_name].append(
                                     np.mean(
@@ -217,7 +255,7 @@ def compute_emp_power_l_c2st(
     n_trials_null_precompute,
     t_stats_null_c2st_nf,
     task_path,
-    methods=["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm"],
+    methods=["c2st", "lc2st", "lc2st_nf", "lhpd"],
     test_stat_names=["accuracy", "mse", "div"],
     compute_emp_power=True,
     compute_type_I_error=False,
@@ -228,43 +266,72 @@ def compute_emp_power_l_c2st(
     load_eval_data=True,
     save_every_n_runs=5,
 ):
-    """Compute the empirical power of the (L)C2ST methods for a given task and npe-flow
+    """Compute the empirical power of all methods for a given task and npe-flow
     (corresponding to n_train). We also compute the type I error if specified.
-    All methods will use the permutation method, except for (l)-c2st_nf that can use the same
-    precomputed test statistics (t_stats_null_lc2st_nf, t_stats_null_c2st_nf) for every run.
+
+    All methods will use the permutation method, except for (l)-c2st_nf and lhpd that for which
+    an asymptotic approximation of the null distribution of the test statistic can be computed
+    and used for both, power and type I error computation.
 
     This function enables doing experiments where the results are obtained for all methods
     on the same data, by computing them all in the same run.
 
     Args:
-        test_stat_names (List[str]): list of test statistic names to compute empirical power for.
-            Must be compatible with the test_stat_estimator from `valdiags.test_utils.eval_htest`.
-        n_runs (int): number of test runs to compute empirical power.
+        n_runs (int): number of test runs to compute empirical power / type I error.
         alpha (float): significance level of the test.
         task (str): sbibm task name
-        npe (sbi.DirectPosterior): neural posterior estimator (normalizing flow).
+        n_train (int): number of training samples for the npe.
         observation_dict (dict): dict of observations over which we average the results.
             keys are observation numbers
             values are torch tensors of shape (1, dim_x)
-        n_cal (int): Number of samples to use for calibration (train classifier).
+        n_cal_list (List[int]): Number of samples to use for calibration (train classifier).
         n_eval (int): Number of samples to use for evaluation (evaluate classifier).
-        method (str): method to use for the test. One of ['c2st', 'lc2st', 'lc2st-nf'].
+        kwargs_c2st (dict): dict of kwargs for c2st.
+        kwargs_lc2st (dict): dict of kwargs for lc2st.
+        kwargs_lhpd (dict): dict of kwargs for lhpd.
+        n_trials_null (int): number of trials to compute the null distribution of the test statistic.
+        n_trials_null_precompute (int): number of trials to precompute the null distribution of
+            the test statistic.
+        t_stats_null_c2st_nf (dict): dict of precomputed test statistics for c2st_nf.
+        task_path (str): path to the task folder.
+        methods (List[str]): list of methods to use for the test.
+            Defaults to ['c2st', 'lc2st', 'lc2st_nf', 'lhpd'].
+        test_stat_names (List[str]): list of test statistic names.
+            Must be compatible with the test_stat_estimator from `valdiags.test_utils.eval_htest`.
+            Defaults to ['accuracy', 'mse', 'div'].
+        compute_emp_power (bool): whether to compute the empirical power of the test.
+            Defaults to True.
         compute_type_I_error (bool): whether to compute the type I error of the test.
-        t_stats_null_lc2st_nf (dict): dict of precomputed test statistics for lc2st_nf.
-            Needs to be provided for lc2st_nf (not _perm).
-            Default: None.
-    Returns:
-        dict: dict of empirical power values for every test statistic computed in eval_htest_fn.
-            The dict keys are the test statistic names.
-            The dict values are lists of length len(num_observation_list) of empirical power values.
-    """
-    # ==== precompute test statistics under null hypothesis ====
+            Defaults to False.
+        n_run_load_results (int): number of the run from which to load the results.
+            Defaults to 0.
+        result_path (str): path to the folder where the results are saved.
+        t_stats_null_path (str): path to the folder where the precomputed test statistics under
+            the null hypothesis are saved.
+        results_n_train_path (str): path to the folder where the results are saved.
+        load_eval_data (bool): whether to load the evaluation data from disk.
+            Defaults to True.
+        save_every_n_runs (int): frequency at which to save the results.
+            Defaults to 5.
 
-    # initialize dict of precomputed test statistics under null hypothesis
+    Returns:
+        emp_power (dict): dict of empirical power for every n_cal, method and test statistic
+            whose values are lists of empirical power for every observation.
+        type_I_error (dict): dict of type I error for every n_cal, method and test statistic
+            whose values are lists of type I error for every observation.
+        p_values (dict): dict of p-values for every n_cal, method, test statistic and observation
+            whose values are lists of p-values for every run.
+        p_values_h0 (dict): dict of p-values under the null hypothesis for every n_cal, method,
+            test statistic and observation, whose values are lists of p-values under the null hypothesis
+            for every run.
+    """
+    # ==== Precompute test statistics under null hypothesis for methods that don't need the permutation method ====
+
+    # Initialize dict of precomputed test statistics under null hypothesis
     all_methods = ["c2st", "lc2st", "lc2st_nf", "lc2st_nf_perm", "lhpd"]
     t_stats_null_dict = {n_cal: {m: None for m in all_methods} for n_cal in n_cal_list}
 
-    # pre-compute test statistics under null hypothesis for c2st:
+    # c2st:
     # independent of x_cal so it's possible to compute them once and use them for all test runs
     if "c2st" in methods:
         try:
@@ -276,7 +343,7 @@ def compute_emp_power_l_c2st(
                     / f"t_stats_null_c2st_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
                 )
         except FileNotFoundError:
-            # generate data for 10000 samples
+            # Generate data for a maximum n_cal
             data_samples = generate_data_one_run(
                 n_cal=max(n_cal_list),
                 n_eval=n_eval,
@@ -289,7 +356,7 @@ def compute_emp_power_l_c2st(
                 load_eval_data=True,
             )
             for n_cal in n_cal_list:
-                # reduce number of calibration samples to n_cal
+                # Reduce number of calibration samples to n_cal
                 data_samples_n = copy.deepcopy(data_samples)
                 data_samples_n["base_dist"]["cal"] = data_samples_n["base_dist"]["cal"][
                     :n_cal
@@ -321,7 +388,7 @@ def compute_emp_power_l_c2st(
                     "inv_transform_theta_cal"
                 ][n_train][:n_cal]
 
-                # compute test statistics for c2st-H_0
+                # Compute test statistics for c2st-H_0
                 print()
                 print(
                     f"Pre-compute test statistics for c2st-H_0 (N_cal={n_cal}, n_trials={n_trials_null})"
@@ -351,7 +418,7 @@ def compute_emp_power_l_c2st(
                 )
                 t_stats_null_dict[n_cal]["c2st"] = t_stats_null["c2st"]
 
-    # initialize dict of p-values
+    # Initialize dict of p-values
     emp_power = {}
     type_I_error = {}
     p_values = {}
@@ -372,7 +439,7 @@ def compute_emp_power_l_c2st(
                 continue
             try:
                 for method in methods:
-                    # load result if it exists
+                    # Load result if it exists and start from run n_run_load_results + 1 ...
                     result_dict[n_cal][method] = torch.load(
                         result_path
                         / f"n_runs_{n_run_load_results}"
@@ -388,6 +455,7 @@ def compute_emp_power_l_c2st(
                     f"Loaded {name} results for N_cal = {n_cal} from run {n_run_load_results} ..."
                 )
             except FileNotFoundError:
+                # ... otherwise initialize them to empty lists and start from run 1
                 start_run = 1
                 for method in methods:
                     result_dict[n_cal][method] = dict(
@@ -410,11 +478,11 @@ def compute_emp_power_l_c2st(
                             ],
                         )
                     )
-
+    # Loop over runs
     for n in range(start_run, n_runs + 1):
         print()
         print("====> RUN: ", n, "/", n_runs, f", N_cal = {n_cal_list} <====")
-        # GENERATE DATA
+        # GENERATE DATA for a maximum n_cal
         generate_c2st_data = True
         if "c2st" not in methods:
             generate_c2st_data = False
@@ -429,16 +497,17 @@ def compute_emp_power_l_c2st(
             load_cal_data=False,
             load_eval_data=load_eval_data,
             generate_c2st_data=generate_c2st_data,
-            seed=n,  # different seed for every run (fixed for reproducibility)
+            seed=n,  # different seed for every run
         )
 
+        # Loop over n_cal
         for n_cal in n_cal_list:
             print()
             print("================")
             print("N_cal = ", n_cal)
             print("================")
             print()
-            # reduce number of calibration samples to n_cal
+            # Reduce number of calibration samples to n_cal
             data_samples_n = copy.deepcopy(data_samples)
             data_samples_n["base_dist"]["cal"] = data_samples_n["base_dist"]["cal"][
                 :n_cal
@@ -458,6 +527,7 @@ def compute_emp_power_l_c2st(
                 "inv_transform_theta_cal"
             ][n_train][:n_cal]
 
+            # Only generate c2st data if needed (can be expensive to sample from the true posterior)
             if generate_c2st_data:
                 data_samples_n["ref_posterior"]["cal"] = {
                     k: v[:n_cal]
@@ -474,7 +544,7 @@ def compute_emp_power_l_c2st(
                     ].items()
                 }
 
-            # compute test statistics for methods dependent of x_cal
+            # Compute test statistics for methods dependent of x_cal
             for m, metrics in zip(["lc2st_nf", "lhpd"], [test_stat_names, ["mse"]]):
                 if m in methods:
                     if m == "lc2st_nf":
@@ -488,7 +558,7 @@ def compute_emp_power_l_c2st(
                         n_cal=n_cal,
                         n_eval=n_eval,
                         dim_theta=dim_theta,
-                        n_trials_null=n_trials_null_precompute,  # high number of trials as they can be computed once and then be used for any estimator
+                        n_trials_null=n_trials_null_precompute,
                         kwargs_lc2st=kwargs_lc2st_temp,
                         kwargs_lhpd=kwargs_lhpd_temp,
                         x_cal=x_cal,
@@ -509,6 +579,7 @@ def compute_emp_power_l_c2st(
                 print()
                 print("Computing empirical power...")
 
+                # Compute test results for H1
                 H1_results_dict, _ = compute_test_results_npe_one_run(
                     alpha=alpha,
                     data_samples=data_samples_n,
@@ -528,29 +599,30 @@ def compute_emp_power_l_c2st(
                     task_path=task_path,
                     results_n_train_path="",
                     save_results=False,
-                    seed=n,  # different seed for every run (fixed for reproducibility)
+                    seed=n,  # different seed for every run
                 )
                 for m in methods:
                     for t_stat_name in test_stat_names:
                         if m == "lhpd" and t_stat_name != "mse":
                             continue
                         p_value_t = H1_results_dict[m]["p_value"][t_stat_name]
-                        # increment list of average rejections of H0 under H1
+                        # Increment list of average rejections of H0 under H1
                         emp_power[n_cal][m][t_stat_name] += (
                             (np.array(p_value_t) <= alpha) * 1 / n_runs
                         )
-                        # increment p_values for every observation
+                        # Increment p_values for every observation
                         for num_obs in observation_dict.keys():
                             p_values[n_cal][m][t_stat_name][num_obs].append(
                                 p_value_t[num_obs - 1]
                             )
 
                     if n % save_every_n_runs == 0:
-                        # set up path to save results
+                        # Set up path to save results
                         result_path_n = result_path / f"n_runs_{n}"
                         if not os.path.exists(result_path_n):
                             os.makedirs(result_path_n)
 
+                        # Save results
                         torch.save(
                             emp_power[n_cal][m],
                             result_path_n
@@ -562,6 +634,7 @@ def compute_emp_power_l_c2st(
                             / f"p_values_obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                         )
 
+                        # Remove previous results
                         result_path_previous = (
                             result_path / f"n_runs_{n-save_every_n_runs}"
                         )
@@ -586,19 +659,20 @@ def compute_emp_power_l_c2st(
                 print("Computing Type I error...")
                 print()
 
-                # fixed distribution for null hypothesis (base distribution)
+                # Fixed distribution for null hypothesis (base distribution)
                 from scipy.stats import multivariate_normal as mvn
 
-                # generate data for L-C2ST-NF (Q_h0 = P_h0 = N(0,1))
+                # Generate data for L-C2ST-NF (Q_h0 = P_h0 = N(0,1))
                 base_dist_samples_null = mvn(
                     mean=torch.zeros(dim_theta), cov=torch.eye(dim_theta)
                 ).rvs(
                     n_cal, random_state=n + 1
                 )  # not same random state as for other data generation (we dont want same data for P and Q)
 
-                # compatible with torch data
+                # Compatible with torch data
                 base_dist_samples_null = torch.FloatTensor(base_dist_samples_null)
 
+                # Compute test results for H0
                 H0_results_dict, _ = compute_test_results_npe_one_run(
                     alpha=alpha,
                     data_samples=data_samples_n,
@@ -619,7 +693,7 @@ def compute_emp_power_l_c2st(
                     task_path=task_path,
                     results_n_train_path="",
                     save_results=False,
-                    seed=n,  # different seed for every run (fixed for reproducibility)
+                    seed=n,  # different seed for every run
                 )
                 for m in methods:
                     for t_stat_name in test_stat_names:
@@ -627,21 +701,21 @@ def compute_emp_power_l_c2st(
                             continue
 
                         p_value_t = H0_results_dict[m]["p_value"][t_stat_name]
-                        # increment list of average rejections of H0 under H0
+                        # Increment list of average rejections of H0 under H0
                         type_I_error[n_cal][m][t_stat_name] += (
                             (np.array(p_value_t) <= alpha) * 1 / n_runs
                         )
-                        # increment p_value for every observation
+                        # Increment p_value for every observation
                         for num_obs in observation_dict.keys():
                             p_values_h0[n_cal][m][t_stat_name][num_obs].append(
                                 p_value_t[num_obs - 1]
                             )
                     if n % save_every_n_runs == 0:
-                        # set up path to save results
+                        # Set up path to save results
                         result_path_n = result_path / f"n_runs_{n}"
                         if not os.path.exists(result_path_n):
                             os.makedirs(result_path_n)
-
+                        # Save results
                         torch.save(
                             type_I_error[n_cal][m],
                             result_path_n
@@ -653,6 +727,7 @@ def compute_emp_power_l_c2st(
                             / f"p_values_h0__obs_per_run_{m}_n_runs_{n}_n_cal_{n_cal}.pkl",
                         )
 
+                        # Remove previous results
                         result_path_previous = (
                             result_path / f"n_runs_{n-save_every_n_runs}"
                         )
@@ -686,11 +761,36 @@ def generate_data_one_run(
     generate_c2st_data=True,
     seed=42,  # fixed seed for reproducibility
 ):
-    # set seed
+    """Generate data for one run of the test.
+
+    Args:
+        n_cal (int): number of calibration samples.
+        n_eval (int): number of evaluation samples.
+        task (str): sbibm task name.
+        observation_dict (dict): dict of observations.
+            keys are observation numbers
+            values are torch tensors of shape (1, dim_x)
+        task_path (str): path to the task folder.
+        n_train_list (List[int]): number of training samples for the npe.
+        save_data (bool): whether to save the generated data.
+            Defaults to True.
+        load_cal_data (bool): whether to load the calibration data from disk.
+            Defaults to True.
+        load_eval_data (bool): whether to load the evaluation data from disk.
+            Defaults to True.
+        generate_c2st_data (bool): whether to generate the data for c2st.
+            Defaults to True.
+        seed (int): seed for reproducibility.
+
+    Returns:
+        data_samples (dict): dict of data samples.
+    """
+
+    # Set seed
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    # load posterior estimator (NF)
+    # Load posterior estimator (NF)
     # trained using the code from https://github.com/sbi-benchmark/results/tree/main/benchmarking_sbi
     # >>> python run.py --multirun task={task} task.num_simulations={n_train_list} algorithm=npe
     npe = {}
@@ -701,15 +801,15 @@ def generate_data_one_run(
     print(f"Loaded npe posterior estimator trained on {n_train_list} samples.")
     print()
 
-    # get base distribution (same for all npes)
+    # Get base distribution (same for all npes)
     base_dist = npe[n_train_list[0]].posterior_estimator._distribution
 
-    # generate / load calibration and evaluation datasets
+    # Generate / load calibration and evaluation datasets
     print(" ==========================================")
     print("     Generating / loading datasets")
     print(" ==========================================")
     print()
-    # cal set for fixed task data
+    # Calibration set for fixed task data
     print(f"Calibration set for fixed task data (n_cal={n_cal})")
     try:
         if not load_cal_data:
@@ -750,7 +850,7 @@ def generate_data_one_run(
                 task_path / f"joint_samples_n_cal_{n_cal}.pkl",
             )
 
-    # eval set for fixed task data
+    # Eval set for fixed task data
     print()
     print(f"Evaluation set for fixed task data (n_eval={n_eval})")
     try:
@@ -786,7 +886,7 @@ def generate_data_one_run(
                 task_path / f"base_dist_samples_n_eval_{n_eval}.pkl",
             )
 
-    # cal and eval set for every estimator
+    # Calibration and eval set for every estimator
     print()
     print(
         f"Calibration and evaluation sets for every estimator (n_cal={n_cal}, n_eval={n_eval})"
@@ -947,7 +1047,7 @@ def compute_test_results_npe_one_run(
     task_path,
     results_n_train_path,
     test_stat_names=["accuracy", "mse", "div"],
-    methods=["c2st", "lc2st", "c2st_nf", "lc2st_nf", "lc2st_nf_perm", "lhpd"],
+    methods=["c2st", "lc2st", "lc2st_nf", "lhpd"],
     alpha=0.05,
     compute_under_null=False,
     base_dist_samples_null=None,
@@ -956,11 +1056,61 @@ def compute_test_results_npe_one_run(
     load_results=True,
     seed=42,  # fix seed for reproducibility
 ):
-    # extract data samples independent from estimator
+    """Compute test results for one run of the test.
+    All methods use the permutation method, except for L-C2ST-NF and local-HPD, which
+        use precomputed asymtotic approximations of the null distributions that can be used for any
+        new NPE.
+
+    Args:
+        data_samples (dict): dict of data samples as returned by generate_data_one_run.
+        n_train (int): number of training samples for the npe.
+        observation_dict (dict): dict of observations.
+            keys are observation numbers
+            values are torch tensors of shape (1, dim_x)
+        kwargs_c2st (dict): kwargs for c2st.
+        kwargs_lc2st (dict): kwargs for lc2st.
+        kwargs_lhpd (dict): kwargs for lhpd.
+        n_trials_null (int): number of trials for the permutation test.
+        t_stats_null_c2st_nf (dict): dict of null test statistics for c2st_nf.
+        t_stats_null_lc2st_nf (dict): dict of null test statistics for lc2st_nf.
+        t_stats_null_lhpd (dict): dict of null test statistics for lhpd.
+        t_stats_null_dict_npe (dict): dict of null test statistics for npe dependent methods.
+        task_path (str): path to the task folder.
+        results_n_train_path (str): path to the results folder for the considered n_train.
+        test_stat_names (List[str]): list of test statistic names.
+            Must be compatible with scores functions of the considered methods.
+            Defaults to ["accuracy", "mse", "div"].
+        methods (List[str]): list of methods.
+            Defaults to ["c2st", "lc2st", "lc2st_nf", "lhpd"].
+        alpha (float): significance level.
+            Defaults to 0.05.
+        compute_under_null (bool): whether to compute the test under the null hypothesis.
+            Defaults to False.
+        base_dist_samples_null (torch tensor): samples from the base distribution
+            for the NF null hypothesis.
+            Defaults to None.
+        return_t_stats_null (bool): whether to return the null test statistics.
+            Defaults to False.
+        save_results (bool): whether to save the results.
+            Defaults to True.
+        load_results (bool): whether to load the results.
+            Defaults to True.
+        seed (int): seed for reproducibility.
+
+    Returns:
+        results_dict (dict): dict of test results for every method, target and test statistic
+            whose values are lists of length n_obs.
+        train_runtime (dict): dict of training runtimes for every method
+            whose values are floats.
+        t_stats_null_dict (dict): dict of null test statistics for every method, test statistics and observation
+            whose values are lists of length n_trials_null(_precompute).
+    """
+
+    # Extract data samples independent from estimator
     base_dist_samples = data_samples["base_dist"]
     reference_posterior_samples = data_samples["ref_posterior"]
     theta_cal, x_cal = data_samples["joint_cal"].values()
-    # extract data samples for the considered "n_train"-estimator (npe)
+    # Extract data samples for the considered "n_train"-estimator (npe)
     npe_samples_obs = {k: v[n_train] for k, v in data_samples["npe_obs"].items()}
     reference_inv_transform_samples = {
         k: v[n_train] for k, v in data_samples["ref_inv_transform"].items()
@@ -1024,13 +1174,13 @@ def compute_test_results_npe_one_run(
                 print()
                 print("     C2ST: train for every observation x_0")
                 print()
-                # loop over observations x_0
+                # Loop over observations x_0
                 for n_obs in tqdm(
                     observation_dict.keys(),
                     desc=f"{m}: Computing T for every observation x_0",
                 ):
                     if m == "c2st":
-                        # class 0: T ~ p_est(theta | x_0) vs. p_ref(theta | x_0)
+                        # Class 0: T ~ p_est(theta | x_0) vs. p_ref(theta | x_0)
                         P, Q = (
                             npe_samples_obs["cal"][n_obs],
                             reference_posterior_samples["cal"][n_obs],
@@ -1039,7 +1189,7 @@ def compute_test_results_npe_one_run(
                             npe_samples_obs["eval"][n_obs],
                             reference_posterior_samples["eval"][n_obs],
                         )
-                        # permutation method
+                        # Permutation method
                         if compute_under_null:
                             P, Q = permute_data(P, Q, seed=seed)
                             P_eval, Q_eval = permute_data(P_eval, Q_eval, seed=seed)
@@ -1049,7 +1199,7 @@ def compute_test_results_npe_one_run(
                             t_stats_null = t_stats_null_dict_npe["c2st"][n_obs]
 
                     elif m == "c2st_nf":
-                        # class 0: Z ~ N(0,I) vs. Z ~ T^{-1}(p_ref(theta | x_0))
+                        # Class 0: Z ~ N(0,I) vs. Z ~ T^{-1}(p_ref(theta | x_0))
                         P, Q = (
                             base_dist_samples["cal"],
                             reference_inv_transform_samples["cal"][n_obs],
@@ -1058,7 +1208,7 @@ def compute_test_results_npe_one_run(
                             base_dist_samples["eval"],
                             reference_inv_transform_samples["eval"][n_obs],
                         )
-                        # no permuation method and precomputed test stats under null
+                        # No permuation method and precomputed test stats under null
                         if compute_under_null:
                             Q = base_dist_samples_null
                         t_stats_null = t_stats_null_c2st_nf
@@ -1110,7 +1260,7 @@ def compute_test_results_npe_one_run(
                         for n_obs in observation_dict.keys()
                     }
                 if m == "lc2st" or m == "lc2st_nf_perm":
-                    # permutation method and no precomputed test stats under null
+                    # Permutation method and no precomputed test stats under null
                     t_stats_null = t_stats_null_dict_npe[m]
                     if compute_under_null:
                         joint_P_x = torch.cat([P, x_P], dim=1)
@@ -1127,12 +1277,12 @@ def compute_test_results_npe_one_run(
                             joint_Q_x[:, Q.shape[-1] :],
                         )
                 else:
-                    # no permutation method and precomputed test stats under null
+                    # No permutation method and precomputed test stats under null
                     t_stats_null = t_stats_null_lc2st_nf
                     if compute_under_null:
                         Q = base_dist_samples_null
 
-                # train classifier on the joint
+                # Train classifier on the joint
                 print(f"{m}: TRAINING CLASSIFIER on the joint ...")
                 print()
                 print("... for the observed data")
@@ -1163,7 +1313,7 @@ def compute_test_results_npe_one_run(
 
                 if t_stats_null is None:
                     print("... under the null hypothesis")
-                    # train classifier on the joint under null
+                    # Train classifier on the joint under null
                     _, _, trained_clfs_null_lc2st = t_stats_lc2st(
                         null_hypothesis=True,
                         n_trials_null=n_trials_null,
@@ -1348,6 +1498,27 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
     compute_fpr=False,
     bonferonni_correction=False,
 ):
+    """Compute rejection rates from p-values over runs and observations for a given method and test statistic.
+
+    Args:
+        n_runs (int): number of runs.
+        alpha (float): significance level.
+        num_observation_list (List[int]): list of observation numbers.
+        p_values_dict (dict): dict of p-values for each observation number and run.
+        p_values_h0_dict (dict): dict of p-values under the null hypothesis for each observation number and run.
+            Defaults to None.
+        compute_tpr (bool): whether to compute the true positive rate (empirical power).
+            Defaults to True.
+        compute_fpr (bool): whether to compute the false positive rate (type I error).
+            Defaults to False.
+        bonferonni_correction (bool): whether to apply the Bonferonni correction.
+            Defaults to False.
+
+    Returns:
+        emp_power_list (List[List[float]]): list of lists of empirical power values.
+            axis 0: runs
+            axis 1: observations
+    """
     emp_power_list = []
     type_I_error_list = []
     for n_r in range(n_runs):
@@ -1373,10 +1544,21 @@ def compute_rejection_rates_from_pvalues_over_runs_and_observations(
 def compute_average_rejection_rates(
     result_dict, mean_over_runs, mean_over_observations
 ):
-    # ... over observations (for the mean rejection rate over runs)
+    """Compute average rejection rates from a dict of results for a given method and test statistic.
+
+    Args:
+        result_dict (dict): dict of results (rejected or not).
+            axis 0: runs
+            axis 1: observations
+
+    Returns:
+        result_list (np.array): array of average rejection rates.
+
+    """
+    # over runs (for each observation)
     if mean_over_runs:
         result_list = np.mean(result_dict, axis=0)
-    # ... over runs (for the mean rejection rate over observations)
+    # over observations (for each run)
     elif mean_over_observations:
         result_list = np.mean(result_dict, axis=1)
     else:

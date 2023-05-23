@@ -323,8 +323,6 @@ if args.plot:
     )
 
     # Load Local Results
-    # Method
-    method = "lc2st_nf"
 
     lct_stats_null = torch.load(
         PATH_EXPERIMENT / "t_stats_null" / eval_params / "lct_stats_null_dict.pkl"
@@ -335,7 +333,7 @@ if args.plot:
         / "local_tests"
         / test_params
         / eval_params
-        / f"{method}_results_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl"
+        / f"lc2st_nf_results_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl"
     )
 
     probas_obs_dict = torch.load(
@@ -343,7 +341,7 @@ if args.plot:
         / "local_tests"
         / test_params
         / eval_params
-        / f"{method}_probas_obs_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl"
+        / f"lc2st_nf_probas_obs_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl"
     )
 
     probas_null = torch.load(
@@ -358,7 +356,7 @@ if args.plot:
         / "local_tests"
         / test_params
         / eval_params
-        / f"trained_clfs_{method}_n_cal_{x_cal.shape[0]}.pkl"
+        / f"trained_clfs_lc2st_nf_n_cal_{x_cal.shape[0]}.pkl"
     )
 
     # Plot Global vs. Local Results
@@ -369,7 +367,7 @@ if args.plot:
         gain_dict={
             g: i for i, g in enumerate(gain_list)
         },  # no -25 and 25 (outside of the prior)
-        t_stats_obs={method: results_dict["t_stat"]},
+        t_stats_obs={"lc2st_nf": results_dict["t_stat"]},
         t_stats_obs_null=lct_stats_null,
         methods=[r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)"],
         labels=[r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)"],

@@ -39,7 +39,7 @@ python figure3_neurips_2023.py --plot --lc2st_interpretability
 ### Results for Figure 1
 ```
 python figure1_neurips_2023.py --opt_bayes --t_shift
-python python figure1_neurips_2023.py --power_shift
+python figure1_neurips_2023.py --power_shift
 ```
 ### Results for Figure 2
 1. Varying N_train (Columns 1 and 2):

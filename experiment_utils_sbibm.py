@@ -1209,6 +1209,9 @@ def compute_test_results_npe_one_run(
                     t_stats_null_path
                     / f"t_stats_null_{m}_n_eval_{n_eval}_n_cal_{n_cal}.pkl"
                 )
+            print()
+            print(f"Loaded {m} results for n_eval={n_eval}, n_cal={n_cal}")
+            print()
         except FileNotFoundError:
             # ... otherwise compute results
             if m == "c2st" or m == "c2st_nf":

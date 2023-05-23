@@ -233,7 +233,6 @@ if args.t_shift and not args.plot:
     print("=================================================")
     print()
     test_stats = dict(zip(test_stat_names, [[] for _ in test_stat_names]))
-    print(test_stats)
 
     # Generate data from P
     P_eval = P_dist.rvs(size=N_SAMPLES_EVAL)
@@ -281,7 +280,6 @@ if args.t_shift and not args.plot:
                     name = t_names[1]
                 else:
                     name = t_names[0]
-                print(name, metric)
                 test_stats[name].append(scores[metric])
 
     # Save computed test statistics
@@ -403,6 +401,8 @@ if args.power_shift and not args.plot:
             PATH_EXPERIMENT
             + f"TPR_std_{clf_name}_shift_{args.q_dist}_dim_{dim}_n_runs_{N_RUNS}.pkl",
         )
+        print("Loaded Results.")
+        print()
     except FileNotFoundError:
         # ... otherwise, compute them
         # Initialize TPR dicts

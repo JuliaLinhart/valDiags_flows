@@ -24,7 +24,7 @@
 # >> python figure2_neurips_2023.py --t_res_ntrain --n_train 100 1000 10000 100000
 # >> python figure2_neurips_2023.py --t_res_ntrain --n_train 100 1000 10000 100000 --power_ntrain
 # >> python figure2_neurips_2023.py --power_ncal --n_cal 100 500 1000 2000 5000 10000
-# >> python figure2_neurips_2023.py --runtime --n_cal <5000/10000> --n_train <100/1000/10000/100000> --task slcp
+# >> python figure2_neurips_2023.py --runtime -nt 0 --n_cal <5000/10000> --task slcp
 # >> python figure2_neurips_2023.py --plot
 
 # ====== Imports ======

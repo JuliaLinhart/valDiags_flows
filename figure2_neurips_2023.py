@@ -24,7 +24,7 @@
 # >> python figure2_neurips_2023.py --t_res_ntrain --n_train 100 1000 10000 100000
 # >> python figure2_neurips_2023.py --t_res_ntrain --n_train 100 1000 10000 100000 --power_ntrain
 # >> python figure2_neurips_2023.py --power_ncal --n_cal 100 500 1000 2000 5000 10000
-# >> python figure2_neurips_2023.py --runtime -nt 0 --n_cal <5000/10000> --task slcp
+# >> python figure2_neurips_2023.py --runtime -nt 0 --n_cal 5000 10000 --task slcp
 # >> python figure2_neurips_2023.py --plot
 
 # ====== Imports ======
@@ -660,42 +660,55 @@ if args.power_ncal:
 
 # ====== Exp 3: RUNTIME ======
 if args.runtime:
-    methods_dict = {
-        "c2st": "accuracy",
-        "lc2st": "mse",
-        "lc2st_nf": "mse",
-        "lhpd": "mse",
-    }
-    n_train_list = [100, 1000, 10000, 100000]
-    for n_cal in args.n_cal:
-        # Compute test statistics for every n_train
-        results_n_train, train_runtime = l_c2st_results_n_train(
-            task,
-            n_cal=n_cal,
-            n_eval=n_eval,
-            observation_dict=observation_dict,
-            n_train_list=n_train_list,
-            alpha=ALPHA,
-            n_trials_null=0,  # just look at runtime to compute test statistics (no null hypothesis)
-            t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
-            n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
-            kwargs_c2st=kwargs_c2st,
-            kwargs_lc2st=kwargs_lc2st,
-            kwargs_lhpd=kwargs_lhpd,
-            task_path=task_path,
-            t_stats_null_path=task_path / "t_stats_null" / eval_params,
-            results_n_train_path=Path(f"results") / test_params / eval_params,
-            methods=methods_dict.keys(),
-            test_stat_names=ALL_METRICS,
-            seed=RANDOM_SEED,
-        )
-        # Print results
-        for m, t in methods_dict.items():
-            print(f"Method: {m}")
-            if "l" in m:
-                print(np.array(train_runtime[m]).round(2))
-            else:
-                print(np.array(results_n_train[m]["run_time_mean"][t]).round(2))
+    try:
+        dict_runtimes = torch.load(task_path / "results" / f"runtimes_appendix.pkl")
+    except FileNotFoundError:
+        methods_dict = {
+            "c2st": "accuracy",
+            "lc2st": "mse",
+            "lc2st_nf": "mse",
+            "lhpd": "mse",
+        }
+        n_train_list = [100, 1000, 10000, 100000]
+        dict_runtimes = {
+            m: {n_cal: [] for n_cal in args.n_cal} for m in methods_dict.keys()
+        }
+        for n_cal in args.n_cal:
+            # Compute test statistics for every n_train
+            results_n_train, train_runtime = l_c2st_results_n_train(
+                task,
+                n_cal=n_cal,
+                n_eval=n_eval,
+                observation_dict=observation_dict,
+                n_train_list=n_train_list,
+                alpha=ALPHA,
+                n_trials_null=0,  # just look at runtime to compute test statistics (no null hypothesis)
+                t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
+                n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
+                kwargs_c2st=kwargs_c2st,
+                kwargs_lc2st=kwargs_lc2st,
+                kwargs_lhpd=kwargs_lhpd,
+                task_path=task_path,
+                t_stats_null_path=task_path / "t_stats_null" / eval_params,
+                results_n_train_path=Path(f"results") / test_params / eval_params,
+                methods=methods_dict.keys(),
+                test_stat_names=ALL_METRICS,
+                seed=RANDOM_SEED,
+            )
+
+            # Add results to dictionary
+            for m, t in methods_dict.items():
+                print(f"Method: {m}")
+                if "l" in m:
+                    dict_runtimes[m][n_cal] = np.array(train_runtime[m])
+                else:
+                    dict_runtimes[m][n_cal] = np.array(
+                        results_n_train[m]["run_time_mean"][t]
+                    )
+
+        # Save results
+        torch.save(dict_runtimes, task_path / "results" / f"runtimes_appendix.pkl")
+    print(dict_runtimes)
 
 # ====== PLOTS ONLY ======
 if args.plot:

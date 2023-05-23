@@ -59,7 +59,7 @@ By default this will compute results for the Two Moons task. For the SLCP task a
 
 ### Results of Appendix A.5 (Runtimes)
 ```
-python figure2_neurips_2023.py --runtime --n_cal <5000/10000> --task slcp
+python figure2_neurips_2023.py --runtime -nt 0 --n_cal <5000/10000> --task slcp
 ```
 
 ### Results for Figures 3 and 4:

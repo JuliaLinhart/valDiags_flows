@@ -245,8 +245,11 @@ if args.local_ct_gain:
         lct_stats_null = torch.load(
             PATH_EXPERIMENT / "t_stats_null" / eval_params / "lct_stats_null_dict.pkl"
         )
-        probas_null = torch.load(
-            PATH_EXPERIMENT / "t_stats_null" / eval_params / "probas_null_dict.pkl"
+        # probas_null = torch.load(
+        #     PATH_EXPERIMENT / "t_stats_null" / eval_params / "probas_null_dict.pkl"
+        # )
+        pp_vals_null = torch.load(
+            PATH_EXPERIMENT / "t_stats_null" / eval_params / "lc2st_nf_pp_vals_null.pkl"
         )
     except FileNotFoundError:
         lct_stats_null, probas_null = precompute_t_stats_null(
@@ -267,6 +270,18 @@ if args.local_ct_gain:
             # args for lc2st only
             kwargs_c2st=None,
         )
+        # Compute pp_vals for local pp-plots for lc2st_nf
+        from valdiags.graphical_valdiags import PP_vals
+        import pandas as pd
+
+        alphas = np.linspace(0, 1, 100)
+        pp_vals_null = {}
+        for g in gain_list:
+            pp_vals_null[g] = {}
+            for t in range(len(probas_null["lc2st_nf"][g])):
+                pp_vals_null[g][t] = pd.Series(
+                    PP_vals(probas_null["lc2st_nf"][g][t], alphas)
+                )
 
         # save results
         torch.save(
@@ -274,9 +289,16 @@ if args.local_ct_gain:
             PATH_EXPERIMENT / "t_stats_null" / eval_params / "lct_stats_null_dict.pkl",
         )
         torch.save(
-            probas_null,
-            PATH_EXPERIMENT / "t_stats_null" / eval_params / "probas_null_dict.pkl",
+            pp_vals_null,
+            PATH_EXPERIMENT
+            / "t_stats_null"
+            / eval_params
+            / "lc2st_nf_pp_vals_null.pkl",
         )
+        # torch.save(
+        #     probas_null,
+        #     PATH_EXPERIMENT / "t_stats_null" / eval_params / "probas_null_dict.pkl",
+        # )
 
     # local test
     (
@@ -344,11 +366,8 @@ if args.plot:
         / f"lc2st_nf_probas_obs_n_eval_{n_eval}_n_cal_{x_cal.shape[0]}.pkl"
     )
 
-    probas_null = torch.load(
-        PATH_EXPERIMENT
-        / "t_stats_null"
-        / eval_params
-        / "lc2st_nf_probas_nt_1000_n_cal_10000.pkl"
+    pp_vals_null = torch.load(
+        PATH_EXPERIMENT / "t_stats_null" / eval_params / "lc2st_nf_pp_vals_null.pkl"
     )
 
     trained_clfs_dict = torch.load(
@@ -407,7 +426,7 @@ if args.plot:
             fig, ax = plt.subplots(1, 1, figsize=(5, 5), constrained_layout=True)
             ax = local_pp_plot(
                 probas_obs=[probas_obs_dict[g]],
-                probas_obs_null=probas_null[g],
+                pp_vals_null_obs=pp_vals_null[g],
                 method=r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
                 text=rf"$g_0 = {g}$",
             )

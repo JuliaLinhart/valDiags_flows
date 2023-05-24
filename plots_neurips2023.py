@@ -586,14 +586,15 @@ def plot_local_t_stats_gain(
     return ax
 
 
-def local_pp_plot(probas_obs, probas_obs_null, method, text="", ax=None):
+def local_pp_plot(probas_obs, pp_vals_null_obs, method, text="", ax=None):
     if ax is None:
         ax = plt.gca()
 
         pp_plot_c2st(
             ax=ax,
             probas=[probas_obs],
-            probas_null=probas_obs_null,
+            pp_vals_null=pp_vals_null_obs,
+            probas_null=None,
             colors=[METHODS_DICT[method]["color"]],
             labels=[""],
             linewidth=linewidth,

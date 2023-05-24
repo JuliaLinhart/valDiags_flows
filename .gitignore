@@ -5,11 +5,13 @@ work_inference/
 *.err
 *.zip
 *.pdf
+*.svg
 .vscode/
 sbi_logs/
-script_margaret_localPIT_regression_old.py
 *.pyc
-notebooks/Toymodel_Timeseries.ipynb
+*.DS_Store
+
+
 saved_experiments/JR-NMM/**/Flows_amortized
 saved_experiments/JR-NMM/fixed_gain_3d/datasets_train.pkl
 saved_experiments/JR-NMM/fixed_gain_3d/lc2st_results
@@ -21,7 +23,24 @@ saved_experiments/JR-NMM/normal_4d/datasets_hnpe.pkl
 saved_experiments/JR-NMM/normal_4d/lct_results
 saved_experiments/JR-NMM/normal_4d/lc2st_results
 saved_experiments/JR-NMM/normal_4d/lc2st_eval_clfs
+
+saved_experiments/Gaussian1d/lc2st_eval_clfs/*.pkl
+
+saved_experiments/neurips_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lc2st_nf_probas_nt_1000_n_cal_10000.pkl
+saved_experiments/neurips_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/probas_null_dict.pkl
+saved_experiments/neurips_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd*.pkl
+
+
 script_margaret_local_c2st.py
+script_margaret_localPIT_regression_old.py
+script_margaret_localPIT_multiLCT_JRNMM.py
+script_margaret_trainHNPE_sim.py
+divergence-test.py
+
+*_old.py
+notebooks/HPDvsMultiPIT_Toy_3D.ipynb
+notebooks/random_plots.ipynb
+notebooks/Toymodel_Timeseries.ipynb
 
 
 

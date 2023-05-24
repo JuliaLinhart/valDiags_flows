@@ -363,6 +363,8 @@ if args.power_shift and not args.plot:
                     scores_null[b] = t_stats_null
 
                 # Save null scores
+                if not os.path.exists(PATH_EXPERIMENT + "t_stats_null/"):
+                    os.makedirs(PATH_EXPERIMENT + "t_stats_null/")
                 np.save(
                     PATH_EXPERIMENT + "t_stats_null/" + filename,
                     scores_null,
@@ -461,6 +463,11 @@ if args.power_shift and not args.plot:
 # ====== ONLY PLOT THE RESULTS ======
 
 if args.plot:
+    # set-up path to save figures:
+    fig_path = PATH_EXPERIMENT + "figures/"
+    if not os.path.exists(fig_path):
+        os.makedirs(fig_path)
+
     # Test statistics for *optimal Bayes* classifier
     t_stats_dict = torch.load(
         PATH_EXPERIMENT + f"test_stats_OptBayes_shift_{args.q_dist}_dim_{dim}.pkl"
@@ -484,8 +491,5 @@ if args.plot:
         shift_name=args.q_dist,
         clf_name=clf_name,
     )
-    plt.savefig(
-        PATH_EXPERIMENT
-        + f"figures/optbayes_{clf_name}_shift_{args.q_dist}_dim_{dim}.pdf"
-    )
+    plt.savefig(fig_path + f"optbayes_{clf_name}_shift_{args.q_dist}_dim_{dim}.pdf")
     plt.show()

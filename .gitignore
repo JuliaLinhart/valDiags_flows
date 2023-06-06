@@ -36,6 +36,14 @@ script_margaret_localPIT_regression_old.py
 script_margaret_localPIT_multiLCT_JRNMM.py
 script_margaret_trainHNPE_sim.py
 divergence-test.py
+lc2st_gaussian_shift.py
+lc2st_null_hyp_precision.py
+
+*_old.py
+notebooks/HPDvsMultiPIT_Toy_3D.ipynb
+notebooks/random_plots.ipynb
+notebooks/Toymodel_Timeseries.ipynb
+notebooks/JRNMM_simple_3d.ipynb
 
 *_old.py
 notebooks/HPDvsMultiPIT_Toy_3D.ipynb

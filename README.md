@@ -1,4 +1,4 @@
-# Validation Diagnostics for (conditional) Flows
+# Validation Diagnostics for SBI-algorithms and Normalizing Flows
 Official code for L-C2ST: Local Diagnostics for Posterior Approximations in
 Simulation-Based Inference
 
@@ -13,7 +13,7 @@ Dependencies:
 
 Make sure to `pip install -e .` within the `valDiags_flows` folder.
 
-## Generate Figures from paper
+## 1. Generate Figures from paper
 
 ### Figure 1: Single-class evaluation
 ```
@@ -36,7 +36,7 @@ python figure3_lc2st_2023.py --plot
 python figure3_lc2st_2023.py --plot --lc2st_interpretability
 ```
 
-## Reproduce experiment results from paper
+## 2. Reproduce experiment results from paper
 
 ### Results for Figure 1
 ```

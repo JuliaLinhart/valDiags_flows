@@ -66,12 +66,12 @@ saved_experiments/Gaussian1d/*
 saved_experiments/Gaussian3D_multiPIT/*
 saved_experiments/c2st_evaluation/*
 saved_experiments/SBIGaussian2D/*
-saved_experiments/JRNMM/fixed_gain_3d/*
-saved_experiments/JRNMM/normal_4d/global_tests/*
-saved_experiments/JRNMM/normal_4d/gt_observations/*
-saved_experiments/JRNMM/normal_4d/lct_results/*
-saved_experiments/JRNMM/normal_4d/r_alpha_learned/*
-saved_experiments/JRNMM/normal_4d/datasets_naive_small.pkl
+saved_experiments/JR-NMM/fixed_gain_3d/*
+saved_experiments/JR-NMM/normal_4d/global_tests/*
+saved_experiments/JR-NMM/normal_4d/gt_observations/*
+saved_experiments/JR-NMM/normal_4d/lct_results/*
+saved_experiments/JR-NMM/normal_4d/r_alpha_learned/*
+saved_experiments/JR-NMM/normal_4d/datasets_naive_small.pkl
 
 saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/*
 saved_experiments/lc2st_2023/exp_2/gaussian_mixture/*

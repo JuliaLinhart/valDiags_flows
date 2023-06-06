@@ -1,4 +1,6 @@
 # Validation Diagnostics for (conditional) Flows
+Official code for L-C2ST: Local Diagnostics for Posterior Approximations in
+Simulation-Based Inference
 
 Dependencies: 
 - python 3.10 conda environment
@@ -11,7 +13,7 @@ Dependencies:
 
 Make sure to `pip install -e .` within the `valDiags_flows` folder.
 
-## Generate NEURIPS 2023 Figures
+## Generate Figures from paper
 
 ### Figure 1: Single-class evaluation
 ```
@@ -34,7 +36,7 @@ python figure3_neurips_2023.py --plot
 python figure3_neurips_2023.py --plot --lc2st_interpretability
 ```
 
-## Reproduce NEURIPS 2023 experiment results
+## Reproduce experiment results from paper
 
 ### Results for Figure 1
 ```

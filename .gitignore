@@ -11,6 +11,8 @@ sbi_logs/
 *.pyc
 *.DS_Store
 
+valdiags.egg-info/*
+
 
 saved_experiments/JR-NMM/**/Flows_amortized
 saved_experiments/JR-NMM/fixed_gain_3d/datasets_train.pkl

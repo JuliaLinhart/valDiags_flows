@@ -26,10 +26,23 @@ saved_experiments/JR-NMM/normal_4d/lc2st_eval_clfs
 
 saved_experiments/Gaussian1d/lc2st_eval_clfs/*.pkl
 
+
 saved_experiments/neurips_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lc2st_nf_probas_nt_1000_n_cal_10000.pkl
 saved_experiments/neurips_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/probas_null_dict.pkl
 saved_experiments/neurips_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd*.pkl
 
+saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/probas_null_dict.pkl
+saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lc2st_nf_probas_nt_1000_n_cal_10000.pkl
+saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd_r_alphas_nt_1000_n_cal_10000.pkl
+saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd_stats_null_nt_1000_n_cal_10000.pkl
+
+saved_experiments/lc2st_2023/exp_2/slcp/figures/*
+saved_experiments/lc2st_2023/exp_2/slcp/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/two_moons/figures/*
+saved_experiments/lc2st_2023/exp_2/two_moons/t_stats_null/*
+
+saved_experiments/lc2st_2023/exp_1/t_stats_null/*
+saved_experiments/lc2st_2023/exp_1/figures/*
 
 script_margaret_local_c2st.py
 script_margaret_localPIT_regression_old.py
@@ -43,4 +56,32 @@ lc2st_null_hyp_precision.py
 *_old.py
 notebooks/random_plots.ipynb
 notebooks/Toymodel_Timeseries.ipynb
-notebooks/JRNMM_simple_3d.ipynb
+
+# remove all that is not lc2st
+notebooks/*
+
+saved_experiments/Gaussian1d/*
+saved_experiments/Gaussian3D_multiPIT/*
+saved_experiments/c2st_evaluation/*
+saved_experiments/SBIGaussian2D/*
+saved_experiments/JRNMM/fixed_gain_3d/*
+saved_experiments/JRNMM/normal_4d/global_tests/*
+saved_experiments/JRNMM/normal_4d/gt_observations/*
+saved_experiments/JRNMM/normal_4d/lct_results/*
+saved_experiments/JRNMM/normal_4d/r_alpha_learned/*
+saved_experiments/JRNMM/normal_4d/datasets_naive_small.pkl
+
+saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/*
+saved_experiments/lc2st_2023/exp_2/gaussian_mixture/*
+
+tasks/toy_examples/*
+
+valdiags/localPIT_regression.py
+valdiags/multi_local_test.py
+valdiags/posterior_correction.py
+valdiags/waldo_CRs.py
+
+c2st_emp_power_lee_2018_fig_2.py
+localPIT1D_test_scripts.py
+plot.py
+plots_neurips2022.py

@@ -1,6 +1,6 @@
 # =============================================================================
 
-#       SCRIPT TO REPRODUCE FIGURE 2 IN NEURIPS 2023 SUBMISSION
+#       SCRIPT TO REPRODUCE FIGURE 2 IN PAPER
 #         (+ additional runtime experiment in Appendix A.5)
 
 # =============================================================================
@@ -21,11 +21,11 @@
 #   - exp 3: run-time for computing the test statistic for one observation (at fixed N_cal and N_train)
 
 # USAGE:
-# >> python figure2_neurips_2023.py --t_res_ntrain --n_train 100 1000 10000 100000
-# >> python figure2_neurips_2023.py --t_res_ntrain --n_train 100 1000 10000 100000 --power_ntrain
-# >> python figure2_neurips_2023.py --power_ncal --n_cal 100 500 1000 2000 5000 10000
-# >> python figure2_neurips_2023.py --runtime -nt 0 --n_cal 5000 10000 --task slcp
-# >> python figure2_neurips_2023.py --plot
+# >> python figure2_lc2st_2023.py --t_res_ntrain --n_train 100 1000 10000 100000
+# >> python figure2_lc2st_2023.py --t_res_ntrain --n_train 100 1000 10000 100000 --power_ntrain
+# >> python figure2_lc2st_2023.py --power_ncal --n_cal 100 500 1000 2000 5000 10000
+# >> python figure2_lc2st_2023.py --runtime -nt 0 --n_cal 5000 10000 --task slcp
+# >> python figure2_lc2st_2023.py --plot
 
 # ====== Imports ======
 
@@ -49,7 +49,7 @@ from experiment_utils_sbibm import (
     compute_average_rejection_rates,
 )
 
-from plots_neurips2023 import plot_sbibm_results_n_train_n_cal
+from plots_lc2st2023 import plot_sbibm_results_n_train_n_cal
 
 # ====== GLOBAL PARAMETERS ======
 
@@ -59,7 +59,7 @@ np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
 # Path to save results
-PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_2")
+PATH_EXPERIMENT = Path("saved_experiments/lc2st_2023/exp_2")
 
 # Methods to compare (labels for plots)
 METHODS_ACC = [
@@ -190,10 +190,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--plot",
-    "-p",
-    action="store_true",
-    help="Plot results only.",
+    "--plot", "-p", action="store_true", help="Plot results only.",
 )
 
 parser.add_argument(
@@ -360,12 +357,7 @@ if args.t_res_ntrain:
         # slcp
         elif args.task == "slcp":
             methods_dict = {
-                "c2st": {
-                    100: 59,
-                    1000: 55,
-                    10000: 76,
-                    100000: 59,
-                },
+                "c2st": {100: 59, 1000: 55, 10000: 76, 100000: 59,},
                 "lc2st": {100: 52, 1000: 50, 10000: 60, 100000: 94},
                 "lc2st_nf": {100: 52, 1000: 55, 10000: 54, 100000: 62},
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
@@ -378,32 +370,31 @@ if args.t_res_ntrain:
         n_runs = N_RUNS
 
         # Initialize dictionaries to store the results
-        emp_power_dict, type_I_error_dict = {
-            n: {
-                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-                for m in methods_dict.keys()
-            }
-            for n in n_train_list
-        }, {
-            n: {
-                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-                for m in methods_dict.keys()
-            }
-            for n in n_train_list
-        }
-        p_values_dict, p_values_h0_dict = {
-            n: {m: None for m in methods_dict.keys()} for n in n_train_list
-        }, {n: {m: None for m in methods_dict.keys()} for n in n_train_list}
+        emp_power_dict, type_I_error_dict = (
+            {
+                n: {
+                    m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                    for m in methods_dict.keys()
+                }
+                for n in n_train_list
+            },
+            {
+                n: {
+                    m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                    for m in methods_dict.keys()
+                }
+                for n in n_train_list
+            },
+        )
+        p_values_dict, p_values_h0_dict = (
+            {n: {m: None for m in methods_dict.keys()} for n in n_train_list},
+            {n: {m: None for m in methods_dict.keys()} for n in n_train_list},
+        )
 
         # Compute / Load p_values of every run for every n_train
         for m, n_train_run_dict in methods_dict.items():
             for n_train in n_train_list:
-                (
-                    _,
-                    _,
-                    p_values,
-                    _,
-                ) = compute_emp_power_l_c2st(
+                (_, _, p_values, _,) = compute_emp_power_l_c2st(
                     n_runs=n_runs,
                     alpha=ALPHA,
                     task=task,
@@ -507,27 +498,13 @@ if args.power_ncal:
             "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
             "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
             # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
-            "lhpd": {
-                100: 51,
-                500: 100,
-                1000: 61,
-                2000: 71,
-                5000: 53,
-                10000: 54,
-            },
+            "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 71, 5000: 53, 10000: 54,},
         }
 
     # slcp
     elif args.task == "slcp":
         methods_dict = {
-            "c2st": {
-                100: 77,
-                500: 77,
-                1000: 77,
-                2000: 52,
-                5000: 56,
-                10000: 55,
-            },
+            "c2st": {100: 77, 500: 77, 1000: 77, 2000: 52, 5000: 56, 10000: 55,},
             "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 50},
             "lc2st_nf": {100: 64, 500: 64, 1000: 64, 2000: 100, 5000: 62, 10000: 55},
             # "lc2st_nf_perm": {
@@ -538,14 +515,7 @@ if args.power_ncal:
             #     5000: 40,
             #     10000: 16,
             # },
-            "lhpd": {
-                100: 88,
-                500: 52,
-                1000: 50,
-                2000: 50,
-                5000: 50,
-                10000: 50,
-            },
+            "lhpd": {100: 88, 500: 52, 1000: 50, 2000: 50, 5000: 50, 10000: 50,},
         }
     else:
         raise NotImplementedError("Only two_moons and slcp are supported for now.")
@@ -554,32 +524,31 @@ if args.power_ncal:
     n_runs = N_RUNS
 
     # Initialize dictionaries to store the results
-    emp_power_dict, type_I_error_dict = {
-        n: {
-            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-            for m in methods_dict.keys()
-        }
-        for n in n_cal_list
-    }, {
-        n: {
-            m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
-            for m in methods_dict.keys()
-        }
-        for n in n_cal_list
-    }
-    p_values_dict, p_values_h0_dict = {
-        n: {m: None for m in methods_dict.keys()} for n in n_cal_list
-    }, {n: {m: None for m in methods_dict.keys()} for n in n_cal_list}
+    emp_power_dict, type_I_error_dict = (
+        {
+            n: {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            }
+            for n in n_cal_list
+        },
+        {
+            n: {
+                m: {t_stat_name: [] for t_stat_name in ALL_METRICS}
+                for m in methods_dict.keys()
+            }
+            for n in n_cal_list
+        },
+    )
+    p_values_dict, p_values_h0_dict = (
+        {n: {m: None for m in methods_dict.keys()} for n in n_cal_list},
+        {n: {m: None for m in methods_dict.keys()} for n in n_cal_list},
+    )
 
     # Compute / Load p_values of every run for every n_cal
     for m, n_cal_run_dict in methods_dict.items():
         for n_cal in n_cal_list:
-            (
-                _,
-                _,
-                p_values,
-                p_values_h0,
-            ) = compute_emp_power_l_c2st(
+            (_, _, p_values, p_values_h0,) = compute_emp_power_l_c2st(
                 n_runs=n_runs,
                 alpha=ALPHA,
                 task=task,
@@ -773,12 +742,7 @@ if args.plot:
         # slcp
         elif args.task == "slcp":
             methods_dict = {
-                "c2st": {
-                    100: 59,
-                    1000: 55,
-                    10000: 76,
-                    100000: 59,
-                },
+                "c2st": {100: 59, 1000: 55, 10000: 76, 100000: 59,},
                 "lc2st": {100: 52, 1000: 50, 10000: 60, 100000: 94},
                 "lc2st_nf": {100: 52, 1000: 55, 10000: 54, 100000: 62},
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},

@@ -864,8 +864,7 @@ def generate_data_one_run(
                     task_path / f"reference_posterior_samples_n_cal_{n_cal}.pkl",
                 )
             torch.save(
-                joint_samples_cal,
-                task_path / f"joint_samples_n_cal_{n_cal}.pkl",
+                joint_samples_cal, task_path / f"joint_samples_n_cal_{n_cal}.pkl",
             )
 
     # Eval set for fixed task data (no joint samples)
@@ -1648,10 +1647,10 @@ if __name__ == "__main__":
 
     task = sbibm.get_task("slcp")
     npe = torch.load(
-        "saved_experiments/neurips_2023/exp_2/slcp/npe_100/posterior_estimator.pkl"
+        "saved_experiments/lc2st_2023/exp_2/slcp/npe_100/posterior_estimator.pkl"
     ).flow
     joint_samples = torch.load(
-        "saved_experiments/neurips_2023/exp_2/slcp/joint_samples_n_cal_10000.pkl"
+        "saved_experiments/lc2st_2023/exp_2/slcp/joint_samples_n_cal_10000.pkl"
     )
     x, theta = joint_samples["x"][:100], joint_samples["theta"][:100]
     observation = task.get_observation(1)

@@ -1,6 +1,6 @@
 # =============================================================================
 
-#       SCRIPT TO REPRODUCE FIGURES 3 and 4 IN NEURIPS 2023 SUBMISSION
+#       SCRIPT TO REPRODUCE FIGURES 3 and 4 IN PAPER
 #         (+ additional illustations in appendix A.6)
 
 # =============================================================================
@@ -20,10 +20,10 @@
 
 
 # USAGE:
-# >> python figure3_neurips_2023.py --global_ct
-# >> python figure3_neurips_2023.py --local_ct_gain
-# >> python figure3_neurips_2023.py --plot
-# >> python figure3_neurips_2023.py --plot --lc2st_interpretability
+# >> python figure3_lc2st_2023.py --global_ct
+# >> python figure3_lc2st_2023.py --local_ct_gain
+# >> python figure3_lc2st_2023.py --plot
+# >> python figure3_lc2st_2023.py --plot --lc2st_interpretability
 
 # ====== Imports ======
 
@@ -47,7 +47,7 @@ from experiment_utils_jrnmm import (
     global_coverage_tests,
     local_coverage_tests,
 )
-from plots_neurips2023 import (
+from plots_lc2st2023 import (
     global_vs_local_tstats,
     plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st,
     local_pp_plot,
@@ -61,7 +61,7 @@ np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
 # Path to save results
-PATH_EXPERIMENT = Path("saved_experiments/neurips_2023/exp_3")
+PATH_EXPERIMENT = Path("saved_experiments/lc2st_2023/exp_3")
 
 # Number of training samples for the NPE
 N_TRAIN = 50000
@@ -107,10 +107,7 @@ parser.add_argument(
 
 # Experiment parameters
 parser.add_argument(
-    "--global_ct",
-    "-gct",
-    action="store_true",
-    help="Exp 1: Global Tests results.",
+    "--global_ct", "-gct", action="store_true", help="Exp 1: Global Tests results.",
 )
 
 parser.add_argument(
@@ -128,10 +125,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--plot",
-    "-p",
-    action="store_true",
-    help="Plot final figures only.",
+    "--plot", "-p", action="store_true", help="Plot final figures only.",
 )
 
 # ====== EXPERIMENTS ======

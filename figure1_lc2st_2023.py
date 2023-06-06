@@ -1,6 +1,6 @@
 # =============================================================================
 
-#       SCRIPT TO REPRODUCE FIGURE 1 IN NEURIPS 2023 SUBMISSION
+#       SCRIPT TO REPRODUCE FIGURE 1 PAPER
 
 # =============================================================================
 
@@ -11,9 +11,9 @@
 #   - exp 2: Compute the empirical power under distribution shift for estimated classifier
 
 # USAGE:
-# >> python figure1_neurips_2023.py --opt_bayes --t_shift
-# >> python figure1_neurips_2023.py --power_shift
-# >> python figure1_neurips_2023.py --plot
+# >> python figure1_lc2st_2023.py --opt_bayes --t_shift
+# >> python figure1_lc2st_2023.py --power_shift
+# >> python figure1_lc2st_2023.py --plot
 
 
 # ====== IMPORTS ======
@@ -45,12 +45,12 @@ from classifiers.optimal_bayes import (
 from c2st_p_values_roc import c2st_p_values_tfpr
 from valdiags.test_utils import eval_htest
 
-from plots_neurips2023 import plot_plot_c2st_single_eval_shift
+from plots_lc2st2023 import plot_plot_c2st_single_eval_shift
 
 # ====== GLOBAL PARAMETERS ======
 
 # Path to save/load the results
-PATH_EXPERIMENT = "saved_experiments/neurips_2023/exp_1/"
+PATH_EXPERIMENT = "saved_experiments/lc2st_2023/exp_1/"
 
 # Data parameters
 N_SAMPLES_EVAL = 10_000  # N_v (validation set size - used to compute the test statistics for a trained classifier)
@@ -65,18 +65,9 @@ USE_PERMUTATION = (
 
 # Test statistics
 METRICS = {
-    "accuracy": [
-        "acc_ref",
-        "acc_single_class",
-    ],
-    "mse": [
-        "mse_ref",
-        "mse_single_class",
-    ],
-    "div": [
-        "max_ref",
-        "max_single_class",
-    ],
+    "accuracy": ["acc_ref", "acc_single_class",],
+    "mse": ["mse_ref", "mse_single_class",],
+    "div": ["max_ref", "max_single_class",],
 }
 
 # ====== Parse arguments ======
@@ -85,10 +76,7 @@ parser = argparse.ArgumentParser()
 
 # Data parameters
 parser.add_argument(
-    "--dim",
-    type=int,
-    default=2,
-    help="Dimension of the data (number of features).",
+    "--dim", type=int, default=2, help="Dimension of the data (number of features).",
 )
 
 parser.add_argument(
@@ -329,8 +317,7 @@ if args.power_shift and not args.plot:
             if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
                 # Load null scores if they exist ...
                 scores_null = np.load(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename,
-                    allow_pickle=True,
+                    PATH_EXPERIMENT + "t_stats_null/" + filename, allow_pickle=True,
                 ).item()
             else:
                 # ... otherwise, compute them
@@ -366,8 +353,7 @@ if args.power_shift and not args.plot:
                 if not os.path.exists(PATH_EXPERIMENT + "t_stats_null/"):
                     os.makedirs(PATH_EXPERIMENT + "t_stats_null/")
                 np.save(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename,
-                    scores_null,
+                    PATH_EXPERIMENT + "t_stats_null/" + filename, scores_null,
                 )
 
         else:

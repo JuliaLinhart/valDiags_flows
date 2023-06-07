@@ -1,6 +1,6 @@
-# Validation Diagnostics for SBI-algorithms and Normalizing Flows
-Official code for L-C2ST: Local Diagnostics for Posterior Approximations in
-Simulation-Based Inference
+# Validation Diagnostics for SBI-algorithms & Normalizing Flows
+Official code for [L-C2ST: Local Diagnostics for Posterior Approximations in
+Simulation-Based Inference](https://arxiv.org/abs/2306.03580)
 
 Dependencies: 
 - python 3.10 conda environment

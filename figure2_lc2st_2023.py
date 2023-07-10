@@ -150,7 +150,7 @@ parser.add_argument(
     "--task",
     type=str,
     default="two_moons",
-    choices=["two_moons", "slcp"],
+    choices=["two_moons", "slcp", "gaussian_linear_uniform"],
     help="Task from sbibm to perform the experiment on.",
 )
 
@@ -190,7 +190,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--plot", "-p", action="store_true", help="Plot results only.",
+    "--plot",
+    "-p",
+    action="store_true",
+    help="Plot results only.",
 )
 
 parser.add_argument(
@@ -357,7 +360,12 @@ if args.t_res_ntrain:
         # slcp
         elif args.task == "slcp":
             methods_dict = {
-                "c2st": {100: 59, 1000: 55, 10000: 76, 100000: 59,},
+                "c2st": {
+                    100: 59,
+                    1000: 55,
+                    10000: 76,
+                    100000: 59,
+                },
                 "lc2st": {100: 52, 1000: 50, 10000: 60, 100000: 94},
                 "lc2st_nf": {100: 52, 1000: 55, 10000: 54, 100000: 62},
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
@@ -394,7 +402,12 @@ if args.t_res_ntrain:
         # Compute / Load p_values of every run for every n_train
         for m, n_train_run_dict in methods_dict.items():
             for n_train in n_train_list:
-                (_, _, p_values, _,) = compute_emp_power_l_c2st(
+                (
+                    _,
+                    _,
+                    p_values,
+                    _,
+                ) = compute_emp_power_l_c2st(
                     n_runs=n_runs,
                     alpha=ALPHA,
                     task=task,
@@ -498,13 +511,27 @@ if args.power_ncal:
             "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 69},
             "lc2st_nf": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
             # "lc2st_nf_perm": {100: 67, 500: 67, 1000: 67, 2000: 100, 5000: 65, 10000: 50},
-            "lhpd": {100: 51, 500: 100, 1000: 61, 2000: 71, 5000: 53, 10000: 54,},
+            "lhpd": {
+                100: 51,
+                500: 100,
+                1000: 61,
+                2000: 71,
+                5000: 53,
+                10000: 54,
+            },
         }
 
     # slcp
     elif args.task == "slcp":
         methods_dict = {
-            "c2st": {100: 77, 500: 77, 1000: 77, 2000: 52, 5000: 56, 10000: 55,},
+            "c2st": {
+                100: 77,
+                500: 77,
+                1000: 77,
+                2000: 52,
+                5000: 56,
+                10000: 55,
+            },
             "lc2st": {100: 100, 500: 100, 1000: 100, 2000: 100, 5000: 100, 10000: 50},
             "lc2st_nf": {100: 64, 500: 64, 1000: 64, 2000: 100, 5000: 62, 10000: 55},
             # "lc2st_nf_perm": {
@@ -515,7 +542,14 @@ if args.power_ncal:
             #     5000: 40,
             #     10000: 16,
             # },
-            "lhpd": {100: 88, 500: 52, 1000: 50, 2000: 50, 5000: 50, 10000: 50,},
+            "lhpd": {
+                100: 88,
+                500: 52,
+                1000: 50,
+                2000: 50,
+                5000: 50,
+                10000: 50,
+            },
         }
     else:
         raise NotImplementedError("Only two_moons and slcp are supported for now.")
@@ -548,7 +582,12 @@ if args.power_ncal:
     # Compute / Load p_values of every run for every n_cal
     for m, n_cal_run_dict in methods_dict.items():
         for n_cal in n_cal_list:
-            (_, _, p_values, p_values_h0,) = compute_emp_power_l_c2st(
+            (
+                _,
+                _,
+                p_values,
+                p_values_h0,
+            ) = compute_emp_power_l_c2st(
                 n_runs=n_runs,
                 alpha=ALPHA,
                 task=task,
@@ -742,7 +781,12 @@ if args.plot:
         # slcp
         elif args.task == "slcp":
             methods_dict = {
-                "c2st": {100: 59, 1000: 55, 10000: 76, 100000: 59,},
+                "c2st": {
+                    100: 59,
+                    1000: 55,
+                    10000: 76,
+                    100000: 59,
+                },
                 "lc2st": {100: 52, 1000: 50, 10000: 60, 100000: 94},
                 "lc2st_nf": {100: 52, 1000: 55, 10000: 54, 100000: 62},
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},

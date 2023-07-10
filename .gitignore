@@ -73,7 +73,6 @@ saved_experiments/JR-NMM/normal_4d/lct_results/*
 saved_experiments/JR-NMM/normal_4d/r_alpha_learned/*
 saved_experiments/JR-NMM/normal_4d/datasets_naive_small.pkl
 
-saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/*
 saved_experiments/lc2st_2023/exp_2/gaussian_mixture/*
 saved_experiments/lc2st_2023/exp_2/slcp/npe_*/t_stats_null/*
 saved_experiments/lc2st_2023/exp_2/slcp/npe_*/results/*

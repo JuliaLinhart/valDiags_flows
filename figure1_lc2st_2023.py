@@ -317,7 +317,7 @@ if args.t_shift and not args.plot:
         plt.ylabel("Predicted probability")
         plt.ylim(0, 1)
         plt.xlim(0, 1)
-        plt.title("Calibration curves, " + label)
+        plt.title(f"Calibration curves, {label}-{clf_name}")
         plt.show()
 
 # ====== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ======

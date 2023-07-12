@@ -169,8 +169,8 @@ elif args.q_dist == "variance":
     n_samples_list = [2000]
 
     # Variance-shift
-    # shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
-    shifts = np.array([0.01, 0.1, 0.5, 1, 1.5, 3])
+    shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
+    # shifts = np.array([0.01, 0.1, 0.5, 1, 1.5, 3])
 
     # Q - class 1 distrribution: centered Gaussian with shifted variance
     Q_dist_list = [mvn(mean=np.zeros(dim), cov=s * np.eye(dim)) for s in shifts]
@@ -300,25 +300,25 @@ if args.t_shift and not args.plot:
         PATH_EXPERIMENT + f"test_stats_{clf_name}_shift_{args.q_dist}_dim_{dim}.pkl",
     )
 
-    # calibration curves
-    for label in ["oracle"]:
-        for i, s in enumerate(shifts):
-            plt.plot(
-                cal_curves[label][i][0],
-                cal_curves[label][i][1],
-                label=f"scale shift = {s}",
-                linestyle="-",
-            )
-        plt.plot(
-            np.linspace(0, 1, 10), np.linspace(0, 1, 10), linestyle="--", color="black"
-        )
-        plt.legend()
-        plt.xlabel("True probability")
-        plt.ylabel("Predicted probability")
-        plt.ylim(0, 1)
-        plt.xlim(0, 1)
-        plt.title("Calibration curves, " + label)
-        plt.show()
+    # # calibration curves
+    # for label in ["oracle"]:
+    #     for i, s in enumerate(shifts):
+    #         plt.plot(
+    #             cal_curves[label][i][0],
+    #             cal_curves[label][i][1],
+    #             label=f"scale shift = {s}",
+    #             linestyle="-",
+    #         )
+    #     plt.plot(
+    #         np.linspace(0, 1, 10), np.linspace(0, 1, 10), linestyle="--", color="black"
+    #     )
+    #     plt.legend()
+    #     plt.xlabel("True probability")
+    #     plt.ylabel("Predicted probability")
+    #     plt.ylim(0, 1)
+    #     plt.xlim(0, 1)
+    #     plt.title("Calibration curves, " + label)
+    #     plt.show()
 
 # ====== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ======
 

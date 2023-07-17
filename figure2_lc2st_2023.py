@@ -150,7 +150,7 @@ parser.add_argument(
     "--task",
     type=str,
     default="two_moons",
-    choices=["two_moons", "slcp", "gaussian_linear_uniform"],
+    choices=["two_moons", "slcp"],
     help="Task from sbibm to perform the experiment on.",
 )
 

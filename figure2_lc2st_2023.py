@@ -150,7 +150,7 @@ parser.add_argument(
     "--task",
     type=str,
     default="two_moons",
-    choices=["two_moons", "slcp", "gaussian_linear_uniform"],
+    choices=["two_moons", "slcp", "gaussian_linear_uniform", "lotka_volterra"],
     help="Task from sbibm to perform the experiment on.",
 )
 
@@ -371,8 +371,16 @@ if args.t_res_ntrain:
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
                 "lhpd": {100: 53, 1000: 50, 10000: 55, 100000: 50},
             }
+        elif args.task == "gaussian_linear_uniform":
+            methods_dict = {
+                "c2st": {100: 0, 1000: 0, 10000: 0, 100000: 0},
+                "lc2st": {100: 0, 1000: 0, 10000: 0, 100000: 0},
+                "lc2st_nf": {100: 0, 1000: 0, 10000: 0, 100000: 0},
+                # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
+                "lhpd": {100: 0, 1000: 0, 10000: 0, 100000: 0},
+            }
         else:
-            raise NotImplementedError("Only two_moons and slcp are supported for now.")
+            raise NotImplementedError("Only two_moons, slcp and gaussian_linear_uniform are supported for now.")
 
         # Number of runs to compute the empirical power over
         n_runs = N_RUNS

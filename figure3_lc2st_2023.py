@@ -447,7 +447,6 @@ if args.plot:
             x_test=x_test,
             npe=npe_jrnmm,
             trained_clf=trained_clfs_lc2st_nf[0],
-            n_bins=50,
         )
 
         plt.plot(prob_true, prob_pred, 'o')

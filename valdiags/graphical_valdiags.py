@@ -14,6 +14,7 @@ import torch
 import torch.distributions as D
 from matplotlib.lines import Line2D
 from matplotlib.colors import Normalize
+from matplotlib.patches import Rectangle
 
 from scipy.stats import hmean, uniform
 
@@ -126,7 +127,10 @@ def pp_plot_c2st(
     alphas = np.linspace(0, 1, 100)
     pp_vals_dirac = PP_vals([0.5] * len(probas), alphas)
     ax.plot(
-        alphas, pp_vals_dirac, "--", color="black",
+        alphas,
+        pp_vals_dirac,
+        "--",
+        color="black",
     )
 
     if pp_vals_null is None:
@@ -195,7 +199,7 @@ def eval_space_with_proba_intensity(
                 bins=n_bins, color=["red", "blue", "grey"], alpha=0.3
             )
         else:
-            _, bins, patches = ax.hist(df.z, n_bins, density=True, color="green")
+            counts, bins, patches = ax.hist(df.z, n_bins, density=True, color="green")
             # bins[-1] = 10
             df["bins"] = np.select(
                 [df.z <= i for i in bins[1:]], list(range(n_bins))
@@ -204,12 +208,17 @@ def eval_space_with_proba_intensity(
             weights = df.groupby(["bins"]).mean().probas
             id = list(set(range(n_bins)) - set(df.bins))
             patches = np.delete(patches, id)
+            counts = np.delete(counts, id)
+            bins = np.delete(bins, id)
+            counts = np.array(counts) * np.diff(bins)
+            counts = (counts - min(counts)) / (max(counts) - min(counts))
 
-            cmap = plt.cm.get_cmap("bwr")
+            cmap = plt.cm.get_cmap("coolwarm")
             norm = Normalize(vmin=0, vmax=1)
 
-            for c, p in zip(weights, patches):
-                p.set_facecolor(cmap(c))
+            for w, c, p in zip(weights, counts, patches):
+                p.set_facecolor(cmap(w))
+                p.set_alpha(c)
             if show_colorbar:
                 ax.colorbar(
                     cm.ScalarMappable(cmap=cmap, norm=norm),
@@ -239,7 +248,10 @@ def eval_space_with_proba_intensity(
                 ax.scatter(df.z_1, df.z_2, c=df.probas, cmap="bwr", alpha=0.3)
             else:
                 # h_prob = np.histogram2d(probas, probas, bins=n_bins)[0]
-                h, x, y, pc = ax.hist2d(df.z_1, df.z_2, bins=n_bins, edgecolor="white")
+                h, x, y = np.histogram2d(df.z_1, df.z_2, bins=n_bins)
+                h = h / np.sum(h)
+                h = (h - np.min(h)) / (np.max(h) - np.min(h))
+
                 df["bins_x"] = np.select(
                     [df.z_1 <= i for i in x[1:]], list(range(n_bins))
                 )
@@ -256,8 +268,21 @@ def eval_space_with_proba_intensity(
                         except KeyError:
                             weights[i, j] = 0.5
 
+                cmap = plt.get_cmap("coolwarm")
                 norm = Normalize(vmin=0, vmax=1)
-                ax.pcolormesh(x, y, weights.T, cmap="bwr", norm=norm)
+                # ax.pcolormesh(x, y, weights.T, cmap="coolwarm", norm=norm)
+                for i in range(len(x) - 1):
+                    for j in range(len(y) - 1):
+                        rect = Rectangle(
+                            (x[i], y[j]),
+                            x[i + 1] - x[i],
+                            y[j + 1] - y[j],
+                            facecolor=cmap(norm(weights.T[j, i])),
+                            alpha=h.T[j, i],
+                            edgecolor='none',
+                        )
+                        ax.add_patch(rect)
+
             if show_colorbar:
                 plt.colorbar(label=legend)
         else:

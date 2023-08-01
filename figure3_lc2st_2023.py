@@ -107,7 +107,10 @@ parser.add_argument(
 
 # Experiment parameters
 parser.add_argument(
-    "--global_ct", "-gct", action="store_true", help="Exp 1: Global Tests results.",
+    "--global_ct",
+    "-gct",
+    action="store_true",
+    help="Exp 1: Global Tests results.",
 )
 
 parser.add_argument(
@@ -125,14 +128,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--plot", "-p", action="store_true", help="Plot final figures only.",
-)
-
-parser.add_argument(
-    "--clf_calibration",
-    "-clf_cal",
+    "--plot",
+    "-p",
     action="store_true",
-    help="Plot calibration curve of the classifier on the test set.",
+    help="Plot final figures only.",
 )
 
 # ====== EXPERIMENTS ======
@@ -419,7 +418,7 @@ if args.plot:
                 n_bins=20,
             )
             plt.savefig(
-                PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}.pdf"
+                PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}_new.pdf"
             )
             plt.show()
 
@@ -435,24 +434,4 @@ if args.plot:
             plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
             plt.show()
 
-    if args.clf_calibration:
-        from experiment_utils_jrnmm import calibration_curve_lc2st_nf
-
-        dataset_test = torch.load(PATH_EXPERIMENT / 'joint_data_jrnmm_test.pkl')
-        theta_test, x_test = dataset_test['theta'], dataset_test['x']
-        print(x_test.shape)
-
-        prob_true, prob_pred = calibration_curve_lc2st_nf(
-            theta_test=theta_test,
-            x_test=x_test,
-            npe=npe_jrnmm,
-            trained_clf=trained_clfs_lc2st_nf[0],
-        )
-
-        plt.plot(prob_true, prob_pred, 'o')
-        plt.plot([0, 1], [0, 1], '--', color='black')
-        plt.xlabel('True Probability')
-        plt.ylabel('Predicted Probability')
-        plt.title('Calibration Curve')
-        plt.show()
 

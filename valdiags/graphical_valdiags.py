@@ -205,20 +205,23 @@ def eval_space_with_proba_intensity(
                 [df.z <= i for i in bins[1:]], list(range(n_bins))
             )  # , 1000)
 
+            # get mean predicted proba for each bin
             weights = df.groupby(["bins"]).mean().probas
             id = list(set(range(n_bins)) - set(df.bins))
             patches = np.delete(patches, id)
             counts = np.delete(counts, id)
             bins = np.delete(bins, id)
+            # get density of each bin
             counts = np.array(counts) * np.diff(bins)
+            # rescale density between 0 and 1
             counts = (counts - min(counts)) / (max(counts) - min(counts))
 
             cmap = plt.cm.get_cmap("coolwarm")
             norm = Normalize(vmin=0, vmax=1)
 
             for w, c, p in zip(weights, counts, patches):
-                p.set_facecolor(cmap(w))
-                p.set_alpha(c)
+                p.set_facecolor(cmap(w)) #  color is mean predicted proba
+                p.set_alpha(c) # opacity is density
             if show_colorbar:
                 ax.colorbar(
                     cm.ScalarMappable(cmap=cmap, norm=norm),
@@ -247,9 +250,10 @@ def eval_space_with_proba_intensity(
             if scatter:
                 ax.scatter(df.z_1, df.z_2, c=df.probas, cmap="bwr", alpha=0.3)
             else:
-                # h_prob = np.histogram2d(probas, probas, bins=n_bins)[0]
                 h, x, y = np.histogram2d(df.z_1, df.z_2, bins=n_bins)
+                # normalize histogram: get density
                 h = h / np.sum(h)
+                # rescale between 0 and 1
                 h = (h - np.min(h)) / (np.max(h) - np.min(h))
 
                 df["bins_x"] = np.select(
@@ -258,6 +262,7 @@ def eval_space_with_proba_intensity(
                 df["bins_y"] = np.select(
                     [df.z_2 <= i for i in y[1:]], list(range(n_bins))
                 )
+                # get mean predicted proba for each bin
                 prob_mean = df.groupby(["bins_x", "bins_y"]).mean().probas
                 weights = np.zeros((n_bins, n_bins))
                 for i in range(n_bins):
@@ -277,8 +282,8 @@ def eval_space_with_proba_intensity(
                             (x[i], y[j]),
                             x[i + 1] - x[i],
                             y[j + 1] - y[j],
-                            facecolor=cmap(norm(weights.T[j, i])),
-                            alpha=h.T[j, i],
+                            facecolor=cmap(norm(weights.T[j, i])), # color is mean predicted proba
+                            alpha=h.T[j, i], # opacity is density
                             edgecolor='none',
                         )
                         ax.add_patch(rect)

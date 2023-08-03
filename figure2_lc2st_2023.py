@@ -150,7 +150,7 @@ parser.add_argument(
     "--task",
     type=str,
     default="two_moons",
-    choices=["two_moons", "slcp", "gaussian_linear_uniform", "lotka_volterra"],
+    choices=["two_moons", "slcp", "gaussian_linear_uniform", "gaussian_mixture", "bernoulli_glm"],
     help="Task from sbibm to perform the experiment on.",
 )
 
@@ -371,13 +371,26 @@ if args.t_res_ntrain:
                 # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
                 "lhpd": {100: 53, 1000: 50, 10000: 55, 100000: 50},
             }
+        elif args.task == "gaussian_mixture":
+            methods_dict = {
+                "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lhpd": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+            }
         elif args.task == "gaussian_linear_uniform":
             methods_dict = {
-                "c2st": {100: 0, 1000: 0, 10000: 0, 100000: 0},
-                "lc2st": {100: 0, 1000: 0, 10000: 0, 100000: 0},
-                "lc2st_nf": {100: 0, 1000: 0, 10000: 0, 100000: 0},
-                # "lc2st_nf_perm": {100: 27, 1000: 16, 10000: 35, 100000: 37},
-                "lhpd": {100: 0, 1000: 0, 10000: 0, 100000: 0},
+                "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lhpd": {100: 41, 1000: 31, 10000: 28, 100000: 29},
+            }
+        elif args.task == "bernoulli_glm":
+            methods_dict = {
+                "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lhpd": {100: 50, 1000: 50, 10000: 50, 100000: 50},
             }
         else:
             raise NotImplementedError("Only two_moons, slcp and gaussian_linear_uniform are supported for now.")
@@ -558,6 +571,30 @@ if args.power_ncal:
                 5000: 50,
                 10000: 50,
             },
+        }
+    elif args.task == "gaussian_mixture":
+        methods_dict = {
+            "c2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            # "lc2st_nf_perm":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+        }
+    elif args.task == "gaussian_linear_uniform":
+        methods_dict = {
+            "c2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            # "lc2st_nf_perm":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd":{100: 50, 500: 50, 1000: 50, 2000: 49, 5000: 37, 10000: 31},
+        }
+    elif args.task == "bernoulli_glm":
+        methods_dict = {
+            "c2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            # "lc2st_nf_perm":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
         }
     else:
         raise NotImplementedError("Only two_moons and slcp are supported for now.")
@@ -750,6 +787,12 @@ if args.plot:
         title = "Two Moons"
     elif args.task == "slcp":
         title = "SLCP"
+    elif args.task == "gaussian_mixture":
+        title = "Gaussian Mixture"
+    elif args.task == "gaussian_linear_uniform":
+        title = "Gaussian Linear Uniform"
+    elif args.task == "bernoulli_glm":
+        title = "Bernoulli GLM"
     else:
         raise NotImplementedError("Only two_moons and slcp are supported for now.")
 

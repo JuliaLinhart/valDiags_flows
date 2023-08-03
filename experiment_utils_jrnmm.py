@@ -623,31 +623,3 @@ def local_coverage_tests(
     else:
         return results_dict, train_runtime
 
-
-def calibration_curve_lc2st_nf(
-    theta_test,
-    x_test,
-    trained_clf,
-    npe,
-    n_bins=10,
-):
-    from sklearn.calibration import calibration_curve
-
-    # Generate base dist samples
-    base_dist_samples_test = npe._flow._distribution.sample(x_test.shape[0]).detach()
-    # Compute inverse transform on joint samples
-    inv_transform_samples_test = npe._transform(theta_test, context=x_test)[0].detach()
-
-    # create joint classification dataset
-    x_test = x_test[:,:,0]
-    P_test = np.concatenate([base_dist_samples_test, x_test], axis=1)
-    Q_test = np.concatenate([inv_transform_samples_test, x_test], axis=1)
-    features_test = np.concatenate([P_test, Q_test], axis=0)
-    labels_test = np.concatenate([np.zeros(P_test.shape[0]), np.ones(Q_test.shape[0])], axis=0)
-
-    # Predict probabilities
-    probas_test = trained_clf.predict_proba(features_test)[:, 1]
-    prob_true, prob_pred = calibration_curve(labels_test, probas_test, n_bins=n_bins)
-
-    return prob_true, prob_pred
-

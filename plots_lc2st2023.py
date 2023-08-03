@@ -823,7 +823,7 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
 
             axs[i][j].set_visible(False)
 
-    cmap = plt.cm.get_cmap("coolwarm")
+    cmap = plt.cm.get_cmap("bwr")
     from matplotlib import cm
 
     plt.subplots_adjust(bottom=0.1, right=0.8, top=0.9)

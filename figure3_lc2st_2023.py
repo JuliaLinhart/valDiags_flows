@@ -418,7 +418,7 @@ if args.plot:
                 n_bins=20,
             )
             plt.savefig(
-                PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}_new.pdf"
+                PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}.pdf"
             )
             plt.show()
 
@@ -433,5 +433,3 @@ if args.plot:
             plt.title("Local PP-Plot")
             plt.savefig(PATH_EXPERIMENT / f"local_tests/pp_plot_g_{g}.pdf")
             plt.show()
-
-

@@ -1,5 +1,6 @@
 import torch
 
+from copy import deepcopy
 from tqdm import tqdm
 
 from .npe_utils import inv_flow_transform_obs, sample_from_npe_obs
@@ -25,8 +26,17 @@ def generate_task_data(
     """
 
     # Get simulator and prior
+    task = deepcopy(task)
     simulator = task.get_simulator()
     prior = task.get_prior()
+
+    # Generate data from joint
+    if sample_from_joint:
+        theta = prior(num_samples=n_samples)
+        x = simulator(theta)
+    else:
+        theta = None
+        x = None
 
     # Generate data from reference posterior
     if sample_from_reference:
@@ -42,14 +52,6 @@ def generate_task_data(
 
     else:
         reference_posterior_samples = None
-
-    # Generate data from joint
-    if sample_from_joint:
-        theta = prior(num_samples=n_samples)
-        x = simulator(theta)
-    else:
-        theta = None
-        x = None
 
     return reference_posterior_samples, theta, x
 

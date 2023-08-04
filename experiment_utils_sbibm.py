@@ -85,6 +85,11 @@ def l_c2st_results_n_train(
             whose values are lists of average runtime for every n_train.
     """
     # Generate data
+    if "c2st" in methods:
+        generate_c2st_data = True
+    else:
+        generate_c2st_data = False
+
     data_samples = generate_data_one_run(
         n_cal=n_cal,
         n_eval=n_eval,
@@ -96,6 +101,7 @@ def l_c2st_results_n_train(
         load_cal_data=True,  # load calibration data from disk
         load_eval_data=True,  # load evaluation data from disk
         seed=seed,  # fixed seed for reproducibility
+        generate_c2st_data=generate_c2st_data,
     )
 
     t_stats_null_lc2st_nf = None

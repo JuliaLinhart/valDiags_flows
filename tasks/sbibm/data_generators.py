@@ -4,12 +4,14 @@ from copy import deepcopy
 from tqdm import tqdm
 
 from .npe_utils import inv_flow_transform_obs, sample_from_npe_obs
+from joblib import Parallel, delayed
 
 
 def generate_task_data(
     n_samples,
     task,
     num_observation_list,
+    observation_list=None,
     sample_from_joint=True,
     sample_from_reference=True,
 ):
@@ -21,8 +23,16 @@ def generate_task_data(
         task (str): sbibm task name
         num_observation_list: List of observation numbers for which we want to sample
             from the reference posterior.
-        seed: Seed
-
+        observation_list: List of observations for which we want to sample
+            from the reference posterior. If None, the observations are loaded
+            using the observation numbers.
+            DEFAULT: None
+        sample_from_joint (bool): If True, samples from the joint distribution
+            (prior x simulator) are generated.
+            DEFAULT: True
+        sample_from_reference (bool): If True, samples from the reference posterior
+            are generated.
+            DEFAULT: True
     """
 
     # Get simulator and prior
@@ -42,13 +52,29 @@ def generate_task_data(
     if sample_from_reference:
         print("Samples from reference posterior:")
         reference_posterior_samples = {}
-        for num_observation in num_observation_list:
-            reference_posterior_samples[
-                num_observation
-            ] = task._sample_reference_posterior(
-                num_samples=n_samples,
-                num_observation=num_observation,
-            )
+
+        if observation_list is None:
+            observation_list = [None] * len(num_observation_list)
+
+        if num_observation_list is None:
+            num_observation_list = [None] * len(observation_list)
+
+        for i, (num_obs, obs) in enumerate(zip(num_observation_list, observation_list)):
+            print()
+            print(f"Observation {i+1}")
+            if num_obs is None:
+                num_obs = i + 1
+                try:
+                    reference_posterior_samples[num_obs] = task._sample_reference_posterior(
+                        num_samples=n_samples, num_observation=None, observation=obs
+                    )
+                except AssertionError:
+                    print(f"Observation {num_obs} not available. Using observation {num_obs-1} instead.")
+                    reference_posterior_samples[num_obs] = reference_posterior_samples[num_obs - 1]
+            else:
+                reference_posterior_samples[num_obs] = task._sample_reference_posterior(
+                    num_samples=n_samples, num_observation=num_obs, observation=None
+                )
 
     else:
         reference_posterior_samples = None

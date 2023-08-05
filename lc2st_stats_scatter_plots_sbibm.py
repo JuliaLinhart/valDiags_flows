@@ -111,12 +111,27 @@ if args.observations == "task":
     observation_dict = dict(zip(NUM_OBSERVATION_LIST, observation_list))
     TEST_SIZE = len(NUM_OBSERVATION_LIST)
     save_load_data = True
+    task_observations = True
 elif args.observations == "empirical":
-    TEST_SIZE = 100
-    theta_test = prior(TEST_SIZE)
-    x_test = simulator(theta_test)
-    observation_dict = {i + 1: x_test[i][None, :] for i in range(len(x_test))}
+    if "bernoulli_glm" in args.task:
+        NUM_OBSERVATION_LIST = list(range(1,101)) # precomputed using >>python sbibm/tasks/bernoulli_glm/task.py
+        print(f"Loading observations {NUM_OBSERVATION_LIST}")
+        observation_list = [
+            task.get_observation(num_observation=n_obs) for n_obs in NUM_OBSERVATION_LIST
+        ]
+        print()
+        observation_dict = dict(zip(NUM_OBSERVATION_LIST, observation_list))
+        task_observations = True
+        TEST_SIZE = len(NUM_OBSERVATION_LIST)
+
+    else:
+        TEST_SIZE = 100
+        theta_test = prior(TEST_SIZE)
+        x_test = simulator(theta_test)
+        observation_dict = {i + 1: x_test[i][None, :] for i in range(len(x_test))}
+        task_observations = False
     save_load_data = False
+
 
 # Data parameters
 n_cal = 10000
@@ -179,9 +194,9 @@ else:
         load_cal_data=save_load_data,  # load calibration data from disk
         load_eval_data=save_load_data,  # load evaluation data from disk
         seed=RANDOM_SEED,  # fixed seed for reproducibility
-        task_observations=(args.observations == "task"),
+        task_observations=task_observations,
     )
-torch.save(data_samples, data_path)
+    torch.save(data_samples, data_path)
 
 
 # Compute/ load and plot results
@@ -232,7 +247,7 @@ plt.xlim(-0.01, 0.26)
 plt.ylim(-0.01, 0.26)
 plt.xlabel(METHODS_DICT["c2st"])
 plt.ylabel(METHODS_DICT[args.method]["name"])
-# plt.legend(title=r"$N_{\mathrm{train}}$ (for NPE)", loc="upper left")
+plt.legend(title=r"$N_{\mathrm{train}}$ (for NPE)", loc="upper left")
 
 if args.task == "two_moons":
     title = "Two Moons"

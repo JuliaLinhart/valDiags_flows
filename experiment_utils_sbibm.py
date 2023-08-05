@@ -1552,10 +1552,10 @@ def compute_test_results_npe_one_run(
             for t_stat_name in test_stat_names:
                 if m == "lhpd" and t_stat_name != "mse":
                     continue
-                for num_obs in observation_dict.keys():
+                for i, num_obs in enumerate(observation_dict.keys()):
                     t_stats_null_dict[m][num_obs][t_stat_name] = results_dict[m][
                         "t_stats_null"
-                    ][t_stat_name][num_obs - 1]
+                    ][t_stat_name][i]
 
             # Save null test statistics for the given method
             if save_results:

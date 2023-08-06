@@ -90,6 +90,12 @@ parser.add_argument(
     default="task",
     choices=["task", "empirical"],
 )
+parser.add_argument(
+    "--precompute_obs",
+    "-p",
+    action="store_true",
+    help="Precompute observations for empirical exp.",
+)
 args = parser.parse_args()
 
 # Task path
@@ -113,19 +119,31 @@ if args.observations == "task":
     save_load_data = True
     task_observations = True
 elif args.observations == "empirical":
-    if "bernoulli_glm" in args.task or args.task in ["gaussian_linear_uniform", "two_moons"]:
-        NUM_OBSERVATION_LIST = list(range(1,101))
+    if "bernoulli_glm" in args.task or args.task in [
+        "gaussian_linear_uniform",
+        "two_moons",
+        "slcp",
+    ]:
+        NUM_OBSERVATION_LIST = list(range(1, 101))
         print(f"Loading observations {NUM_OBSERVATION_LIST}")
-        # precomputed using task.num_observations=TEST_SIZE, task.setup(generate_reference=False)
+        TEST_SIZE = len(NUM_OBSERVATION_LIST)
+        if args.precompute_obs:
+            task.num_observations = TEST_SIZE
+            task.observation_seeds = task.observation_seeds + [
+                1000000 + i + 5 for i in range(TEST_SIZE - 10)
+            ]
+            print(task.num_observations, len(task.observation_seeds))
+            task._setup(create_reference=False)
         observation_list = [
-            task.get_observation(num_observation=n_obs) for n_obs in NUM_OBSERVATION_LIST
+            task.get_observation(num_observation=n_obs)
+            for n_obs in NUM_OBSERVATION_LIST
         ]
         print()
         observation_dict = dict(zip(NUM_OBSERVATION_LIST, observation_list))
         task_observations = True
-        TEST_SIZE = len(NUM_OBSERVATION_LIST)
 
     else:
+        print("hi")
         TEST_SIZE = 100
         theta_test = prior(TEST_SIZE)
         x_test = simulator(theta_test)

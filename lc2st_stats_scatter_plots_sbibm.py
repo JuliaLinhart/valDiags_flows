@@ -113,9 +113,10 @@ if args.observations == "task":
     save_load_data = True
     task_observations = True
 elif args.observations == "empirical":
-    if "bernoulli_glm" in args.task:
-        NUM_OBSERVATION_LIST = list(range(1,101)) # precomputed using >>python sbibm/tasks/bernoulli_glm/task.py
+    if "bernoulli_glm" in args.task or args.task in ["gaussian_linear_uniform", "two_moons"]:
+        NUM_OBSERVATION_LIST = list(range(1,101))
         print(f"Loading observations {NUM_OBSERVATION_LIST}")
+        # precomputed using task.num_observations=TEST_SIZE, task.setup(generate_reference=False)
         observation_list = [
             task.get_observation(num_observation=n_obs) for n_obs in NUM_OBSERVATION_LIST
         ]
@@ -247,7 +248,7 @@ plt.xlim(-0.01, 0.26)
 plt.ylim(-0.01, 0.26)
 plt.xlabel(METHODS_DICT["c2st"])
 plt.ylabel(METHODS_DICT[args.method]["name"])
-plt.legend(title=r"$N_{\mathrm{train}}$ (for NPE)", loc="upper left")
+# plt.legend(title=r"$N_{\mathrm{train}}$ (for NPE)", loc="upper left")
 
 if args.task == "two_moons":
     title = "Two Moons"

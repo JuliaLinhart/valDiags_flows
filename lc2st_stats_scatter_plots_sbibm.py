@@ -92,9 +92,15 @@ parser.add_argument(
 )
 parser.add_argument(
     "--precompute_obs",
-    "-p",
+    "-p_o",
     action="store_true",
     help="Precompute observations for empirical exp.",
+)
+parser.add_argument(
+    "--paralellize",
+    "-p",
+    action="store_true",
+    help="Whether to paralellize reference sample computation."
 )
 args = parser.parse_args()
 
@@ -123,6 +129,7 @@ elif args.observations == "empirical":
         "gaussian_linear_uniform",
         "two_moons",
         "slcp",
+        "gaussian_mixture"
     ]:
         NUM_OBSERVATION_LIST = list(range(1, 101))
         print(f"Loading observations {NUM_OBSERVATION_LIST}")
@@ -214,6 +221,7 @@ else:
         load_eval_data=save_load_data,  # load evaluation data from disk
         seed=RANDOM_SEED,  # fixed seed for reproducibility
         task_observations=task_observations,
+        paralellize=args.paralellize
     )
     torch.save(data_samples, data_path)
 

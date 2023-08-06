@@ -64,7 +64,6 @@ def generate_task_data(
             num_observation_list = [None] * len(observation_list)
 
         def sample(num_obs):
-            print(num_obs)
             try:
                 ref_samples = task._sample_reference_posterior(
                     num_samples=n_samples,

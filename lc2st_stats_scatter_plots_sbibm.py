@@ -96,12 +96,6 @@ parser.add_argument(
     action="store_true",
     help="Precompute observations for empirical exp.",
 )
-parser.add_argument(
-    "--paralellize",
-    "-p",
-    action="store_true",
-    help="Whether to paralellize reference sample computation."
-)
 args = parser.parse_args()
 
 # Task path
@@ -221,7 +215,6 @@ else:
         load_eval_data=save_load_data,  # load evaluation data from disk
         seed=RANDOM_SEED,  # fixed seed for reproducibility
         task_observations=task_observations,
-        paralellize=args.paralellize
     )
     torch.save(data_samples, data_path)
 

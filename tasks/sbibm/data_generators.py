@@ -15,7 +15,6 @@ def generate_task_data(
     observation_list=None,
     sample_from_joint=True,
     sample_from_reference=True,
-    paralellize=False,
 ):
     """Generate data for a given task.
     This data is fixed and independent of the used sbi-algorithm.
@@ -35,8 +34,6 @@ def generate_task_data(
         sample_from_reference (bool): If True, samples from the reference posterior
             are generated.
             DEFAULT: True
-        paralellize (bool): If True, the reference data generation is paralellized over observations.
-            DEFAULT: False
     """
 
     # Get simulator and prior
@@ -94,36 +91,28 @@ def generate_task_data(
 
             return ref_samples
 
-        if paralellize:
-            list_results = Parallel(
-                n_jobs=len(num_observation_list), verbose=50, backend="loky"
-            )(delayed(sample)(num_obs) for num_obs in num_observation_list)
-            print(list_results)
-            for num_obs, result in zip(num_observation_list, list_results):
-                reference_posterior_samples[num_obs] = result
-        else:
-            for i, (num_obs, obs) in enumerate(
-                zip(num_observation_list, observation_list)
-            ):
-                print()
-                print(f"Observation {i+1}")
-                if num_obs is None:
-                    num_obs = i + 1
-                    try:
-                        reference_posterior_samples[
-                            num_obs
-                        ] = task._sample_reference_posterior(
-                            num_samples=n_samples, num_observation=None, observation=obs
-                        )
-                    except AssertionError:
-                        print(
-                            f"Observation {num_obs} not available. Using observation {num_obs-1} instead."
-                        )
-                        reference_posterior_samples[
-                            num_obs
-                        ] = reference_posterior_samples[num_obs - 1]
-                else:
-                    reference_posterior_samples[num_obs] = sample(num_obs)
+        for i, (num_obs, obs) in enumerate(
+            zip(num_observation_list, observation_list)
+        ):
+            print()
+            print(f"Observation {i+1}")
+            if num_obs is None:
+                num_obs = i + 1
+                try:
+                    reference_posterior_samples[
+                        num_obs
+                    ] = task._sample_reference_posterior(
+                        num_samples=n_samples, num_observation=None, observation=obs
+                    )
+                except AssertionError:
+                    print(
+                        f"Observation {num_obs} not available. Using observation {num_obs-1} instead."
+                    )
+                    reference_posterior_samples[
+                        num_obs
+                    ] = reference_posterior_samples[num_obs - 1]
+            else:
+                reference_posterior_samples[num_obs] = sample(num_obs)
 
     else:
         reference_posterior_samples = None

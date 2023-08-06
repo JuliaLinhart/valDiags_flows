@@ -780,7 +780,6 @@ def generate_data_one_run(
     generate_c2st_data=True,
     seed=42,  # fixed seed for reproducibility
     task_observations=True,
-    paralellize=False,
 ):
     """Generate data for one run of the test.
 
@@ -802,8 +801,6 @@ def generate_data_one_run(
         generate_c2st_data (bool): whether to generate the data for c2st.
             Defaults to True.
         seed (int): seed for reproducibility.
-        paralellize (bool): whether to parallelize reference sample computation.
-            Defaults to False.
 
     Returns:
         data_samples (dict): dict of data samples.
@@ -866,7 +863,6 @@ def generate_data_one_run(
             num_observation_list=num_observation_list,
             observation_list=list(observation_dict.values()),
             sample_from_reference=generate_c2st_data,  # only sample from reference if needed
-            paralellize=paralellize
         )
         joint_samples_cal = {"theta": theta_cal, "x": x_cal}
         # Save data
@@ -915,7 +911,6 @@ def generate_data_one_run(
             observation_list=list(observation_dict.values()),
             sample_from_joint=False,
             sample_from_reference=generate_c2st_data,  # only sample from reference if needed
-            paralellize=paralellize
         )
         base_dist_samples_eval = base_dist.sample(n_eval).detach()
         # Save data

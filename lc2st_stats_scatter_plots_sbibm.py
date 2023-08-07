@@ -131,9 +131,8 @@ elif args.observations == "empirical":
         if args.precompute_obs:
             task.num_observations = TEST_SIZE
             task.observation_seeds = task.observation_seeds + [
-                1000000 + i + 5 for i in range(TEST_SIZE - 10)
+                1000000 + i + 5 for i in range(10, TEST_SIZE)
             ]
-            print(task.num_observations, len(task.observation_seeds))
             task._setup(create_reference=False)
         observation_list = [
             task.get_observation(num_observation=n_obs)
@@ -144,7 +143,6 @@ elif args.observations == "empirical":
         task_observations = True
 
     else:
-        print("hi")
         TEST_SIZE = 100
         theta_test = prior(TEST_SIZE)
         x_test = simulator(theta_test)

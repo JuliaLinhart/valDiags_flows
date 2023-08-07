@@ -60,21 +60,26 @@ def generate_task_data(
         if num_observation_list is None:
             num_observation_list = [None] * len(observation_list)
 
-        def sample(num_obs):
+        def generate_sample(num_obs):
             try:
+                print(f"Sampling observation {num_obs}...")
                 ref_samples = task._sample_reference_posterior(
                     num_samples=n_samples,
                     num_observation=num_obs,
                     observation=None,
                 )
             except TypeError:
+                print(f"Sampling observation {num_obs}...")
                 ref_samples = task._sample_reference_posterior(
                     num_samples=n_samples,
                     num_observation=num_obs,
                 )
-            except ValueError:
-                print("Observation not available. Generating new observation.")
-                seed = task.observation_seeds[-1] + 1 + num_obs
+            except (ValueError, AssertionError) as e:
+                print()
+                print(e, ": observation not available. Generating new observation.")
+                print()
+                old_seed = np.random.get_state()[1][0]
+                seed = task.observation_seeds[-1] + np.random.randint(1, 100000000) + num_obs
                 task._save_observation_seed(num_obs, seed)
                 np.random.seed(seed)
                 torch.manual_seed(seed)
@@ -83,6 +88,9 @@ def generate_task_data(
                 observation = simulator(theta)
                 task._save_observation(num_obs, observation)
 
+                np.random.seed(old_seed)
+                torch.manual_seed(old_seed)
+                print(f"Last attempt: Sampling observation {num_obs}...")
                 ref_samples = task._sample_reference_posterior(
                     num_samples=n_samples,
                     num_observation=num_obs,
@@ -91,29 +99,48 @@ def generate_task_data(
 
             return ref_samples
 
-        for i, (num_obs, obs) in enumerate(
-            zip(num_observation_list, observation_list)
-        ):
+        reuse_obs = []
+        for i, (num_obs, obs) in enumerate(zip(num_observation_list, observation_list)):
             print()
-            print(f"Observation {i+1}")
             if num_obs is None:
                 num_obs = i + 1
                 try:
+                    print(f"Sampling observation {num_obs}...")
                     reference_posterior_samples[
                         num_obs
                     ] = task._sample_reference_posterior(
                         num_samples=n_samples, num_observation=None, observation=obs
                     )
                 except AssertionError:
+                    print()
                     print(
                         f"Observation {num_obs} not available. Using observation {num_obs-1} instead."
                     )
-                    reference_posterior_samples[
-                        num_obs
-                    ] = reference_posterior_samples[num_obs - 1]
+                    print()
+                    reference_posterior_samples[num_obs] = reference_posterior_samples[
+                        num_obs - 1
+                    ]
+                    reuse_obs.append(num_obs)
             else:
-                reference_posterior_samples[num_obs] = sample(num_obs)
-
+                try:
+                    reference_posterior_samples[num_obs] = generate_sample(num_obs)
+                except AssertionError:
+                    print()
+                    print(
+                        f"Observation {num_obs} not available. Using observation {num_obs-1} instead."
+                    )
+                    print()
+                    reference_posterior_samples[num_obs] = reference_posterior_samples[
+                        num_obs - 1
+                    ]
+                    reuse_obs.append(num_obs)
+            print(
+                f"... DONE: observation {num_obs}"
+            )
+        print()
+        print(f"DONE sampling reference posteriors with {len(num_observation_list)-len(reuse_obs)} unique observation seeds.")
+        print(f"Observations {reuse_obs} didn't work")
+        print()
     else:
         reference_posterior_samples = None
 

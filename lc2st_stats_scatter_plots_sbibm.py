@@ -27,6 +27,7 @@ import torch
 import sbibm
 
 from pathlib import Path
+from scipy import stats
 from valdiags.vanillaC2ST import sbibm_clf_kwargs
 from experiment_utils_sbibm import (
     generate_data_one_run,
@@ -48,8 +49,16 @@ plt.rcParams["figure.figsize"] = (5, 5)
 
 METHODS_DICT = {
     "c2st": r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
-    "lc2st": {"name": r"$\ell$-C2ST ($\hat{t}_{\mathrm{MSE}_0}$)", "marker": "o", "colors": plt.get_cmap("RdPu", 6)},
-    "lc2st_nf": {"name": r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)", "marker": "*", "colors": plt.get_cmap("RdPu", 6)},
+    "lc2st": {
+        "name": r"$\ell$-C2ST ($\hat{t}_{\mathrm{MSE}_0}$)",
+        "marker": "o",
+        "colors": plt.get_cmap("RdPu", 6),
+    },
+    "lc2st_nf": {
+        "name": r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
+        "marker": "*",
+        "colors": plt.get_cmap("RdPu", 6),
+    },
 }
 
 # Set seed for reproducibility
@@ -123,7 +132,7 @@ elif args.observations == "empirical":
         "gaussian_linear_uniform",
         "two_moons",
         "slcp",
-        "gaussian_mixture"
+        "gaussian_mixture",
     ]:
         NUM_OBSERVATION_LIST = list(range(1, 101))
         print(f"Loading observations {NUM_OBSERVATION_LIST}")
@@ -221,6 +230,9 @@ else:
 
 # methods to compute results for
 methods = ["c2st", "lc2st", "lc2st_nf"]
+observation_num_list = list(data_samples["npe_obs"]["cal"][100].keys())
+observation_list = [observation_dict[num_obs] for num_obs in observation_num_list]
+observation_dict = dict(zip(observation_num_list, observation_list))
 
 # plot identity line
 plt.plot([0, 1], [0, 1], "k--")
@@ -248,14 +260,22 @@ for c, n_train in enumerate([100, 1000, 10000, 100000]):
         save_results=True,  # save results to disk
         seed=RANDOM_SEED,
     )
+    x = results_dict["c2st"]["t_stat"]["mse"]
+    y = results_dict[args.method]["t_stat"]["mse"]
+    # pearson test statistic
+    pearson_res = stats.pearsonr(x, y)
+    print(
+        f"Pearson correlation coeff. and p-value: {pearson_res.statistic}, {pearson_res.pvalue}"
+    )
+    print()
 
     # plot scatter plot for n_train
     plt.scatter(
-        results_dict["c2st"]["t_stat"]["mse"],
-        results_dict[args.method]["t_stat"]["mse"],
+        x,
+        y,
         label=rf"${n_train}$",
         marker=METHODS_DICT[args.method]["marker"],
-        color=METHODS_DICT[args.method]["colors"](c+2),
+        color=METHODS_DICT[args.method]["colors"](c + 2),
         s=100,  # marker size
         alpha=0.7,  # marker transparency
     )
@@ -265,7 +285,7 @@ plt.xlim(-0.01, 0.26)
 plt.ylim(-0.01, 0.26)
 plt.xlabel(METHODS_DICT["c2st"])
 plt.ylabel(METHODS_DICT[args.method]["name"])
-# plt.legend(title=r"$N_{\mathrm{train}}$ (for NPE)", loc="upper left")
+plt.legend(title=r"$N_{\mathrm{train}}$ (for NPE)", loc="upper left")
 
 if args.task == "two_moons":
     title = "Two Moons"

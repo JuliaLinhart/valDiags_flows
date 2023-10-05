@@ -967,6 +967,7 @@ def generate_data_one_run(
                     base_dist_samples_cal,
                     reference_posterior_samples_cal,
                     list(observation_dict.values()),
+                    list(observation_dict.keys()),
                 )
                 # Save data
                 if save_data:
@@ -1012,6 +1013,7 @@ def generate_data_one_run(
                 base_dist_samples_eval,
                 reference_posterior_samples_eval,
                 list(observation_dict.values()),
+                list(observation_dict.keys()),
                 nf_case=(not generate_c2st_data),  # only generate if needed
             )
             # Save data

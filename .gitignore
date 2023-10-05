@@ -46,6 +46,7 @@ saved_experiments/lc2st_2023/exp_2/two_moons/t_stats_null/*
 saved_experiments/lc2st_2023/exp_1/t_stats_null/*
 saved_experiments/lc2st_2023/exp_1/figures/*
 
+script_margaret_lc2st_stats_scatter_plots_sbibm.py
 script_margaret_sbibm_lc2st.py
 script_margaret_local_c2st.py
 script_margaret_localPIT_regression_old.py

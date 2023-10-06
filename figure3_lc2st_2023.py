@@ -406,15 +406,28 @@ if args.plot:
             observation = x_obs_list[dict_obs_g[g]][None, :, :]
             theta_gt = np.array([c, mu, sigma, g])
 
+            samples_z = npe_jrnmm._flow._distribution.sample(n_eval).detach()
+            observation_emb = npe_jrnmm._flow._embedding_net(observation)
+            samples_theta = npe_jrnmm._flow._transform.inverse(samples_z, observation_emb)[
+                0
+            ].detach()
+
+            _, probas = lc2st_scores(
+                P=None,
+                Q=None,
+                x_P=None,
+                x_Q=None,
+                x_eval=observation[:, :, 0],
+                P_eval=samples_z,
+                trained_clfs=trained_clfs_lc2st_nf,
+                **kwargs_lc2st,
+            )
+
             # Pairplot with ground truth and Predicted Probability (PP) intensity
             fig = plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
-                npe_jrnmm,
                 theta_gt=theta_gt,
-                observation=observation,
-                trained_clfs_lc2st=trained_clfs_lc2st_nf,
-                scores_fn_lc2st=partial(lc2st_scores, **kwargs_lc2st),
-                probas_null_obs_lc2st=None,
-                n_samples=n_eval,
+                probas=probas,
+                P_eval=samples_theta,
                 n_bins=20,
             )
             plt.savefig(

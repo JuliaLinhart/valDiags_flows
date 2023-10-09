@@ -13,6 +13,8 @@ Dependencies:
 
 Make sure to `pip install -e .` within the `valDiags_flows` folder.
 
+Any computations on the `bernoulli_glm(_raw)` tasks from `sbibm` require the `pypolyagamma` package.
+
 ## 1. Generate Figures from paper
 
 ### Figure 1: Single-class evaluation

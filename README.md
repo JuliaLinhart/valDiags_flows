@@ -84,6 +84,20 @@ python figure3_lc2st_2023.py --global_ct
 python figure3_lc2st_2023.py --local_ct_gain
 ```
 
+### Results for Figure 6 and Table 3 (Appendix F.2): 
+1. 10 reference observations
+```
+python lc2st_stats_scatter_plots_sbibm.py --task <task_name> --observations task --method <lc2st/lc2st_nf>
+```
+
+2. 100 reference observations
+```
+python lc2st_stats_scatter_plots_sbibm.py --task <task_name> --observations empirical --method <lc2st/lc2st_nf> 
+```
+For `task_name = two_moons`, `slcp`, `gaussian_mixture`, `gaussian_linear_uniform`, `bernoulli_glm`, `bernoulli_glm_raw`.
+You can add `--sbibm_obs` to generate new observations via the `sbibm` platform. This can be problematic for some tasks, which is why by default they are simply generated them with the `prior` and `simulator` directly.
+
+
 
 
 

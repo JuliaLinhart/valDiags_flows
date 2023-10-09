@@ -102,6 +102,8 @@ saved_experiments/lc2st_2023/exp_2/bernoulli_glm_raw/npe_*/results/*
 saved_experiments/lc2st_2023/exp_2/lotka_volterra/npe_*/t_stats_null/*
 saved_experiments/lc2st_2023/exp_2/lotka_volterra/npe_*/results/*
 
+saved_experiments/lc2st_2023/exp_2/lotka_volterra/*
+
 
 saved_experiments/lc2st_2023/exp_3/local_tests/alpha_0.05_n_trials_null_1000/n_eval_10000_n_ensemble_1_cross_val_False/*lhpd*.pkl
 

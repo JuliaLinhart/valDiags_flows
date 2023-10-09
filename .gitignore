@@ -5,6 +5,7 @@ work_inference/
 *.err
 *.zip
 *.pdf
+*.png
 *.svg
 .vscode/
 sbi_logs/
@@ -42,6 +43,17 @@ saved_experiments/lc2st_2023/exp_2/slcp/figures/*
 saved_experiments/lc2st_2023/exp_2/slcp/t_stats_null/*
 saved_experiments/lc2st_2023/exp_2/two_moons/figures/*
 saved_experiments/lc2st_2023/exp_2/two_moons/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/gaussian_mixture/figures/*
+saved_experiments/lc2st_2023/exp_2/gaussian_mixture/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/figures/*
+saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm/figures/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm_raw/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm_raw/figures/*
+saved_experiments/lc2st_2023/exp_2/lotka_volterra/figures/*
+saved_experiments/lc2st_2023/exp_2/lotka_volterra/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/sir/*
 
 saved_experiments/lc2st_2023/exp_1/t_stats_null/*
 saved_experiments/lc2st_2023/exp_1/figures/*
@@ -75,11 +87,21 @@ saved_experiments/JR-NMM/normal_4d/lct_results/*
 saved_experiments/JR-NMM/normal_4d/r_alpha_learned/*
 saved_experiments/JR-NMM/normal_4d/datasets_naive_small.pkl
 
-saved_experiments/lc2st_2023/exp_2/gaussian_mixture/*
 saved_experiments/lc2st_2023/exp_2/slcp/npe_*/t_stats_null/*
 saved_experiments/lc2st_2023/exp_2/slcp/npe_*/results/*
 saved_experiments/lc2st_2023/exp_2/two_moons/npe_*/t_stats_null/*
 saved_experiments/lc2st_2023/exp_2/two_moons/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/gaussian_mixture/npe_*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/gaussian_mixture/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/npe_*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm/npe_*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm_raw/npe_*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/bernoulli_glm_raw/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/lotka_volterra/npe_*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/lotka_volterra/npe_*/results/*
+
 
 saved_experiments/lc2st_2023/exp_3/local_tests/alpha_0.05_n_trials_null_1000/n_eval_10000_n_ensemble_1_cross_val_False/*lhpd*.pkl
 
@@ -94,3 +116,4 @@ c2st_emp_power_lee_2018_fig_2.py
 localPIT1D_test_scripts.py
 plot.py
 plots_neurips2022.py
+plot_posteriors_sbibm.py

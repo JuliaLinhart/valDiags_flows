@@ -44,6 +44,7 @@ python figure3_lc2st_2023.py --plot --lc2st_interpretability
 python lc2st_stats_scatter_plots_sbibm.py --task <task_name> --observations <task/empirical> --method <lc2st/lc2st_nf>
 ```
 For `task_name = two_moons`, `slcp`, `gaussian_mixture`, `gaussian_linear_uniform`, `bernoulli_glm`, `bernoulli_glm_raw`.
+
 Specifying `empirical` for the `--observations` argument, generates results and plots for `100` different reference observations (instead of just `10`).
 
 ## 2. Reproduce experiment results from paper
@@ -95,6 +96,7 @@ python lc2st_stats_scatter_plots_sbibm.py --task <task_name> --observations task
 python lc2st_stats_scatter_plots_sbibm.py --task <task_name> --observations empirical --method <lc2st/lc2st_nf> 
 ```
 For `task_name = two_moons`, `slcp`, `gaussian_mixture`, `gaussian_linear_uniform`, `bernoulli_glm`, `bernoulli_glm_raw`.
+
 You can add `--sbibm_obs` to generate new observations via the `sbibm` platform. This can be problematic for some tasks, which is why by default they are simply generated them with the `prior` and `simulator` directly.
 
 

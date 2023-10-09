@@ -5,6 +5,7 @@ work_inference/
 *.err
 *.zip
 *.pdf
+*.png
 *.svg
 .vscode/
 sbi_logs/
@@ -38,14 +39,13 @@ saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_
 saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd_r_alphas_nt_1000_n_cal_10000.pkl
 saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd_stats_null_nt_1000_n_cal_10000.pkl
 
-saved_experiments/lc2st_2023/exp_2/slcp/figures/*
-saved_experiments/lc2st_2023/exp_2/slcp/t_stats_null/*
-saved_experiments/lc2st_2023/exp_2/two_moons/figures/*
-saved_experiments/lc2st_2023/exp_2/two_moons/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/*/figures/*
+saved_experiments/lc2st_2023/exp_2/*/t_stats_null/*
 
 saved_experiments/lc2st_2023/exp_1/t_stats_null/*
 saved_experiments/lc2st_2023/exp_1/figures/*
 
+script_margaret_lc2st_stats_scatter_plots_sbibm.py
 script_margaret_sbibm_lc2st.py
 script_margaret_local_c2st.py
 script_margaret_localPIT_regression_old.py
@@ -74,12 +74,13 @@ saved_experiments/JR-NMM/normal_4d/lct_results/*
 saved_experiments/JR-NMM/normal_4d/r_alpha_learned/*
 saved_experiments/JR-NMM/normal_4d/datasets_naive_small.pkl
 
-saved_experiments/lc2st_2023/exp_2/gaussian_linear_uniform/*
-saved_experiments/lc2st_2023/exp_2/gaussian_mixture/*
-saved_experiments/lc2st_2023/exp_2/slcp/npe_*/t_stats_null/*
-saved_experiments/lc2st_2023/exp_2/slcp/npe_*/results/*
-saved_experiments/lc2st_2023/exp_2/two_moons/npe_*/t_stats_null/*
-saved_experiments/lc2st_2023/exp_2/two_moons/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/*/npe_*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/*/npe_*/results/*
+
+saved_experiments/lc2st_2023/exp_2/*/scatter_plots/data*.pkl
+saved_experiments/lc2st_2023/exp_3/npe_samples*.pkl
+
+saved_experiments/lc2st_2023/exp_2/lotka_volterra/*
 
 saved_experiments/lc2st_2023/exp_3/local_tests/alpha_0.05_n_trials_null_1000/n_eval_10000_n_ensemble_1_cross_val_False/*lhpd*.pkl
 
@@ -94,3 +95,4 @@ c2st_emp_power_lee_2018_fig_2.py
 localPIT1D_test_scripts.py
 plot.py
 plots_neurips2022.py
+plot_posteriors_sbibm.py

@@ -136,8 +136,9 @@ def opt_bayes_scores(
 
 
 if __name__ == "__main__":
-
     import matplotlib.pyplot as plt
+
+    from sklearn.calibration import calibration_curve
 
     N_SAMPLES = 10_000
     DIM = 5
@@ -150,22 +151,22 @@ if __name__ == "__main__":
     shifts = np.array(
         [
             0.01,
-            0.1,
-            0.2,
-            0.3,
-            0.4,
+            # 0.1,
+            # 0.2,
+            # 0.3,
+            # 0.4,
             0.5,
-            0.6,
-            0.7,
-            0.8,
+            # 0.6,
+            # 0.7,
+            # 0.8,
             0.9,
             1,
             1.1,
-            1.2,
-            1.3,
-            1.4,
+            # 1.2,
+            # 1.3,
+            # 1.4,
             1.5,
-            2,
+            # 2,
             3,
         ]
     )
@@ -178,7 +179,8 @@ if __name__ == "__main__":
         r"$\hat{t}_{Max}$": [],
         r"$\hat{t}_{Max0}$": [],
     }
-    for r in range(10):
+
+    for r in range(1):
         # ref norm samples
         ref_samples = mvn(mean=np.zeros(DIM), cov=np.eye(DIM)).rvs(N_SAMPLES)
 
@@ -207,6 +209,8 @@ if __name__ == "__main__":
             r"$\hat{t}_{Max0}$": [],
         }
 
+        cal_curves = {"oracle": [], "single_class": []}
+
         for s, s_samples in zip(shifts, shifted_samples):
             # uncomment this to do the mean-shift experiment
             # clf = AnalyticGaussianLQDA(dim=DIM, mu=s)
@@ -217,27 +221,40 @@ if __name__ == "__main__":
             # clf = AnalyticStudentClassifier(df=s)
 
             for b in [True, False]:
-                # single_class.append(b)
-                # shift_list.append(s)
 
+                # scores
                 scores = opt_bayes_scores(
                     P=ref_samples, Q=s_samples, clf=clf, single_class_eval=b
                 )
                 if b:
                     test_stats[r"$\hat{t}_{Acc0}$"].append(scores["accuracy"])
                     test_stats[r"$\hat{t}_{Reg0}$"].append(scores["mse"] + 0.5)
-                    test_stats[r"$\hat{t}_{Max0}$"].append(scores["div"])
+                    # test_stats[r"$\hat{t}_{Max0}$"].append(scores["div"])
                 else:
                     test_stats[r"$\hat{t}_{Acc}$"].append(scores["accuracy"])
                     test_stats[r"$\hat{t}_{Reg}$"].append(scores["mse"] + 0.5)
-                    test_stats[r"$\hat{t}_{Max}$"].append(scores["div"])
+                    # test_stats[r"$\hat{t}_{Max}$"].append(scores["div"])
+
+                # calibration
+                if b:
+                    features = ref_samples
+                    y_true = np.zeros(N_SAMPLES)
+                    label = "single_class"
+                else:
+                    features = np.concatenate([ref_samples, s_samples])
+                    y_true = np.concatenate([np.zeros(N_SAMPLES), np.ones(N_SAMPLES)])
+                    label = "oracle"
+                y_pred = clf.predict_proba(features)[:, 1]
+                prob_true, prob_pred = calibration_curve(y_true, y_pred, n_bins=3)
+                cal_curves[label].append((prob_true, prob_pred))
+                print(prob_true, prob_pred)
 
         for k in test_stats.keys():
             test_stats_runs[k].append(test_stats[k])
 
     test_stats_mean = {k: np.mean(v, axis=0) for k, v in test_stats_runs.items()}
     test_stats_std = {k: np.std(v, axis=0) for k, v in test_stats_runs.items()}
-    colors = ["red", "red", "blue", "blue", "orange", "orange"]
+    colors = ["orange", "orange", "blue", "blue"]  # , "red", "red"]
 
     # # Mean-shift experiment plot
     # for name, color in zip(test_stats.keys(), colors):
@@ -298,6 +315,26 @@ if __name__ == "__main__":
     plt.title(f"Optimal Bayes Classifier for H_0: N(0, I) = N(0, s), dim={DIM}")
     plt.savefig(f"lqda_scale_shift_dim_{DIM}_n_{N_SAMPLES}.pdf")
     plt.show()
+
+    # calibration
+    for label in cal_curves.keys():
+        for i, s in enumerate(shifts):
+            plt.plot(
+                cal_curves[label][i][0],
+                cal_curves[label][i][1],
+                label=f"scale shift = {s}",
+                linestyle="-",
+            )
+        plt.plot(
+            np.linspace(0, 1, 10), np.linspace(0, 1, 10), linestyle="--", color="black"
+        )
+        plt.legend()
+        plt.xlabel("True probability")
+        plt.ylabel("Predicted probability")
+        plt.ylim(0, 1)
+        plt.xlim(0, 1)
+        plt.title("Calibration curves, " + label)
+        plt.show()
 
     # # DF-shift experiment plot
     # for name, color in zip(test_stats.keys(), colors):

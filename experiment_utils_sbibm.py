@@ -85,6 +85,11 @@ def l_c2st_results_n_train(
             whose values are lists of average runtime for every n_train.
     """
     # Generate data
+    if "c2st" in methods:
+        generate_c2st_data = True
+    else:
+        generate_c2st_data = False
+
     data_samples = generate_data_one_run(
         n_cal=n_cal,
         n_eval=n_eval,
@@ -96,6 +101,7 @@ def l_c2st_results_n_train(
         load_cal_data=True,  # load calibration data from disk
         load_eval_data=True,  # load evaluation data from disk
         seed=seed,  # fixed seed for reproducibility
+        generate_c2st_data=generate_c2st_data,
     )
 
     t_stats_null_lc2st_nf = None
@@ -773,6 +779,7 @@ def generate_data_one_run(
     load_eval_data=True,
     generate_c2st_data=True,
     seed=42,  # fixed seed for reproducibility
+    task_observations=True,
 ):
     """Generate data for one run of the test.
 
@@ -845,10 +852,16 @@ def generate_data_one_run(
     except FileNotFoundError:
         # Generate data
         base_dist_samples_cal = base_dist.sample(n_cal).detach()
+
+        if task_observations:
+            num_observation_list = list(observation_dict.keys())
+        else:
+            num_observation_list = None
         reference_posterior_samples_cal, theta_cal, x_cal = generate_task_data(
             n_cal,
             task,
-            list(observation_dict.keys()),
+            num_observation_list=num_observation_list,
+            observation_list=list(observation_dict.values()),
             sample_from_reference=generate_c2st_data,  # only sample from reference if needed
         )
         joint_samples_cal = {"theta": theta_cal, "x": x_cal}
@@ -864,7 +877,8 @@ def generate_data_one_run(
                     task_path / f"reference_posterior_samples_n_cal_{n_cal}.pkl",
                 )
             torch.save(
-                joint_samples_cal, task_path / f"joint_samples_n_cal_{n_cal}.pkl",
+                joint_samples_cal,
+                task_path / f"joint_samples_n_cal_{n_cal}.pkl",
             )
 
     # Eval set for fixed task data (no joint samples)
@@ -886,10 +900,15 @@ def generate_data_one_run(
             reference_posterior_samples_eval = None
     except FileNotFoundError:
         # Generate data
+        if task_observations:
+            num_observation_list = list(observation_dict.keys())
+        else:
+            num_observation_list = None
         reference_posterior_samples_eval, _, _ = generate_task_data(
             n_eval,
             task,
-            list(observation_dict.keys()),
+            num_observation_list=num_observation_list,
+            observation_list=list(observation_dict.values()),
             sample_from_joint=False,
             sample_from_reference=generate_c2st_data,  # only sample from reference if needed
         )
@@ -948,6 +967,7 @@ def generate_data_one_run(
                     base_dist_samples_cal,
                     reference_posterior_samples_cal,
                     list(observation_dict.values()),
+                    list(observation_dict.keys()),
                 )
                 # Save data
                 if save_data:
@@ -993,6 +1013,7 @@ def generate_data_one_run(
                 base_dist_samples_eval,
                 reference_posterior_samples_eval,
                 list(observation_dict.values()),
+                list(observation_dict.keys()),
                 nf_case=(not generate_c2st_data),  # only generate if needed
             )
             # Save data
@@ -1154,6 +1175,9 @@ def compute_test_results_npe_one_run(
     # Get dataset sizes
     n_cal = len(base_dist_samples["cal"])
     n_eval = len(base_dist_samples["eval"])
+
+    if list(observation_dict.keys())[0] is None:
+        observation_dict = {i + 1: v for i, v in enumerate(observation_dict.values())}
 
     print()
     print(" ==========================================")
@@ -1530,10 +1554,10 @@ def compute_test_results_npe_one_run(
             for t_stat_name in test_stat_names:
                 if m == "lhpd" and t_stat_name != "mse":
                     continue
-                for num_obs in observation_dict.keys():
+                for i, num_obs in enumerate(observation_dict.keys()):
                     t_stats_null_dict[m][num_obs][t_stat_name] = results_dict[m][
                         "t_stats_null"
-                    ][t_stat_name][num_obs - 1]
+                    ][t_stat_name][i]
 
             # Save null test statistics for the given method
             if save_results:

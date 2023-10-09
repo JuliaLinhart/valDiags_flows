@@ -47,6 +47,8 @@ from valdiags.test_utils import eval_htest
 
 from plots_lc2st2023 import plot_plot_c2st_single_eval_shift
 
+from sklearn.calibration import calibration_curve
+
 # ====== GLOBAL PARAMETERS ======
 
 # Path to save/load the results
@@ -168,6 +170,7 @@ elif args.q_dist == "variance":
 
     # Variance-shift
     shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
+    # shifts = np.array([0.01, 0.1, 0.5, 1, 1.5, 3])
 
     # Q - class 1 distrribution: centered Gaussian with shifted variance
     Q_dist_list = [mvn(mean=np.zeros(dim), cov=s * np.eye(dim)) for s in shifts]
@@ -221,6 +224,7 @@ if args.t_shift and not args.plot:
     print("=================================================")
     print()
     test_stats = dict(zip(test_stat_names, [[] for _ in test_stat_names]))
+    cal_curves = {"oracle": [], "single_class": []}
 
     # Generate data from P
     P_eval = P_dist.rvs(size=N_SAMPLES_EVAL)
@@ -250,7 +254,7 @@ if args.t_shift and not args.plot:
                     P_eval = P_eval.reshape(-1, 1)
                     Q_eval = Q_eval.reshape(-1, 1)
                 # Train and evaluate the *extimated* classifier
-                scores = t_stats_c2st(
+                scores, probas = t_stats_c2st(
                     P=P,
                     Q=Q,
                     cross_val=False,
@@ -261,6 +265,7 @@ if args.t_shift and not args.plot:
                     metrics=list(METRICS.keys()),
                     single_class_eval=b,
                     null_hypothesis=False,
+                    return_probas=True,
                 )
             # Append scores to dict
             for metric, t_names in zip(METRICS.keys(), METRICS.values()):
@@ -270,11 +275,51 @@ if args.t_shift and not args.plot:
                     name = t_names[0]
                 test_stats[name].append(scores[metric])
 
+            # calibration
+            if b:
+                features = P_eval
+                y_true = np.zeros(len(P_eval))
+                label = "single_class"
+            else:
+                features = np.concatenate([P_eval, Q_eval])
+                y_true = np.concatenate([np.zeros(len(P_eval)), np.ones(len(P_eval))])
+                label = "oracle"
+            if args.opt_bayes:
+                clf = clf_list[i]
+                y_pred = clf.predict_proba(features)[:, 1]
+            else:
+                y_pred = 1 - probas
+
+            prob_true, prob_pred = calibration_curve(y_true, y_pred, n_bins=10)
+            cal_curves[label].append((prob_true, prob_pred))
+            print(prob_true, prob_pred)
+
     # Save computed test statistics
     torch.save(
         test_stats,
         PATH_EXPERIMENT + f"test_stats_{clf_name}_shift_{args.q_dist}_dim_{dim}.pkl",
     )
+
+    # calibration curves
+    for label in ["oracle"]:
+        for i, s in enumerate(shifts):
+            plt.plot(
+                cal_curves[label][i][0],
+                cal_curves[label][i][1],
+                label=f"scale shift = {s}",
+                linestyle="-",
+            )
+        plt.plot(
+            np.linspace(0, 1, 10), np.linspace(0, 1, 10), linestyle="--", color="black"
+        )
+        plt.legend()
+        plt.xlabel("True probability")
+        plt.ylabel("Predicted probability")
+        plt.ylim(0, 1)
+        plt.xlim(0, 1)
+        plt.title(f"Calibration curves, {label}-{clf_name}")
+        plt.show()
+
 
 # ====== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ======
 

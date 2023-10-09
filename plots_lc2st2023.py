@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from tueplots import fonts, axes
 import matplotlib.gridspec as gridspec
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib import cm
 
 import pandas as pd
 import torch
@@ -12,6 +14,7 @@ from scipy.stats import binom, uniform
 
 from valdiags.graphical_valdiags import (
     PP_vals,
+    compute_dfs_with_probas_marginals,
     eval_space_with_proba_intensity,
     pp_plot_c2st,
 )
@@ -760,14 +763,11 @@ PARAMETER_DICT = {
 
 
 def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
-    posterior,
     theta_gt,
-    observation,
-    trained_clfs_lc2st,
-    scores_fn_lc2st,
-    probas_null_obs_lc2st,
-    n_samples=10000,
+    probas,
+    P_eval,
     n_bins=20,
+    cmap=cm.get_cmap("Spectral_r"),
 ):
     plt.rcParams["figure.figsize"] = (9, 9)
 
@@ -775,32 +775,19 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
         nrows=4, ncols=4, sharex=False, sharey=False, constrained_layout=False
     )
 
-    samples_z = posterior._flow._distribution.sample(n_samples).detach()
-    observation_emb = posterior._flow._embedding_net(observation)
-    samples_theta = posterior._flow._transform.inverse(samples_z, observation_emb)[
-        0
-    ].detach()
-
-    _, probas = scores_fn_lc2st(
-        P=None,
-        Q=None,
-        x_P=None,
-        x_Q=None,
-        x_eval=observation[:, :, 0],
-        P_eval=samples_z,
-        trained_clfs=trained_clfs_lc2st,
-    )
+    dfs = compute_dfs_with_probas_marginals(probas, P_eval=P_eval)
 
     for i in range(4):
         eval_space_with_proba_intensity(
-            probas=probas,
-            probas_null=probas_null_obs_lc2st,
-            P_eval=samples_theta[:, i].numpy().reshape(-1, 1),
+            df_probas=dfs[f"{i}"],
             dim=1,
             z_space=False,
             n_bins=n_bins,
-            ax=axs[i][i],
+            vmin=0.2,
+            vmax=0.8,
+            cmap=cmap,
             show_colorbar=False,
+            ax=axs[i][i],
         )
 
         # plot ground truth dirac
@@ -808,30 +795,28 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
 
         for j in range(i + 1, 4):
             eval_space_with_proba_intensity(
-                probas=probas,
-                probas_null=probas_null_obs_lc2st,
-                P_eval=samples_theta[:, [i, j]].numpy(),
+                df_probas=dfs[f"{i}_{j}"],
                 dim=2,
                 z_space=False,
                 n_bins=n_bins,
-                ax=axs[j][i],
+                vmin=0.2,
+                vmax=0.8,
+                cmap=cmap,
                 show_colorbar=False,
-                scatter=False,
+                ax=axs[j][i],
             )
+
             # plot points
             axs[j][i].scatter(theta_gt[i], theta_gt[j], color="black", s=15)
-
             axs[i][j].set_visible(False)
 
-    cmap = plt.cm.get_cmap("bwr")
-    from matplotlib import cm
 
     plt.subplots_adjust(bottom=0.1, right=0.8, top=0.9)
     cax = plt.axes([0.82, 0.1, 0.075, 0.8])
     plt.colorbar(
-        cm.ScalarMappable(cmap=cmap),
+        cm.ScalarMappable(cmap=cmap, norm=cm.colors.Normalize(vmin=0.2, vmax=0.8)),
         cax=cax,
-        label=r"Predicted Probabaility ($\ell$-C2ST-NF)",
+        label=r"Predicted Probability ($\ell$-C2ST-NF)",
     )
 
     fig.suptitle(

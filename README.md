@@ -3,17 +3,16 @@ Official code for [L-C2ST: Local Diagnostics for Posterior Approximations in
 Simulation-Based Inference](https://arxiv.org/abs/2306.03580)
 
 Dependencies: 
-- python 3.10 conda environment
-- sbi
-- lampe
-- zuko
-- sbibm
-- tueplots
-- seaborn
+- conda environment: python 3.10 
+- pip packages: `lampe`, `sbi`, `sbibm`, `seaborn`, `tueplots`, `zuko`
 
-Make sure to `pip install -e .` within the `valDiags_flows` folder.
+Run `pip install -e .` within the `valDiags_flows` folder. This will automatically install all dependencies.
 
-Any computations on the `bernoulli_glm(_raw)` tasks from `sbibm` require the `pypolyagamma` package.
+Special requirements for the `bernoulli_glm_(raw)` tasks:
+- intall the `pypolyagamma` package
+- clone and modify the `sbibm` repository: `pip install -e .` in the cloned folder after changing the `task.py` file as follows:
+  - add `observation: Optional[torch.Tensor] = None,` as an input variable to the `_sample_reference_posterior` method
+  - change `dtype=np.int` to `int` in line 245
 
 ## 1. Generate Figures from paper
 

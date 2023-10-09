@@ -142,7 +142,10 @@ elif args.observations == "empirical":
             task.observation_seeds = task.observation_seeds + [
                 1000000 + i + 5 for i in range(10, TEST_SIZE)
             ]
-            task._setup(create_reference=False)
+            if "bernoulli_glm" in args.task:
+                task._setup()
+            else:
+                task._setup(create_reference=False)
         observation_list = [
             task.get_observation(num_observation=n_obs)
             for n_obs in NUM_OBSERVATION_LIST

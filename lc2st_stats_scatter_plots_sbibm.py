@@ -200,68 +200,79 @@ result_path = PATH_EXPERIMENT / "scatter_plots"
 if not os.path.exists(result_path):
     os.makedirs(result_path)
 
-results_n_train_path = Path(f"results") / test_params / eval_params
-if args.observations == "empirical":
-    results_n_train_path = results_n_train_path / "empirical"
-
-# Load or generate data
-data_path = PATH_EXPERIMENT / "scatter_plots" / f"data_{args.observations}_obs.pkl"
-if os.path.exists(data_path):
-    data_samples = torch.load(data_path)
+if os.path.exists(result_path / f"results_dict_{args.method}_{args.observations}.pkl"):
+    results_dict = torch.load(result_path / f"results_dict_{args.method}_{args.observations}.pkl")
 else:
-    data_samples = generate_data_one_run(
-        n_cal=n_cal,
-        n_eval=n_eval,
-        task=task,
-        observation_dict=observation_dict,
-        # n_train_list=[args.n_train],
-        n_train_list=[100, 1000, 10000, 100000],
-        task_path=PATH_EXPERIMENT,
-        save_data=save_load_data,  # save data to disk
-        load_cal_data=save_load_data,  # load calibration data from disk
-        load_eval_data=save_load_data,  # load evaluation data from disk
-        seed=RANDOM_SEED,  # fixed seed for reproducibility
-        task_observations=task_observations,
-    )
-    torch.save(data_samples, data_path)
+
+    results_n_train_path = Path(f"results") / test_params / eval_params
+    if args.observations == "empirical":
+        results_n_train_path = results_n_train_path / "empirical"
+
+    # Load or generate data
+    data_path = PATH_EXPERIMENT / "scatter_plots" / f"data_{args.observations}_obs.pkl"
+    if os.path.exists(data_path):
+        data_samples = torch.load(data_path)
+    else:
+        data_samples = generate_data_one_run(
+            n_cal=n_cal,
+            n_eval=n_eval,
+            task=task,
+            observation_dict=observation_dict,
+            # n_train_list=[args.n_train],
+            n_train_list=[100, 1000, 10000, 100000],
+            task_path=PATH_EXPERIMENT,
+            save_data=save_load_data,  # save data to disk
+            load_cal_data=save_load_data,  # load calibration data from disk
+            load_eval_data=save_load_data,  # load evaluation data from disk
+            seed=RANDOM_SEED,  # fixed seed for reproducibility
+            task_observations=task_observations,
+        )
+        torch.save(data_samples, data_path)
 
 
-# Compute/ load and plot results
+    # Compute/ load and plot results
 
-# methods to compute results for
-methods = ["c2st", "lc2st", "lc2st_nf"]
-observation_num_list = list(data_samples["npe_obs"]["cal"][100].keys())
-observation_list = [observation_dict[num_obs] for num_obs in observation_num_list]
-observation_dict = dict(zip(observation_num_list, observation_list))
+    # methods to compute results for
+    methods = ["c2st", "lc2st", "lc2st_nf"]
+    observation_num_list = list(data_samples["npe_obs"]["cal"][100].keys())
+    observation_list = [observation_dict[num_obs] for num_obs in observation_num_list]
+    observation_dict = dict(zip(observation_num_list, observation_list))
 
-# plot identity line
-plt.plot([0, 1], [0, 1], "k--")
+    # plot identity line
+    plt.plot([0, 1], [0, 1], "k--")
 
-# Compute test statistics
+    # Compute test statistics
+    results_dict = {}
+    for c, n_train in enumerate([100, 1000, 10000, 100000]):
+        results_dict[n_train], train_runtime_n = compute_test_results_npe_one_run(
+            alpha=ALPHA,
+            data_samples=data_samples,
+            n_train=n_train,
+            observation_dict=observation_dict,
+            kwargs_c2st=kwargs_c2st,
+            kwargs_lc2st=kwargs_lc2st,
+            kwargs_lhpd=kwargs_lhpd,
+            n_trials_null=0,
+            t_stats_null_c2st_nf=None,
+            t_stats_null_lc2st_nf=None,
+            t_stats_null_lhpd=None,
+            t_stats_null_dict_npe={m: None for m in methods},
+            task_path=PATH_EXPERIMENT,
+            results_n_train_path=results_n_train_path,
+            methods=methods,
+            test_stat_names=ALL_METRICS,
+            compute_under_null=False,  # no type I error computation
+            save_results=True,  # save results to disk
+            seed=RANDOM_SEED,
+        )
+    torch.save(results_dict, result_path / f"results_{args.method}_dict_{args.observations}.pkl")
+
+# Plot results
 for c, n_train in enumerate([100, 1000, 10000, 100000]):
-    results_dict, train_runtime_n = compute_test_results_npe_one_run(
-        alpha=ALPHA,
-        data_samples=data_samples,
-        n_train=n_train,
-        observation_dict=observation_dict,
-        kwargs_c2st=kwargs_c2st,
-        kwargs_lc2st=kwargs_lc2st,
-        kwargs_lhpd=kwargs_lhpd,
-        n_trials_null=0,
-        t_stats_null_c2st_nf=None,
-        t_stats_null_lc2st_nf=None,
-        t_stats_null_lhpd=None,
-        t_stats_null_dict_npe={m: None for m in methods},
-        task_path=PATH_EXPERIMENT,
-        results_n_train_path=results_n_train_path,
-        methods=methods,
-        test_stat_names=ALL_METRICS,
-        compute_under_null=False,  # no type I error computation
-        save_results=True,  # save results to disk
-        seed=RANDOM_SEED,
-    )
-    x = results_dict["c2st"]["t_stat"]["mse"]
-    y = results_dict[args.method]["t_stat"]["mse"]
+
+    x = results_dict[n_train]["c2st"]["t_stat"]["mse"]
+    y = results_dict[n_train][args.method]["t_stat"]["mse"]
+
     # pearson test statistic
     pearson_res = stats.pearsonr(x, y)
     print(

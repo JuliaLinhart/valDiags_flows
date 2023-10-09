@@ -237,9 +237,6 @@ else:
     observation_list = [observation_dict[num_obs] for num_obs in observation_num_list]
     observation_dict = dict(zip(observation_num_list, observation_list))
 
-    # plot identity line
-    plt.plot([0, 1], [0, 1], "k--")
-
     # Compute test statistics
     results_dict = {}
     for c, n_train in enumerate([100, 1000, 10000, 100000]):
@@ -265,6 +262,9 @@ else:
             seed=RANDOM_SEED,
         )
     torch.save(results_dict, result_path / f"results_{args.method}_dict_{args.observations}.pkl")
+
+# plot identity line
+plt.plot([0, 1], [0, 1], "k--")
 
 # Plot results
 for c, n_train in enumerate([100, 1000, 10000, 100000]):

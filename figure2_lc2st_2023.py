@@ -157,7 +157,6 @@ parser.add_argument(
         "gaussian_mixture",
         "bernoulli_glm",
         "bernoulli_glm_raw",
-        "lotka_volterra",
     ],
     help="Task from sbibm to perform the experiment on.",
 )
@@ -222,11 +221,10 @@ print("  VALIDATION METHOD COMPARISON for sbibm-tasks")
 print("=================================================")
 print()
 
-# Add oracle C2ST for all tasks except lotka_volterra
-if args.task != "lotka_volterra":
-    METHODS_L2.append(r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)")
-    METHODS_ALL.append(r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)")
-    METHODS_ALL.append(r"oracle C2ST ($\hat{t}_{Acc}$)")
+# Add oracle C2ST for all tasks
+METHODS_L2.append(r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)")
+METHODS_ALL.append(r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)")
+METHODS_ALL.append(r"oracle C2ST ($\hat{t}_{Acc}$)")
 
 # Define task and path
 task = sbibm.get_task(args.task)
@@ -334,10 +332,7 @@ if args.t_res_ntrain:
     print(f"... for N_cal = {n_cal}")
     print()
 
-    if args.task == "lotka_volterra":
-        methods = ["lc2st", "lc2st_nf", "lhpd"]
-    else:
-        methods = ["lc2st", "lc2st_nf", "lhpd", "c2st"]
+    methods = ["lc2st", "lc2st_nf", "lhpd", "c2st"]
 
     # Compute test statistics for every n_train
     results_n_train, train_runtime = l_c2st_results_n_train(
@@ -416,13 +411,6 @@ if args.t_res_ntrain:
                 "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
                 "lhpd": {100: 50, 1000: 50, 10000: 50, 100000: 50},
             }
-        elif args.task == "lotka_volterra":
-            methods_dict = {
-                # "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
-                "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
-                "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
-                "lhpd": {100: 42, 1000: 31, 10000: 33, 100000: 33},
-            }
         else:
             raise NotImplementedError(f"Task {args.task} not implemented.")
 
@@ -435,7 +423,6 @@ if args.t_res_ntrain:
             "gausiian_linear_uniform": 50,
             "bernoulli_glm": 50,
             "bernoulli_glm_raw": 50,
-            "lotka_volterra": 31, # lhpd still computing
         }
         n_runs = n_runs_dict[args.task]
 
@@ -642,13 +629,6 @@ if args.power_ncal:
             "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
             "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
         }
-    elif args.task == "lotka_volterra":
-        methods_dict = {
-            # "c2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 39, 5000: 39, 10000: 31},
-        }
     else:
         raise NotImplementedError(f"Task {args.task} not implemented.")
 
@@ -661,7 +641,6 @@ if args.power_ncal:
             "gausiian_linear_uniform": 50,
             "bernoulli_glm": 50,
             "bernoulli_glm_raw": 50,
-            "lotka_volterra": 31, # lhpd still computing
         }
     n_runs = n_runs_dict[args.task]
 
@@ -858,8 +837,6 @@ if args.plot:
         title = "Bernoulli GLM"
     elif args.task == "bernoulli_glm_raw":
         title = "Bernoulli GLM Raw"
-    elif args.task == "lotka_volterra":
-        title = "Lotka Volterra"
     else:
         raise NotImplementedError(f"Task {args.task} not implemented.")
 

@@ -300,25 +300,26 @@ if args.t_shift and not args.plot:
         PATH_EXPERIMENT + f"test_stats_{clf_name}_shift_{args.q_dist}_dim_{dim}.pkl",
     )
 
-    # # calibration curves
-    # for label in ["oracle"]:
-    #     for i, s in enumerate(shifts):
-    #         plt.plot(
-    #             cal_curves[label][i][0],
-    #             cal_curves[label][i][1],
-    #             label=f"scale shift = {s}",
-    #             linestyle="-",
-    #         )
-    #     plt.plot(
-    #         np.linspace(0, 1, 10), np.linspace(0, 1, 10), linestyle="--", color="black"
-    #     )
-    #     plt.legend()
-    #     plt.xlabel("True probability")
-    #     plt.ylabel("Predicted probability")
-    #     plt.ylim(0, 1)
-    #     plt.xlim(0, 1)
-    #     plt.title("Calibration curves, " + label)
-    #     plt.show()
+    # calibration curves
+    for label in ["oracle"]:
+        for i, s in enumerate(shifts):
+            plt.plot(
+                cal_curves[label][i][0],
+                cal_curves[label][i][1],
+                label=f"scale shift = {s}",
+                linestyle="-",
+            )
+        plt.plot(
+            np.linspace(0, 1, 10), np.linspace(0, 1, 10), linestyle="--", color="black"
+        )
+        plt.legend()
+        plt.xlabel("True probability")
+        plt.ylabel("Predicted probability")
+        plt.ylim(0, 1)
+        plt.xlim(0, 1)
+        plt.title(f"Calibration curves, {label}-{clf_name}")
+        plt.show()
+
 
 # ====== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ======
 

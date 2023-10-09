@@ -200,10 +200,9 @@ result_path = PATH_EXPERIMENT / "scatter_plots"
 if not os.path.exists(result_path):
     os.makedirs(result_path)
 
-if os.path.exists(result_path / f"results_dict_{args.method}_{args.observations}.pkl"):
-    results_dict = torch.load(result_path / f"results_dict_{args.method}_{args.observations}.pkl")
+if os.path.exists(result_path / f"results_{args.method}_dict_{args.observations}.pkl"):
+    results_dict = torch.load(result_path / f"results_{args.method}_dict_{args.observations}.pkl")
 else:
-
     results_n_train_path = Path(f"results") / test_params / eval_params
     if args.observations == "empirical":
         results_n_train_path = results_n_train_path / "empirical"

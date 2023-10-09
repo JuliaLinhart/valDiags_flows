@@ -8,6 +8,8 @@ Dependencies:
 
 Run `pip install -e .` within the `valDiags_flows` folder. This will automatically install all dependencies.
 
+=================================================================================
+
 Special requirements for the `bernoulli_glm_(raw)` tasks:
 - intall the `pypolyagamma` package
 - clone and modify the `sbibm` repository: `pip install -e .` in the cloned folder after changing the `task.py` file as follows:

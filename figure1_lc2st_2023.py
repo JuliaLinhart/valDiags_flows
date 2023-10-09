@@ -169,8 +169,8 @@ elif args.q_dist == "variance":
     n_samples_list = [2000]
 
     # Variance-shift
-    # shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
-    shifts = np.array([0.01, 0.1, 0.5, 1, 1.5, 3])
+    shifts = np.concatenate([[0.01], np.arange(0.1, 1.6, 0.1)])
+    # shifts = np.array([0.01, 0.1, 0.5, 1, 1.5, 3])
 
     # Q - class 1 distrribution: centered Gaussian with shifted variance
     Q_dist_list = [mvn(mean=np.zeros(dim), cov=s * np.eye(dim)) for s in shifts]
@@ -319,6 +319,7 @@ if args.t_shift and not args.plot:
         plt.xlim(0, 1)
         plt.title(f"Calibration curves, {label}-{clf_name}")
         plt.show()
+
 
 # ====== EXP 2: EMPIRICAL POWER UNDER DISTRIBUTION SHIFT  ======
 

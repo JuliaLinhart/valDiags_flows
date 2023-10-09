@@ -100,10 +100,9 @@ parser.add_argument(
     choices=["task", "empirical"],
 )
 parser.add_argument(
-    "--precompute_obs",
-    "-p_o",
+    "--sbibm_obs",
     action="store_true",
-    help="Precompute observations for empirical exp.",
+    help="Use observations from sbibm for empirical exp.",
 )
 args = parser.parse_args()
 
@@ -128,24 +127,19 @@ if args.observations == "task":
     save_load_data = True
     task_observations = True
 elif args.observations == "empirical":
-    if "bernoulli_glm" in args.task or args.task in [
-        "gaussian_linear_uniform",
-        "two_moons",
-        "slcp",
-        "gaussian_mixture",
-    ]:
+    if args.sbibm_obs:
         NUM_OBSERVATION_LIST = list(range(1, 101))
         print(f"Loading observations {NUM_OBSERVATION_LIST}")
         TEST_SIZE = len(NUM_OBSERVATION_LIST)
-        if args.precompute_obs:
-            task.num_observations = TEST_SIZE
-            task.observation_seeds = task.observation_seeds + [
-                1000000 + i + 5 for i in range(10, TEST_SIZE)
-            ]
-            if "bernoulli_glm" in args.task:
-                task._setup()
-            else:
-                task._setup(create_reference=False)
+        task.num_observations = TEST_SIZE
+        task.observation_seeds = task.observation_seeds + [
+            1000000 + i + 5 for i in range(10, TEST_SIZE)
+        ]
+
+        if "bernoulli_glm" in args.task:
+            task._setup()
+        else:
+            task._setup(create_reference=False)
         observation_list = [
             task.get_observation(num_observation=n_obs)
             for n_obs in NUM_OBSERVATION_LIST

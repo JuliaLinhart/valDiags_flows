@@ -69,15 +69,15 @@ METHODS_ACC = [
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
 ]
 METHODS_L2 = [
-    r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
+    # r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
     r"$\ell$-C2ST ($\hat{t}_{\mathrm{MSE}_0}$)",
     r"$\ell$-C2ST-NF ($\hat{t}_{\mathrm{MSE}_0}$)",
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{\mathrm{MSE}_0}$)",
     r"$local$-HPD",
 ]
 METHODS_ALL = [
-    r"oracle C2ST ($\hat{t}_{Acc}$)",
-    r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
+    # r"oracle C2ST ($\hat{t}_{Acc}$)",
+    # r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)",
     # r"$\ell$-C2ST ($\hat{t}_{Max0}$)",
     # r"$\ell$-C2ST-NF ($\hat{t}_{Max0}$)",
     # r"$\ell$-C2ST-NF-perm ($\hat{t}_{Max0}$)",
@@ -150,7 +150,15 @@ parser.add_argument(
     "--task",
     type=str,
     default="two_moons",
-    choices=["two_moons", "slcp", "gaussian_linear_uniform", "gaussian_mixture", "bernoulli_glm"],
+    choices=[
+        "two_moons",
+        "slcp",
+        "gaussian_linear_uniform",
+        "gaussian_mixture",
+        "bernoulli_glm",
+        "bernoulli_glm_raw",
+        "lotka_volterra",
+    ],
     help="Task from sbibm to perform the experiment on.",
 )
 
@@ -213,6 +221,12 @@ print("=================================================")
 print("  VALIDATION METHOD COMPARISON for sbibm-tasks")
 print("=================================================")
 print()
+
+# Add oracle C2ST for all tasks except lotka_volterra
+if args.task != "lotka_volterra":
+    METHODS_L2.append(r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)")
+    METHODS_ALL.append(r"oracle C2ST ($\hat{t}_{\mathrm{MSE}}$)")
+    METHODS_ALL.append(r"oracle C2ST ($\hat{t}_{Acc}$)")
 
 # Define task and path
 task = sbibm.get_task(args.task)
@@ -320,7 +334,10 @@ if args.t_res_ntrain:
     print(f"... for N_cal = {n_cal}")
     print()
 
-    methods = ["c2st", "lc2st", "lc2st_nf", "lhpd"]
+    if args.task == "lotka_volterra":
+        methods = ["lc2st", "lc2st_nf", "lhpd"]
+    else:
+        methods = ["lc2st", "lc2st_nf", "lhpd", "c2st"]
 
     # Compute test statistics for every n_train
     results_n_train, train_runtime = l_c2st_results_n_train(
@@ -383,7 +400,7 @@ if args.t_res_ntrain:
                 "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
                 "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
                 "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
-                "lhpd": {100: 41, 1000: 31, 10000: 28, 100000: 29},
+                "lhpd": {100: 50, 1000: 50, 10000: 50, 100000: 50},
             }
         elif args.task == "bernoulli_glm":
             methods_dict = {
@@ -392,11 +409,35 @@ if args.t_res_ntrain:
                 "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
                 "lhpd": {100: 50, 1000: 50, 10000: 50, 100000: 50},
             }
+        elif args.task == "bernoulli_glm_raw":
+            methods_dict = {
+                "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lhpd": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+            }
+        elif args.task == "lotka_volterra":
+            methods_dict = {
+                # "c2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lc2st_nf": {100: 50, 1000: 50, 10000: 50, 100000: 50},
+                "lhpd": {100: 42, 1000: 31, 10000: 33, 100000: 33},
+            }
         else:
-            raise NotImplementedError("Only two_moons, slcp and gaussian_linear_uniform are supported for now.")
+            raise NotImplementedError(f"Task {args.task} not implemented.")
 
         # Number of runs to compute the empirical power over
-        n_runs = N_RUNS
+        # n_runs = N_RUNS
+        n_runs_dict = {
+            "two_moons": 50,
+            "slcp": 50,
+            "gaussian_mixture": 50,
+            "gausiian_linear_uniform": 50,
+            "bernoulli_glm": 50,
+            "bernoulli_glm_raw": 50,
+            "lotka_volterra": 31, # lhpd still computing
+        }
+        n_runs = n_runs_dict[args.task]
 
         # Initialize dictionaries to store the results
         emp_power_dict, type_I_error_dict = (
@@ -422,6 +463,7 @@ if args.t_res_ntrain:
 
         # Compute / Load p_values of every run for every n_train
         for m, n_train_run_dict in methods_dict.items():
+
             for n_train in n_train_list:
                 (
                     _,
@@ -574,33 +616,54 @@ if args.power_ncal:
         }
     elif args.task == "gaussian_mixture":
         methods_dict = {
-            "c2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st_nf":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            # "lc2st_nf_perm":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lhpd":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "c2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
         }
     elif args.task == "gaussian_linear_uniform":
         methods_dict = {
-            "c2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st_nf":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            # "lc2st_nf_perm":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lhpd":{100: 50, 500: 50, 1000: 50, 2000: 49, 5000: 37, 10000: 31},
+            "c2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
         }
     elif args.task == "bernoulli_glm":
         methods_dict = {
-            "c2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lc2st_nf":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            # "lc2st_nf_perm":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
-            "lhpd":{100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "c2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+        }
+    elif args.task == "bernoulli_glm_raw":
+        methods_dict = {
+            "c2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+        }
+    elif args.task == "lotka_volterra":
+        methods_dict = {
+            # "c2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lc2st_nf": {100: 50, 500: 50, 1000: 50, 2000: 50, 5000: 50, 10000: 50},
+            "lhpd": {100: 50, 500: 50, 1000: 50, 2000: 39, 5000: 39, 10000: 31},
         }
     else:
-        raise NotImplementedError("Only two_moons and slcp are supported for now.")
+        raise NotImplementedError(f"Task {args.task} not implemented.")
 
     # Number of runs to compute the empirical power over
-    n_runs = N_RUNS
+    # n_runs = N_RUNS
+    n_runs_dict = {
+            "two_moons": 50,
+            "slcp": 50,
+            "gaussian_mixture": 50,
+            "gausiian_linear_uniform": 50,
+            "bernoulli_glm": 50,
+            "bernoulli_glm_raw": 50,
+            "lotka_volterra": 31, # lhpd still computing
+        }
+    n_runs = n_runs_dict[args.task]
 
     # Initialize dictionaries to store the results
     emp_power_dict, type_I_error_dict = (
@@ -793,8 +856,12 @@ if args.plot:
         title = "Gaussian Linear Uniform"
     elif args.task == "bernoulli_glm":
         title = "Bernoulli GLM"
+    elif args.task == "bernoulli_glm_raw":
+        title = "Bernoulli GLM Raw"
+    elif args.task == "lotka_volterra":
+        title = "Lotka Volterra"
     else:
-        raise NotImplementedError("Only two_moons and slcp are supported for now.")
+        raise NotImplementedError(f"Task {args.task} not implemented.")
 
     # Plot results
     fig = plot_sbibm_results_n_train_n_cal(

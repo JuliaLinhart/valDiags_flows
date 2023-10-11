@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from tueplots import fonts, axes
 import matplotlib.gridspec as gridspec
-from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import cm
 
 import pandas as pd
@@ -12,11 +11,11 @@ import torch
 
 from scipy.stats import binom, uniform
 
-from valdiags.graphical_valdiags import (
+from valdiags.graphical_diagnostics import (
     PP_vals,
     compute_dfs_with_probas_marginals,
     eval_space_with_proba_intensity,
-    pp_plot_c2st,
+    pp_plot_lc2st,
 )
 
 plt.rcParams.update(fonts.neurips2022())
@@ -67,7 +66,7 @@ METRICS_DICT = {
 }
 
 
-def plot_plot_c2st_single_eval_shift(
+def plot_c2st_single_eval_shift(
     shift_list,
     t_stats_dict,
     TPR_dict,
@@ -593,7 +592,7 @@ def local_pp_plot(probas_obs, pp_vals_null_obs, method, text="", ax=None):
     if ax is None:
         ax = plt.gca()
 
-        pp_plot_c2st(
+        pp_plot_lc2st(
             ax=ax,
             probas=[probas_obs],
             pp_vals_null=pp_vals_null_obs,
@@ -668,7 +667,7 @@ def local_tstats_with_pp_plots(
     probas_obs_null = probas_obs_null[method_name]
     p_values_obs = p_values_obs[method_name][t_stat_name]
     for n, (axs1, g) in enumerate(zip(axes1, gain_list_pp_plots)):
-        pp_plot_c2st(
+        pp_plot_lc2st(
             ax=axs1,
             probas=[probas_obs[g]],
             probas_null=probas_obs_null[g],

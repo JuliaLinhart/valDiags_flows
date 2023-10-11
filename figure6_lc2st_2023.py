@@ -16,7 +16,7 @@
 #   - empirical: 100 randomly generated using prior and simulator
 
 # USAGE:
-# >> python lc2st_stats_scatter_plots_sbibm.py --task <> --observations <task/empirical> --method <lc2st/lc2st_nf>
+# >> python figure6_lc2st_2023.py --task <> --observations <task/empirical> --method <lc2st/lc2st_nf>
 
 
 import argparse
@@ -28,7 +28,7 @@ import sbibm
 
 from pathlib import Path
 from scipy import stats
-from valdiags.vanillaC2ST import sbibm_clf_kwargs
+from valdiags.c2st import sbibm_clf_kwargs
 from experiment_utils_sbibm import (
     generate_data_one_run,
     compute_test_results_npe_one_run,

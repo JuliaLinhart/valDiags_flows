@@ -11,9 +11,9 @@ from tqdm import tqdm
 import time
 
 from valdiags.test_utils import eval_htest, permute_data
-from valdiags.vanillaC2ST import t_stats_c2st
-from valdiags.localC2ST import t_stats_lc2st, lc2st_scores
-from valdiags.localHPD import t_stats_lhpd, lhpd_scores
+from valdiags.c2st import t_stats_c2st
+from valdiags.lc2st import t_stats_lc2st, lc2st_scores
+from valdiags.lhpd import t_stats_lhpd, lhpd_scores
 
 from tasks.sbibm.data_generators import (
     generate_task_data,
@@ -22,7 +22,7 @@ from tasks.sbibm.data_generators import (
 )
 from tasks.sbibm.npe_utils import sample_from_npe_obs
 
-from precompute_test_statistics_null import precompute_t_stats_null
+from valdiags.test_utils import precompute_t_stats_null
 
 
 def l_c2st_results_n_train(
@@ -74,7 +74,7 @@ def l_c2st_results_n_train(
         methods (List[str]): list of methods to use for the test.
             Defaults to ['c2st', 'lc2st', 'lc2st-nf'].
         test_stat_names (List[str]): list of test statistic names to compute empirical power for.
-            Must be compatible with the test_stat_estimator from `valdiags.test_utils.eval_htest`.
+            Must be compatible with the test_stat_estimator from `lc2st.test_utils.eval_htest`.
             Defaults to ['accuracy', 'mse', 'div'].
         seed (int): seed for reproducibility.
 
@@ -311,7 +311,7 @@ def compute_emp_power_l_c2st(
         methods (List[str]): list of methods to use for the test.
             Defaults to ['c2st', 'lc2st', 'lc2st_nf', 'lhpd'].
         test_stat_names (List[str]): list of test statistic names.
-            Must be compatible with the test_stat_estimator from `valdiags.test_utils.eval_htest`.
+            Must be compatible with the test_stat_estimator from `lc2st.test_utils.eval_htest`.
             Defaults to ['accuracy', 'mse', 'div'].
         compute_emp_power (bool): whether to compute the empirical power of the test.
             Defaults to True.
@@ -1663,9 +1663,9 @@ def compute_average_rejection_rates(
 if __name__ == "__main__":
     import torch
     import sbibm
-    from valdiags.localHPD import hpd_values, t_stats_lhpd
+    from valdiags.lhpd import hpd_values, t_stats_lhpd
     from tasks.sbibm.npe_utils import sample_from_npe_obs
-    from valdiags.localC2ST import sbibm_clf_kwargs
+    from valdiags.lc2st import sbibm_clf_kwargs
 
     import matplotlib.pyplot as plt
 

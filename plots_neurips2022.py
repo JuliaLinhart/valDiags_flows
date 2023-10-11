@@ -10,7 +10,7 @@ import seaborn as sns
 
 from scipy.stats import binom, uniform
 
-from valdiags.graphical_valdiags import PP_vals
+from valdiags.graphical_diagnostics import PP_vals
 from valdiags.multi_local_test import get_lct_results
 
 

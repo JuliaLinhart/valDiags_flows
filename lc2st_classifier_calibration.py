@@ -6,7 +6,7 @@ import torch
 
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
-from valdiags.vanillaC2ST import sbibm_clf_kwargs
+from valdiags.c2st import sbibm_clf_kwargs
 from sklearn.calibration import (
     CalibratedClassifierCV,
     CalibrationDisplay,

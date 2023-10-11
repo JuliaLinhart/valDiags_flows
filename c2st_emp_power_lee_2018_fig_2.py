@@ -51,7 +51,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     from valdiags.test_utils import eval_htest
-    from valdiags.vanillaC2ST import t_stats_c2st
+    from valdiags.c2st import t_stats_c2st
 
     from scipy.stats import multivariate_normal as mvn
 

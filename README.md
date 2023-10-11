@@ -1,13 +1,13 @@
-# Validation Diagnostics for SBI-algorithms & Normalizing Flows
+# lc2st: local classifier two-sample tests
 Official code for [L-C2ST: Local Diagnostics for Posterior Approximations in
-Simulation-Based Inference](https://arxiv.org/abs/2306.03580).
+Simulation-Based Inference](https://arxiv.org/abs/2306.03580)
 
 
 Dependencies:
 - conda environment: python 3.10
 - pip packages: `lampe`, `sbi`, `sbibm`, `seaborn`, `tueplots`, `zuko`
 
-Run `pip install -e .` within the `lc2st` folder. This will automatically install all dependencies.
+Run `pip install -e .` within the `valdiags` folder. This will automatically install all dependencies.
 
 =================================================================================
 
@@ -80,7 +80,7 @@ python figure3_lc2st_2023.py --local_ct_gain
 ### Appendix F.2: Accuracy of L-C2ST w.r.t. the true C2ST
 To generate Figure 6 (correlation scatter plots) and results for Table 3 (corresponding p-values), run:
 ```
-python lc2st_stats_scatter_plots_sbibm.py --observations <task/empirical> --method <lc2st/lc2st_nf> --task <task_name>
+python figure6_lc2st_2023.py --observations <task/empirical> --method <lc2st/lc2st_nf> --task <task_name>
 ```
 For `task_name = two_moons`, `slcp`, `gaussian_mixture`, `gaussian_linear_uniform`, `bernoulli_glm`, `bernoulli_glm_raw`.
 

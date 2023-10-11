@@ -22,8 +22,8 @@ from hnpe.posterior import build_flow, IdentityJRNMM, get_posterior
 from tasks.jrnmm.summary import summary_JRNMM
 
 from sbi.analysis.sbc import run_sbc
-from valdiags.localHPD import hpd_values, lhpd_scores, t_stats_lhpd
-from valdiags.localC2ST import lc2st_scores, t_stats_lc2st
+from valdiags.lhpd import hpd_values, lhpd_scores, t_stats_lhpd
+from valdiags.lc2st import lc2st_scores, t_stats_lc2st
 from valdiags.test_utils import eval_htest
 
 # GLOBAL VARIABLES

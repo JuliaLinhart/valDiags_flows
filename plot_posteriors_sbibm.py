@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import torch
 
 from pathlib import Path
-from valdiags.plot_pdfs import multi_corner_plots
+from valdiags.graphical_diagnostics import multi_corner_plots
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--method", type=str, default="lc2st")

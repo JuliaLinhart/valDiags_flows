@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from valdiags.localC2ST import eval_lc2st
+from .lc2st import eval_lc2st
 
 
 ## Sampling

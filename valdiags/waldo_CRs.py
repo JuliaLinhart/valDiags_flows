@@ -1,5 +1,5 @@
 # FREQUENTIST CONFIDENCE REGIONS for SBI-tasks using NEURAL POSTERIOR ESTIMATION (NPE)
-# Code adapted from WALDO git-repo:
+# Code adapted from https://github.com/lee-group-cmu/lf2i:
 #   - HPD (Highest Predictive Density)
 #   - WALDO (Calibrated CR based on the WALD statistic): quantile regression for critical value estimation.
 

@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 import torch
 
-from .localPIT_regression import (
+from .localPIT import (
     localPIT_regression_baseline,
     infer_r_alphas_baseline,
     infer_r_alphas_amortized,
 )
-from .graphical_valdiags import multi_cde_pit_values
+from .graphical_diagnostics import multi_cde_pit_values
 
 from tasks.toy_examples.embeddings import identity
 
@@ -52,9 +52,9 @@ def compute_pvalue(r_alpha_learned, r_alpha_null_list):
     output:
     - pvalue: float
         P-value p(x) = mean_{k=1:n_trials}[T_est(x) < T_null_k(x)]
-        where T_est(x) (resp. T_null_k(x)) is the output from "compute_test_statistic" 
-        for the regressed local pit values of the estimator 
-        (resp. the regressed uniform pit values of the k^th trial, i.e. under the null hypothesis), 
+        where T_est(x) (resp. T_null_k(x)) is the output from "compute_test_statistic"
+        for the regressed local pit values of the estimator
+        (resp. the regressed uniform pit values of the k^th trial, i.e. under the null hypothesis),
         evaluated at x.
     """
     T_est = compute_test_statistic(r_alpha_learned)
@@ -77,10 +77,10 @@ def multi_local_pit_regression(
     x_eval=None,
     trained_clfs=None,
 ):
-    """ Train regressors and/or infer estimated local pit values 
+    """ Train regressors and/or infer estimated local pit values
         for multivariate target data.
-    
-    inputs: 
+
+    inputs:
     - dim: int
         dimension of the multivariate target data
     - pit_values_train: list of length dim with numpy arrays of size (N, )
@@ -91,7 +91,7 @@ def multi_local_pit_regression(
         One of "localPIT_regression_baseline", "localPIT_regression_grid",
         "localPIT_regression_sample" defined in localPIT_regression.py.
     - classifier: object
-        Regression model trained to estimate the point-wise c.d.f. 
+        Regression model trained to estimate the point-wise c.d.f.
     - alphas_eval: numpy array, size (K,)
         Grid of alpha values in (0,1) to evaluate the regressor in.
         Default is None: we just train, not evaluate.
@@ -99,15 +99,15 @@ def multi_local_pit_regression(
         Observation to evaluate the trained regressors in.
         Default is None: we just train, not evaluate.
     - trained_clfs: object or list of objects
-        Trained regression model(s), that need to be evaluated in x_eval. 
+        Trained regression model(s), that need to be evaluated in x_eval.
         Default is None: the regressor(s) need to be trained.
 
-    outputs: 
-    - r_alpha_learned: dict of dicts. 
+    outputs:
+    - r_alpha_learned: dict of dicts.
         keys level 1: dimension, keys level 2: alpha-values
         One output from "infer_r-alpha..." for every dimension.
     - trained_clfs: object or list of objects
-        Trained regression model(s), as output from "localPIT_regression...". 
+        Trained regression model(s), as output from "localPIT_regression...".
     """
     r_alpha_learned = {}
     trained_clfs_new = {}
@@ -156,17 +156,17 @@ def multivariate_lct(
     return_pvalues=False,
 ):
     """ Compute LCT quantities for multivariate target data.
-        
-    inputs: 
+
+    inputs:
     - theta_train: torch.Tensor, size: (N, dim)
         dimension of the multivariate target data
     - x_train: torch.Tensor, size: (N, nb_features, 1)
     - x_eval: torch.Tensor, size: (1, nb_features, 1)
         Observation to evaluate the trained regressors in.
     - flow: class based on pyknos.nflows.distributions.base.Distribution
-        Pytorch neural network defining our Normalizing Flow, 
+        Pytorch neural network defining our Normalizing Flow,
         hence conditional (posterior) density estimator.
-    - feature_transform: function 
+    - feature_transform: function
         Default is "identity": no feature transform on x.
     - n_trials: int
         Number of trials for the null-hypothesis regression.
@@ -176,20 +176,20 @@ def multivariate_lct(
         Default is K=21.
     - alpha_max: float
         Maximum alpha-value.
-        Default is 0.99 (for the baseline regression method, otherwise it should be 1). 
+        Default is 0.99 (for the baseline regression method, otherwise it should be 1).
     - reg_method: function
         One of the functions defined in localPIT_regression.py.
         Default is "localPIT_regression_baseline".
     - classifier: object
-        Regression model trained to estimate the point-wise c.d.f. 
+        Regression model trained to estimate the point-wise c.d.f.
         Default is sklearn.MLPClassifier(alpha=0, max_iter=25000).
     - trained_clfs: object or list of objects
-        Trained regression model(s) on the estimated pit-values, 
-        that need to be evaluated in x_eval. 
+        Trained regression model(s) on the estimated pit-values,
+        that need to be evaluated in x_eval.
         Default is None: the regressor(s) need to be trained.
     - trained_clfs_null: object or list of objects
-        Trained regression model(s) on uniform pit-values (i.e. under the null hypothesis), 
-        that need to be evaluated in x_eval. 
+        Trained regression model(s) on uniform pit-values (i.e. under the null hypothesis),
+        that need to be evaluated in x_eval.
         Default is None: the regressor(s) need to be trained.
     - return_pvalues: bool
         Wheather to compute the pvalues or not.
@@ -197,7 +197,7 @@ def multivariate_lct(
 
     outputs:
     - lct_dict: dict of dicts.
-        keys level 1: different test quantities 
+        keys level 1: different test quantities
         (r_alpha_learned, r_alpha_null, test stats, pvalues, etc)
         keys level 2: dimensions of the target data.
     """
@@ -273,10 +273,10 @@ def multivariate_lct(
 def get_lct_results(lct_paths, alpha_level=0.05, n_dims=4, pvalues=True):
     """ Generate DataFrame with LCT results.
 
-    inputs: 
+    inputs:
     - lct_paths: list of strings
         Paths to files with the output from "multivariate_lct".
-        One element of the list corresponds to the lct results 
+        One element of the list corresponds to the lct results
         of one observations x_eval.
     - alpha_level: float
         Defines the (1-alpha_level) confidence level for the test.
@@ -286,11 +286,11 @@ def get_lct_results(lct_paths, alpha_level=0.05, n_dims=4, pvalues=True):
         Default is 4.
     - pvalues: bool
         Whether to output the pvalues or not.
-        Default is True. 
+        Default is True.
 
     outputs:
-    - df: pandas DataFrame 
-        Dataframe with multivaraite LCT results.  
+    - df: pandas DataFrame
+        Dataframe with multivaraite LCT results.
     """
     test_stats = {}
     if not pvalues:

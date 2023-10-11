@@ -17,6 +17,7 @@ valdiags.egg-info/*
 *_old.py
 notebooks/random_plots.ipynb
 notebooks/Toymodel_Timeseries.ipynb
+notebooks/*
 
 saved_experiments/JR-NMM/fixed_gain_3d/datasets_train.pkl
 # saved_experiments/JR-NMM/fixed_gain_3d/lc2st_results

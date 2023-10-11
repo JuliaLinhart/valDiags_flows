@@ -8,10 +8,10 @@ This repository includes the implementation of several validation methods:
 - `waldo` [[Masserano et al. (2023)]](https://arxiv.org/abs/2205.15680)
 - `c2st` [[Lopez et al. (2016)]](https://arxiv.org/abs/1610.06545) and [[Lee et al. (2018)]](https://arxiv.org/abs/1812.08927)
 
-The `notebooks` folder contains code with numerical illustrations and comparisons of these methods on
+<!-- The `notebooks` folder contains code with numerical illustrations and comparisons of these methods on
 - easy toy-examples in 1D, 2D or 3D
 - the Jansen and Rit Neural Mass Model (JRNMM) in 4D (includes the code to reproduce the figures in `multiPIT` paper)
-including posterior correction with `lc2st`.
+including posterior correction with `lc2st`. -->
 
 Several scripts provide the code to
 - evaluate `c2st` gaussian toy-examples as in [[Lee et al. (2018)]](https://arxiv.org/abs/1812.08927): `c2st_emp_power_lee_2018_fig_2.py`

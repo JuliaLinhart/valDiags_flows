@@ -19,6 +19,8 @@ notebooks/random_plots.ipynb
 notebooks/Toymodel_Timeseries.ipynb
 notebooks/JRNMM_simple_3d.ipynb
 
+
+saved_experiments/JR-NMM/fixed_gain_3d/*
 saved_experiments/JR-NMM/fixed_gain_3d/datasets_train.pkl
 # saved_experiments/JR-NMM/fixed_gain_3d/lc2st_results
 saved_experiments/JR-NMM/fixed_gain_3d/lc2st_eval_clfs

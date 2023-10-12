@@ -10,10 +10,6 @@ import numpy as np
 import torch
 import os
 
-from .c2st import t_stats_c2st
-from .lc2st import t_stats_lc2st
-from .lhpd import t_stats_lhpd
-
 
 def compute_pvalue(t_stat_est, t_stats_null):
     """Computes the p-value of a hypothesis test as the empirical estimate of:
@@ -103,6 +99,9 @@ def precompute_t_stats_null(
     t_stats_null_path,
     observation_dict,
     x_cal,
+    t_stats_fn_c2st,
+    t_stats_fn_lc2st,
+    t_stats_fn_lhpd,
     kwargs_c2st,
     kwargs_lc2st,
     kwargs_lhpd,
@@ -157,7 +156,7 @@ def precompute_t_stats_null(
                 print()
                 print("C2ST: TRAIN / EVAL CLASSIFIERS ...")
                 print()
-                t_stats_null = t_stats_c2st(
+                t_stats_null = t_stats_fn_c2st(
                     null_hypothesis=True,
                     metrics=metrics,
                     list_P_null=list_P_null,
@@ -175,7 +174,7 @@ def precompute_t_stats_null(
                 print()
                 print("L-C2ST: TRAINING CLASSIFIERS on the joint ...")
                 print()
-                _, _, trained_clfs_null = t_stats_lc2st(
+                _, _, trained_clfs_null = t_stats_fn_lc2st(
                     null_hypothesis=True,
                     metrics=metrics,
                     list_P_null=list_P_null,
@@ -200,7 +199,7 @@ def precompute_t_stats_null(
                 t_stats_null = {}
                 probas_null = {}
                 for key_obs, observation in observation_dict.items():
-                    t_stats_null[key_obs], probas_null[key_obs] = t_stats_lc2st(
+                    t_stats_null[key_obs], probas_null[key_obs] = t_stats_fn_lc2st(
                         null_hypothesis=True,
                         metrics=metrics,
                         list_P_null=list_P_null,
@@ -227,7 +226,7 @@ def precompute_t_stats_null(
                 print()
                 print("L-HPD: TRAINING CLASSIFIERS on the joint ...")
                 print()
-                _, _, trained_clfs_null = t_stats_lhpd(
+                _, _, trained_clfs_null = t_stats_fn_lhpd(
                     metrics=["mse"],
                     Y=list_P_null[0],  # for dim inside lhpd_scores
                     X=x_cal,
@@ -247,7 +246,7 @@ def precompute_t_stats_null(
                 t_stats_null = {}
                 probas_null = {}
                 for key_obs, observation in observation_dict.items():
-                    t_stats_null[key_obs], probas_null[key_obs] = t_stats_lhpd(
+                    t_stats_null[key_obs], probas_null[key_obs] = t_stats_fn_lhpd(
                         metrics=["mse"],
                         Y=list_P_null[0],  # for dim inside lhpd_scores
                         X=x_cal,

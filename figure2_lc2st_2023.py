@@ -39,7 +39,7 @@ import numpy as np
 import torch
 import sbibm
 
-from valdiags.c2st import sbibm_clf_kwargs
+from valdiags.c2st import sbibm_clf_kwargs #, t_stats_c2st
 
 from experiment_utils_sbibm import (
     l_c2st_results_n_train,
@@ -308,6 +308,7 @@ t_stats_null_c2st_nf = {ncal: None for ncal in n_cal_list}
 #             n_trials_null=N_TRIALS_PRECOMPUTE,
 #             t_stats_null_path=task_path / "t_stats_null" / eval_params,
 #             methods=["c2st_nf"],
+#             t_stats_fn_c2st=t_stats_c2st,
 #             kwargs_c2st=kwargs_c2st,
 #             save_results=True,
 #             load_results=True,

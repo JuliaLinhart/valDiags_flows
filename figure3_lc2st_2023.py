@@ -30,13 +30,12 @@
 import argparse
 from pathlib import Path
 import os
-from functools import partial
 
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-from lc2st.lc2st import sbibm_clf_kwargs, lc2st_scores
+from lc2st.lc2st import sbibm_clf_kwargs, lc2st_scores, t_stats_lc2st
 
 from tasks.jrnmm.prior import prior_JRNMM
 
@@ -262,8 +261,10 @@ if args.local_ct_gain:
             t_stats_null_path=PATH_EXPERIMENT / "t_stats_null" / eval_params,
             methods=["lc2st_nf"],  # , "lhpd"],
             metrics=METRICS_LC2ST,
+            t_stats_fn_lc2st=t_stats_lc2st,
+            # t_stats_fn_lhpd=t_stats_lhpd,
             kwargs_lc2st=kwargs_lc2st,
-            kwargs_lhpd=kwargs_lhpd,
+            # kwargs_lhpd=kwargs_lhpd,
             save_results=True,
             load_results=True,
             return_predicted_probas=True,

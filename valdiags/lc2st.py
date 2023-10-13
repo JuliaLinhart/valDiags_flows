@@ -277,39 +277,36 @@ def lc2st_scores(
                 )
             clf_list.append(clf_n)
 
-        if not eval:
-            return None, None, clf_list
-
-        # evaluate classifiers over cv-folds
-        for n, (train_index, val_index) in enumerate(cv_splits):
-            # get val split
-            P_val = P[val_index]  # ok if P is independent of x
-            if P_eval is not None:
-                P_val = P_eval[val_index]
-            if Q_eval is not None:
-                Q_val = Q_eval[val_index]
+            if not eval:
+                scores, probas = None, None
             else:
-                Q_val = None
-
-            # eval n^th classifier
-            accuracy, proba = eval_lc2st(
-                P=P_val,
-                Q=Q_val,
-                x_eval=x_eval,
-                clf=clf_list[n],
-                single_class_eval=single_class_eval,
-            )
-            # compute metrics
-            for m in metrics:
-                if "accuracy" in m:
-                    scores[m].append(accuracy)
+                P_val = P[val_index]  # ok if P is independent of x
+                if P_eval is not None:
+                    P_val = P_eval[val_index]
+                if Q_eval is not None:
+                    Q_val = Q_eval[val_index]
                 else:
-                    scores[m].append(
-                        compute_metric(
-                            proba, metrics=[m], single_class_eval=single_class_eval
-                        )[m]
-                    )
-            probas.append(proba)
+                    Q_val = None
+
+                # eval n^th classifier
+                accuracy, proba = eval_lc2st(
+                    P=P_val,
+                    Q=Q_val,
+                    x_eval=x_eval,
+                    clf=clf_list[n],
+                    single_class_eval=single_class_eval,
+                )
+
+                for m in metrics:
+                    if "accuracy" in m:
+                        scores[m].append(accuracy)
+                    else:
+                        scores[m].append(
+                            compute_metric(
+                                proba, metrics=[m], single_class_eval=single_class_eval
+                            )[m]
+                        )
+                probas.append(proba)
 
     if return_clfs:
         return scores, probas, clf_list
@@ -457,9 +454,7 @@ def t_stats_lc2st(
                 joint_P_x = torch.cat([P, x_P], dim=1)
                 joint_Q_x = torch.cat([Q, x_Q], dim=1)
                 joint_P_x_perm, joint_Q_x_perm = permute_data(
-                    joint_P_x,
-                    joint_Q_x,
-                    seed=t,
+                    joint_P_x, joint_Q_x, seed=t,
                 )
                 P_t = joint_P_x_perm[:, : P.shape[-1]]
                 x_P_t = joint_P_x_perm[:, P.shape[-1] :]

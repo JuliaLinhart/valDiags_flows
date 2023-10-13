@@ -269,17 +269,10 @@ if not os.path.exists(results_path):
 # Classifier parameters
 sbibm_kwargs = sbibm_clf_kwargs(ndim=dim_theta)
 
-# kwargs for c2st_scores function
-kwargs_c2st = {
+# kwargs for (l)c2st_scores function
+kwargs_l_c2st = {
     "cross_val": CROSS_VAL,
     "n_ensemble": N_ENSEMBLE,
-    "clf_kwargs": sbibm_kwargs,
-}
-# kwargs for lc2st_scores function
-kwargs_lc2st = {
-    "cross_val": CROSS_VAL,
-    "n_ensemble": N_ENSEMBLE,
-    "single_class_eval": True,
     "clf_kwargs": sbibm_kwargs,
 }
 
@@ -346,8 +339,8 @@ if args.t_res_ntrain:
         n_trials_null=args.n_trials_null,
         t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
         n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
-        kwargs_c2st=kwargs_c2st,
-        kwargs_lc2st=kwargs_lc2st,
+        kwargs_c2st=kwargs_l_c2st,
+        kwargs_lc2st=kwargs_l_c2st,
         kwargs_lhpd=kwargs_lhpd,
         task_path=task_path,
         t_stats_null_path=task_path / "t_stats_null" / eval_params,
@@ -467,8 +460,8 @@ if args.t_res_ntrain:
                     n_cal_list=[n_cal],
                     n_eval=n_eval,
                     n_trials_null=args.n_trials_null,
-                    kwargs_c2st=kwargs_c2st,
-                    kwargs_lc2st=kwargs_lc2st,
+                    kwargs_c2st=kwargs_l_c2st,
+                    kwargs_lc2st=kwargs_l_c2st,
                     kwargs_lhpd=kwargs_lhpd,
                     t_stats_null_c2st_nf=None,
                     n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
@@ -684,8 +677,8 @@ if args.power_ncal:
                 n_cal_list=[n_cal],
                 n_eval=n_eval,
                 n_trials_null=args.n_trials_null,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
+                kwargs_c2st=kwargs_l_c2st,
+                kwargs_lc2st=kwargs_l_c2st,
                 kwargs_lhpd=kwargs_lhpd,
                 t_stats_null_c2st_nf=None,
                 n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
@@ -781,8 +774,8 @@ if args.runtime:
                 n_trials_null=0,  # just look at runtime to compute test statistics (no null hypothesis)
                 t_stats_null_c2st_nf=t_stats_null_c2st_nf[n_cal],
                 n_trials_null_precompute=N_TRIALS_PRECOMPUTE,
-                kwargs_c2st=kwargs_c2st,
-                kwargs_lc2st=kwargs_lc2st,
+                kwargs_c2st=kwargs_l_c2st,
+                kwargs_lc2st=kwargs_l_c2st,
                 kwargs_lhpd=kwargs_lhpd,
                 task_path=task_path,
                 t_stats_null_path=task_path / "t_stats_null" / eval_params,

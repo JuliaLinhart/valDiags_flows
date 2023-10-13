@@ -35,7 +35,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-from lc2st.lc2st import sbibm_clf_kwargs, lc2st_scores, t_stats_lc2st
+from valdiags.lc2st import sbibm_clf_kwargs, lc2st_scores, t_stats_lc2st
 
 from tasks.jrnmm.prior import prior_JRNMM
 
@@ -203,7 +203,6 @@ eval_params = f"n_eval_{n_eval}_n_ensemble_{N_ENSEMBLE}_cross_val_{CROSS_VAL}"
 kwargs_lc2st = {
     "cross_val": CROSS_VAL,
     "n_ensemble": N_ENSEMBLE,
-    "single_class_eval": True,
     "clf_kwargs": sbibm_kwargs,
 }
 

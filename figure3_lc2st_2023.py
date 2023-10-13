@@ -106,10 +106,7 @@ parser.add_argument(
 
 # Experiment parameters
 parser.add_argument(
-    "--global_ct",
-    "-gct",
-    action="store_true",
-    help="Exp 1: Global Tests results.",
+    "--global_ct", "-gct", action="store_true", help="Exp 1: Global Tests results.",
 )
 
 parser.add_argument(
@@ -127,10 +124,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--plot",
-    "-p",
-    action="store_true",
-    help="Plot final figures only.",
+    "--plot", "-p", action="store_true", help="Plot final figures only.",
 )
 
 # ====== EXPERIMENTS ======
@@ -408,9 +402,9 @@ if args.plot:
 
             samples_z = npe_jrnmm._flow._distribution.sample(n_eval).detach()
             observation_emb = npe_jrnmm._flow._embedding_net(observation)
-            samples_theta = npe_jrnmm._flow._transform.inverse(samples_z, observation_emb)[
-                0
-            ].detach()
+            samples_theta = npe_jrnmm._flow._transform.inverse(
+                samples_z, observation_emb
+            )[0].detach()
 
             _, probas = lc2st_scores(
                 P=None,
@@ -425,10 +419,7 @@ if args.plot:
 
             # Pairplot with ground truth and Predicted Probability (PP) intensity
             fig = plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
-                theta_gt=theta_gt,
-                probas=probas,
-                P_eval=samples_theta,
-                n_bins=20,
+                theta_gt=theta_gt, probas=probas, P_eval=samples_theta, n_bins=20,
             )
             plt.savefig(
                 PATH_EXPERIMENT / f"local_tests/pairplot_with_intensity_g_{g}.pdf"

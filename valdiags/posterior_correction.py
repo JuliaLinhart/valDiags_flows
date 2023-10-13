@@ -46,18 +46,13 @@ def clf_ratio_obs(batch, x_obs, clfs, inv_flow_transform=None):
     if inv_flow_transform is not None:
         batch = inv_flow_transform(batch)
     proba = np.mean(
-        [eval_lc2st(batch.numpy(), x_obs, clf=clf)[1] for clf in clfs],
-        axis=0,
+        [eval_lc2st(batch.numpy(), x_obs, clf=clf)[1] for clf in clfs], axis=0,
     )
     return (1 - proba) / proba
 
 
 def corrected_pdf_old(
-    batch,
-    dist,
-    x_obs,
-    clfs,
-    inv_flow_transform=None,
+    batch, dist, x_obs, clfs, inv_flow_transform=None,
 ):
     dist_pdf = dist.log_prob(batch).exp().detach().numpy()
 

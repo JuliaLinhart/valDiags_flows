@@ -16,12 +16,7 @@ DEFAULT_CLF = MLPClassifier(alpha=0, max_iter=25000)
 
 
 def hpd_values(
-    Y,
-    est_log_prob_fn,
-    est_sample_fn,
-    X=None,
-    n_samples=1000,
-    verbose=True,
+    Y, est_log_prob_fn, est_sample_fn, X=None, n_samples=1000, verbose=True,
 ):
     """Highest Predictive Density values for a (conditional) estimator q:
 

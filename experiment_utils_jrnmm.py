@@ -250,9 +250,7 @@ def global_coverage_tests(
             from sbi.inference.posteriors.direct_posterior import DirectPosterior
 
             posterior_sbc = DirectPosterior(
-                posterior_estimator=npe,
-                prior=prior,
-                x_shape=x_cal[0][None, :].shape,
+                posterior_estimator=npe, prior=prior, x_shape=x_cal[0][None, :].shape,
             )
             # Run SBC
             sbc = run_sbc(theta_cal, x_cal, posterior=posterior_sbc)

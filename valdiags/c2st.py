@@ -233,10 +233,7 @@ def c2st_scores(
                 )
 
             accuracy, proba = eval_c2st(
-                P=P_eval,
-                Q=Q_eval,
-                clf=clf,
-                single_class_eval=single_class_eval,
+                P=P_eval, Q=Q_eval, clf=clf, single_class_eval=single_class_eval,
             )
 
             ens_accuracies.append(accuracy)
@@ -458,22 +455,13 @@ def sbibm_clf_kwargs(ndim):
 
 
 def c2st_sbibm(
-    P,
-    Q,
-    metric="accuracy",
-    classifier=None,
-    **kwargs,  # kwargs for c2st_scores
+    P, Q, metric="accuracy", classifier=None, **kwargs,  # kwargs for c2st_scores
 ):
     ndim = P.shape[-1]
     if classifier is None:
         clf_class = MLPClassifier
         clf_kwargs = sbibm_clf_kwargs(ndim)
     scores, _ = c2st_scores(
-        P,
-        Q,
-        metrics=[metric],
-        clf_class=clf_class,
-        clf_kwargs=clf_kwargs,
-        **kwargs,
+        P, Q, metrics=[metric], clf_class=clf_class, clf_kwargs=clf_kwargs, **kwargs,
     )
     return torch.tensor([np.mean(scores[metric])])

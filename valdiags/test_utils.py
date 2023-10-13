@@ -89,7 +89,6 @@ def permute_data(P, Q, seed=42):
     return X_perm[:n_samples], X_perm[n_samples:]
 
 
-
 def precompute_t_stats_null(
     metrics,
     n_cal,

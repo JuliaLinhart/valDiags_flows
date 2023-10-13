@@ -95,9 +95,7 @@ def eval_lc2st(P, x_eval, clf):
     P_x_eval = np.concatenate([P, x_eval.repeat(len(P), 1)], axis=1)
 
     # evaluate the classifier: accuracy and predicted probabilities for class 0 (P|x_eval)
-    accuracy, proba = eval_c2st(
-        P=P_x_eval, Q=None, clf=clf, single_class_eval=True
-    )
+    accuracy, proba = eval_c2st(P=P_x_eval, Q=None, clf=clf, single_class_eval=True)
 
     return accuracy, proba
 
@@ -211,11 +209,7 @@ def lc2st_scores(
                     In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
                 )
 
-            accuracy, proba = eval_lc2st(
-                P=P_eval,
-                x_eval=x_eval,
-                clf=clf_n,
-            )
+            accuracy, proba = eval_lc2st(P=P_eval, x_eval=x_eval, clf=clf_n,)
 
             ens_accuracies.append(accuracy)
             ens_probas.append(proba)
@@ -230,9 +224,9 @@ def lc2st_scores(
             if "accuracy" in m:
                 scores[m] = accuracy
             else:
-                scores[m] = compute_metric(
-                    probas, metrics=[m], single_class_eval=True
-                )[m]
+                scores[m] = compute_metric(probas, metrics=[m], single_class_eval=True)[
+                    m
+                ]
 
     else:
         # initialize scores as dict of empty lists
@@ -269,20 +263,16 @@ def lc2st_scores(
                     P_val = P_eval[val_index]
 
                 # eval n^th classifier
-                accuracy, proba = eval_lc2st(
-                    P=P_val,
-                    x_eval=x_eval,
-                    clf=clf_list[n],
-                )
+                accuracy, proba = eval_lc2st(P=P_val, x_eval=x_eval, clf=clf_list[n],)
 
                 for m in metrics:
                     if "accuracy" in m:
                         scores[m].append(accuracy)
                     else:
                         scores[m].append(
-                            compute_metric(
-                                proba, metrics=[m], single_class_eval=True
-                            )[m]
+                            compute_metric(proba, metrics=[m], single_class_eval=True)[
+                                m
+                            ]
                         )
                 probas.append(proba)
 
@@ -322,11 +312,6 @@ def t_stats_lc2st(
     - Under the null distribution, we either use the pre-computed scores (if `t_stats_null` is provided)
     or we compute the test statistics for each trial using `lc2st_scores` on each element of the provided
     lists of null samples.
-
-    In sbi, we typically do not have access to data from both classes during evaluation, therefore we cannot
-    use the permutation method to simulate the null hypothesis as in the classical c2st setting.
-    This is why this method is not implemented here. (we could add it in the future if needed with a
-    statement "if Q_eval is not None: ... else: ...").
 
     Args:
         P (numpy.array): data drawn from P

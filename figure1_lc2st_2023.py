@@ -65,18 +65,9 @@ USE_PERMUTATION = (
 
 # Test statistics
 METRICS = {
-    "accuracy": [
-        "acc_ref",
-        "acc_single_class",
-    ],
-    "mse": [
-        "mse_ref",
-        "mse_single_class",
-    ],
-    "div": [
-        "max_ref",
-        "max_single_class",
-    ],
+    "accuracy": ["acc_ref", "acc_single_class",],
+    "mse": ["mse_ref", "mse_single_class",],
+    "div": ["max_ref", "max_single_class",],
 }
 
 # ====== Parse arguments ======
@@ -85,10 +76,7 @@ parser = argparse.ArgumentParser()
 
 # Data parameters
 parser.add_argument(
-    "--dim",
-    type=int,
-    default=2,
-    help="Dimension of the data (number of features).",
+    "--dim", type=int, default=2, help="Dimension of the data (number of features).",
 )
 
 parser.add_argument(
@@ -333,8 +321,7 @@ if args.power_shift and not args.plot:
             if os.path.exists(PATH_EXPERIMENT + "t_stats_null/" + filename):
                 # Load null scores if they exist ...
                 scores_null = np.load(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename,
-                    allow_pickle=True,
+                    PATH_EXPERIMENT + "t_stats_null/" + filename, allow_pickle=True,
                 ).item()
             else:
                 # ... otherwise, compute them
@@ -370,8 +357,7 @@ if args.power_shift and not args.plot:
                 if not os.path.exists(PATH_EXPERIMENT + "t_stats_null/"):
                     os.makedirs(PATH_EXPERIMENT + "t_stats_null/")
                 np.save(
-                    PATH_EXPERIMENT + "t_stats_null/" + filename,
-                    scores_null,
+                    PATH_EXPERIMENT + "t_stats_null/" + filename, scores_null,
                 )
 
         else:

@@ -57,9 +57,7 @@ def cde_pit_values(samples_theta, samples_x, flow, local=False):
 
 
 def multi_cde_pit_values(
-    samples_theta,
-    samples_x,
-    flow,
+    samples_theta, samples_x, flow,
 ):
     """Compute PIT-values for multivaraite target data,
     computed on N samples (theta, x) from the joint.
@@ -101,9 +99,7 @@ def cde_pit_values_zuko(target, context, flow):
 
 
 def multi_cde_pit_values_zuko(
-    samples_theta,
-    samples_x,
-    flow,
+    samples_theta, samples_x, flow,
 ):
     """Compute PIT-values for multivaraite target data,
     computed on N samples (theta, x) from the joint.

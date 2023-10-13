@@ -881,8 +881,7 @@ def generate_data_one_run(
                     task_path / f"reference_posterior_samples_n_cal_{n_cal}.pkl",
                 )
             torch.save(
-                joint_samples_cal,
-                task_path / f"joint_samples_n_cal_{n_cal}.pkl",
+                joint_samples_cal, task_path / f"joint_samples_n_cal_{n_cal}.pkl",
             )
 
     # Eval set for fixed task data (no joint samples)

@@ -45,7 +45,9 @@ parser.add_argument(
 parser.add_argument(
     "--experiment", "-e", type=str, required=True, choices=["clf_eval", "clf_choice"]
 )
-parser.add_argument("--param", "-p", type=str, default="l2_reg", choices=["l2_reg", "hf_nl"])
+parser.add_argument(
+    "--param", "-p", type=str, default="l2_reg", choices=["l2_reg", "hf_nl"]
+)
 parser.add_argument("--cross_val", "-cv", action="store_true")
 parser.add_argument("--calibration", "-cal", action="store_true")
 parser.add_argument(
@@ -53,11 +55,7 @@ parser.add_argument(
     "-s",
     type=str,
     default="accuracy",
-    choices=[
-        "accuracy",
-        "neg_log_loss",
-        "neg_brier_score",
-    ],
+    choices=["accuracy", "neg_log_loss", "neg_brier_score",],
 )
 args = parser.parse_args()
 
@@ -106,12 +104,15 @@ if args.task == "jrnmm":
         if not os.path.exists(PATH_EXPERIMENT / f"npe_samples_{name}.pkl"):
             npe_samples = []
             for x, z in tqdm(
-                zip(x_samples, base_dist_samples), desc=f"Sampling from reference ({name})"
+                zip(x_samples, base_dist_samples),
+                desc=f"Sampling from reference ({name})",
             ):
                 x = x[None, :]
                 z = z[None, :]
                 x_emb = npe._flow._embedding_net(x)
-                z_transformed = npe._flow._transform.inverse(z, context=x_emb)[0].detach()
+                z_transformed = npe._flow._transform.inverse(z, context=x_emb)[
+                    0
+                ].detach()
                 npe_samples.append(z_transformed)
             npe_samples = torch.stack(npe_samples)[:, 0, :]
             torch.save(npe_samples, PATH_EXPERIMENT / f"npe_samples_{name}.pkl")
@@ -245,9 +246,7 @@ if args.cross_val:
     scores_cv = []
     for i, (clf, name) in tqdm(enumerate(clf_list), desc="CV", total=len(clf_list)):
         scores_cv.append(
-            cross_val_score(
-                clf, features_cal, labels_cal, scoring=args.scoring
-            ).mean()
+            cross_val_score(clf, features_cal, labels_cal, scoring=args.scoring).mean()
         )
 
     # plot cross validation scores
@@ -263,7 +262,7 @@ if args.cross_val:
     if args.scoring == "accuracy":
         plt.ylim(0.45, 1)
     elif args.scoring == "neg_log_loss":
-        plt.ylim(min(scores_cv)-0.1, 0)
+        plt.ylim(min(scores_cv) - 0.1, 0)
     plt.title("MLP CV scores" + f"\n ({experiment_name})")
     plt.savefig(
         PATH_EXPERIMENT

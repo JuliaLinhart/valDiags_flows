@@ -66,7 +66,6 @@ for n in args.num_observation:
         ["Reference", "NPE"],
         ["blue", "orange"],
         labels=labels,
-        title=f"{args.task} - npe_{args.n_train} - obs_{n}"
-        + f"\n({args.method})",
+        title=f"{args.task} - npe_{args.n_train} - obs_{n}" + f"\n({args.method})",
     )
     plt.show()

@@ -67,12 +67,7 @@ METRICS_DICT = {
 
 
 def plot_c2st_single_eval_shift(
-    shift_list,
-    t_stats_dict,
-    TPR_dict,
-    TPR_std_dict,
-    shift_name,
-    clf_name,
+    shift_list, t_stats_dict, TPR_dict, TPR_std_dict, shift_name, clf_name,
 ):
     plt.rcParams["figure.figsize"] = (10, 5)
 
@@ -650,12 +645,7 @@ def local_tstats_with_pp_plots(
 
     # test statistics
     ax = plot_local_t_stats_gain(
-        gain_dict,
-        t_stats_obs,
-        t_stats_obs_null,
-        methods=methods,
-        labels=labels,
-        ax=ax,
+        gain_dict, t_stats_obs, t_stats_obs_null, methods=methods, labels=labels, ax=ax,
     )
     ax.set_title("Local Test statistics")
 
@@ -762,11 +752,7 @@ PARAMETER_DICT = {
 
 
 def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
-    theta_gt,
-    probas,
-    P_eval,
-    n_bins=20,
-    cmap=cm.get_cmap("Spectral_r"),
+    theta_gt, probas, P_eval, n_bins=20, cmap=cm.get_cmap("Spectral_r"),
 ):
     plt.rcParams["figure.figsize"] = (9, 9)
 
@@ -808,7 +794,6 @@ def plot_pairgrid_with_groundtruth_and_proba_intensity_lc2st(
             # plot points
             axs[j][i].scatter(theta_gt[i], theta_gt[j], color="black", s=15)
             axs[i][j].set_visible(False)
-
 
     plt.subplots_adjust(bottom=0.1, right=0.8, top=0.9)
     cax = plt.axes([0.82, 0.1, 0.075, 0.8])

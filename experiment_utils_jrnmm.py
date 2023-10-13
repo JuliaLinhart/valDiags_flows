@@ -9,22 +9,21 @@
 # requires a special R-environment.
 
 # IMPORTS
+import numpy as np
 import os
 import time
-from functools import partial
 import torch
-import numpy as np
-from tqdm import tqdm
 
+from functools import partial
 from hnpe.misc import make_label
 from hnpe.inference import run_inference
 from hnpe.posterior import build_flow, IdentityJRNMM, get_posterior
-from tasks.jrnmm.summary import summary_JRNMM
-
-from sbi.analysis.sbc import run_sbc
 from valdiags.lhpd import hpd_values, lhpd_scores, t_stats_lhpd
 from valdiags.lc2st import lc2st_scores, t_stats_lc2st
 from valdiags.test_utils import eval_htest
+from sbi.analysis.sbc import run_sbc
+from tasks.jrnmm.summary import summary_JRNMM
+from tqdm import tqdm
 
 # GLOBAL VARIABLES
 

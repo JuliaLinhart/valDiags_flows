@@ -1,15 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
-
-import matplotlib.pyplot as plt
-from tueplots import fonts, axes
 import matplotlib.gridspec as gridspec
-from matplotlib import cm
-
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import torch
-
-from scipy.stats import binom, uniform
 
 from valdiags.graphical_diagnostics import (
     PP_vals,
@@ -17,6 +10,10 @@ from valdiags.graphical_diagnostics import (
     eval_space_with_proba_intensity,
     pp_plot_lc2st,
 )
+from matplotlib import cm
+from scipy.stats import binom, uniform
+from tueplots import fonts, axes
+
 
 plt.rcParams.update(fonts.neurips2022())
 plt.rcParams.update(axes.color(base="black"))

@@ -1,12 +1,11 @@
 # L-C2ST: Local C2ST
 # Implementation based on the vanilla C2ST method implemented in `c2st.py`.
 
-from tqdm import tqdm
-
 import numpy as np
 
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
+from tqdm import tqdm
 
 from .c2st import (
     train_c2st,
@@ -205,8 +204,7 @@ def lc2st_scores(
         for clf_n in clf_list:
             if P_eval is None:
                 raise ValueError(
-                    "If cross_val=False and in-sample=False, at least P_eval must be provided.\
-                    In this case an out-of-sample evaluation is performed (single-class if Q_eval=None)."
+                    "If cross_val=False and in-sample=False, at P_eval must be provided."
                 )
 
             accuracy, proba = eval_lc2st(P=P_eval, x_eval=x_eval, clf=clf_n,)

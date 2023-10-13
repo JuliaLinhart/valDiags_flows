@@ -16,23 +16,23 @@
 #   - empirical: 100 randomly generated using prior and simulator
 
 # USAGE:
-# >> python figure6_lc2st_2023.py --task <> --observations <task/empirical> --method <lc2st/lc2st_nf>
+# >> python figure6_lc2st_neurips2023.py --task <> --observations <task/empirical> --method <lc2st/lc2st_nf>
 
 
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import torch
 import sbibm
+import torch
 
-from pathlib import Path
-from scipy import stats
-from valdiags.c2st import sbibm_clf_kwargs
 from experiment_utils_sbibm import (
     generate_data_one_run,
     compute_test_results_npe_one_run,
 )
+from valdiags.c2st import sbibm_clf_kwargs
+from pathlib import Path
+from scipy import stats
 from tueplots import fonts, axes
 
 # Plotting parameters

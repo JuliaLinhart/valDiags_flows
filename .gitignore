@@ -43,14 +43,14 @@ saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_
 saved_experiments/lc2st_2023/exp_3/t_stats_null/n_eval_10000_n_ensemble_1_cross_val_False/lhpd_stats_null_nt_1000_n_cal_10000.pkl
 saved_experiments/lc2st_2023/exp_3/local_tests/alpha_0.05_n_trials_null_1000/n_eval_10000_n_ensemble_1_cross_val_False/*lhpd*.pkl
 
-saved_experiments/lc2st_2023/exp_2/*/figures/*
-saved_experiments/lc2st_2023/exp_2/*/t_stats_null/*
+saved_experiments/lc2st_2023/exp_2/*/figures
+saved_experiments/lc2st_2023/exp_2/*/t_stats_null
 
-saved_experiments/lc2st_2023/exp_1/t_stats_null/*
-saved_experiments/lc2st_2023/exp_1/figures/*
+saved_experiments/lc2st_2023/exp_1/t_stats_null
+saved_experiments/lc2st_2023/exp_1/figures
 
-saved_experiments/lc2st_2023/exp_2/*/npe_*/t_stats_null/*
-saved_experiments/lc2st_2023/exp_2/*/npe_*/results/*
+saved_experiments/lc2st_2023/exp_2/*/npe_*/t_stats_null
+saved_experiments/lc2st_2023/exp_2/*/npe_*/results
 
 saved_experiments/lc2st_2023/exp_2/*/scatter_plots/data*.pkl
 
@@ -65,5 +65,7 @@ divergence-test.py
 lc2st_gaussian_shift.py
 lc2st_null_hyp_precision.py
 
-
+# tests
+saved_experiments/lc2st_2023/exp_2/test
+saved_experiments/lc2st_2023/exp_3/test
 

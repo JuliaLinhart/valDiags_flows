@@ -1,28 +1,23 @@
 # Functions to run experiments on sbibm tasks with npe-flows
 
 # IMPORTS
-import os
 import copy
-
-import torch
 import numpy as np
-
-from tqdm import tqdm
+import os
 import time
+import torch
 
-from valdiags.test_utils import eval_htest, permute_data
+from valdiags.test_utils import eval_htest, permute_data, precompute_t_stats_null
 from valdiags.c2st import t_stats_c2st
 from valdiags.lc2st import t_stats_lc2st, lc2st_scores
 from valdiags.lhpd import t_stats_lhpd, lhpd_scores
-
 from tasks.sbibm.data_generators import (
     generate_task_data,
     generate_npe_data_for_c2st,
     generate_npe_data_for_lc2st,
 )
 from tasks.sbibm.npe_utils import sample_from_npe_obs
-
-from valdiags.test_utils import precompute_t_stats_null
+from tqdm import tqdm
 
 
 def l_c2st_results_n_train(
@@ -126,7 +121,9 @@ def l_c2st_results_n_train(
             t_stats_null_path=t_stats_null_path,
             save_results=True,
             load_results=True,
-            # args only for c2st
+            # args only for lc2st
+            t_stats_fn_c2st=None,
+            t_stats_fn_lhpd=None,
             kwargs_c2st=None,
             kwargs_lhpd=None,
         )["lc2st_nf"]
@@ -148,7 +145,9 @@ def l_c2st_results_n_train(
             t_stats_null_path=t_stats_null_path,
             save_results=True,
             load_results=True,
-            # args only for c2st and lc2st
+            # args only for lhpd
+            t_stats_fn_c2st=None,
+            t_stats_fn_lc2st=None,
             kwargs_c2st=None,
             kwargs_lc2st=None,
         )["lhpd"]
@@ -590,6 +589,7 @@ def compute_emp_power_l_c2st(
                         save_results=False,
                         load_results=False,
                         # args only for c2st
+                        t_stats_fn_c2st=None,
                         kwargs_c2st=None,
                     )[m]
 
@@ -1426,7 +1426,6 @@ def compute_test_results_npe_one_run(
                         # kwargs for t_stats_estimator
                         x_eval=observation,
                         P_eval=P_eval_obs[num_observation],
-                        Q_eval=None,
                         use_permutation=True,
                         n_trials_null=n_trials_null,
                         return_probas=False,

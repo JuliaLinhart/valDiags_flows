@@ -11,41 +11,37 @@
 #   - exp 2: Compute the empirical power under distribution shift for estimated classifier
 
 # USAGE:
-# >> python figure1_lc2st_2023.py --opt_bayes --t_shift
-# >> python figure1_lc2st_2023.py --power_shift
-# >> python figure1_lc2st_2023.py --plot
+# >> python figure1_lc2st_neurips2023.py --opt_bayes --t_shift
+# >> python figure1_lc2st_neurips2023.py --power_shift
+# >> python figure1_lc2st_neurips2023.py --plot
 
 
 # ====== IMPORTS ======
 
 import argparse
-import os
-from functools import partial
-
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import os
 import torch
-
-from scipy.stats import multivariate_normal as mvn
-from scipy.stats import t
-
-from sklearn.discriminant_analysis import (
-    LinearDiscriminantAnalysis,
-    QuadraticDiscriminantAnalysis,
-)
-from sklearn.neural_network import MLPClassifier
-from valdiags.c2st import c2st_scores, t_stats_c2st
 
 from classifiers.optimal_bayes import (
     opt_bayes_scores,
     AnalyticGaussianLQDA,
     AnalyticStudentClassifier,
 )
-
 from c2st_p_values_roc import c2st_p_values_tfpr
+from functools import partial
+from valdiags.c2st import c2st_scores, t_stats_c2st
 from valdiags.test_utils import eval_htest
+from plots_lc2st_neurips2023 import plot_c2st_single_eval_shift
+from scipy.stats import multivariate_normal as mvn
+from scipy.stats import t
+from sklearn.discriminant_analysis import (
+    LinearDiscriminantAnalysis,
+    QuadraticDiscriminantAnalysis,
+)
+from sklearn.neural_network import MLPClassifier
 
-from plots_lc2st2023 import plot_c2st_single_eval_shift
 
 # ====== GLOBAL PARAMETERS ======
 

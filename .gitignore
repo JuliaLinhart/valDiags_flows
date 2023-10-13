@@ -17,6 +17,7 @@ valdiags.egg-info/*
 *_old.py
 notebooks/random_plots.ipynb
 notebooks/Toymodel_Timeseries.ipynb
+notebooks/localPIT_notes.ipynb
 notebooks/JRNMM_simple_3d.ipynb
 
 
